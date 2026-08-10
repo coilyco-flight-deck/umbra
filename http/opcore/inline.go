@@ -195,7 +195,8 @@ func (p *inlineParser) parseProxy(n *kdl.Node) error {
 }
 
 // applyInlineGrantChild dispatches one child of a `can` operation body onto d,
-// failing closed on anything outside path | query | body | set | fail-when.
+// failing closed on anything outside path | query | body | set | fail-when |
+// describe.
 func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 	switch c.Name() {
 	case "path":
@@ -240,6 +241,19 @@ func applyInlineBody(d *Descriptor, c *kdl.Node) error {
 
 func applyInlineGrantControlChild(d *Descriptor, c *kdl.Node) error {
 	switch c.Name() {
+	case "describe":
+		if d.Describe != "" {
+			return fmt.Errorf("duplicate `describe` (fail-closed)")
+		}
+		v, err := singleInlineArg(c, "describe")
+		if err != nil {
+			return err
+		}
+		if v == "" {
+			return fmt.Errorf("`describe` needs a non-empty note")
+		}
+		d.Describe = v
+		return nil
 	case "set":
 		return applyInlineSet(d, c)
 	case "fail-when":
@@ -259,7 +273,7 @@ func applyInlineGrantControlChild(d *Descriptor, c *kdl.Node) error {
 		d.FailWhen = expr
 		return nil
 	default:
-		return fmt.Errorf("unknown node %q (want path | query | body | set | fail-when; fail-closed)", c.Name())
+		return fmt.Errorf("unknown node %q (want path | query | body | set | fail-when | describe; fail-closed)", c.Name())
 	}
 }
 
