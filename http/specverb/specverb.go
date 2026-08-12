@@ -376,6 +376,7 @@ func resolveDescriptor(spec *spec, group []string, g guardfile.Grant) (opDescrip
 		Destructive: opcore.DestructiveVerb(g.Verb),
 		Grant:       formatGrant(g),
 		Describe:    g.Describe,
+		RawResponse: rawResponseOp(op.op),
 	}
 	if len(desc.FixedBody) > 0 {
 		// a state toggle owns its body: the spec's edit fields stay unmounted
