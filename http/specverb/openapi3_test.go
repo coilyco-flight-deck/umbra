@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
 )
 
@@ -178,5 +180,53 @@ func TestBuildOpenAPI3Tailscale(t *testing.T) {
 	}
 	if got := byLeaf["create"]; got.Method != "POST" {
 		t.Errorf("create keys method = %s, want POST", got.Method)
+	}
+}
+
+// TestRawResponseOpReadsDeclaredMediaType proves the engine decides raw-vs-parsed
+// from the spec rather than from the bytes that come back. Forgejo's Actions job
+// log is the motivating case: it declares text/plain, and parsing it as JSON
+// fails on the first timestamp.
+func TestRawResponseOpReadsDeclaredMediaType(t *testing.T) {
+	cases := map[string]struct {
+		media string
+		want  bool
+	}{
+		"plain text is raw":    {media: "text/plain", want: true},
+		"zip is raw":           {media: "application/zip", want: true},
+		"octet-stream is raw":  {media: "application/octet-stream", want: true},
+		"json is parsed":       {media: "application/json", want: false},
+		"suffixed json parsed": {media: "application/vnd.api+json", want: false},
+		"json with params":     {media: "application/json; charset=utf-8", want: false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			op := &openapi3.Operation{Responses: openapi3.NewResponses()}
+			resp := openapi3.NewResponse().WithContent(openapi3.Content{
+				tc.media: openapi3.NewMediaType(),
+			})
+			op.Responses.Set("200", &openapi3.ResponseRef{Value: resp})
+			if got := rawResponseOp(op); got != tc.want {
+				t.Errorf("rawResponseOp(%s) = %v, want %v", tc.media, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRawResponseOpDefaultsToParsed keeps the fail-safe direction: a spec that
+// says nothing about its response keeps the parsed path it has always had.
+func TestRawResponseOpDefaultsToParsed(t *testing.T) {
+	if rawResponseOp(nil) {
+		t.Error("a nil operation must not be treated as raw")
+	}
+	if rawResponseOp(&openapi3.Operation{}) {
+		t.Error("an operation with no responses must not be treated as raw")
+	}
+	op := &openapi3.Operation{Responses: openapi3.NewResponses()}
+	op.Responses.Set("404", &openapi3.ResponseRef{Value: openapi3.NewResponse().WithContent(
+		openapi3.Content{"text/plain": openapi3.NewMediaType()},
+	)})
+	if rawResponseOp(op) {
+		t.Error("a non-success response must not decide the success path")
 	}
 }

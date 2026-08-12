@@ -187,7 +187,7 @@ func (rt *runtime) actionFor(desc opDescriptor) cli.ActionFunc {
 		if c.Bool(flagDryRun) {
 			return rt.renderDryRun(desc.Method, url, body, contentType, preview, c.String(flagOutput))
 		}
-		return rt.fire(ctx, desc.Method, url, body, contentType, c.String(flagQuery), c.String(flagOutput))
+		return rt.fire(ctx, desc, desc.Method, url, body, contentType, c.String(flagQuery), c.String(flagOutput))
 	}
 }
 
@@ -457,10 +457,13 @@ func (rt *runtime) previewURL(url string) string {
 
 // fire captures the response through the engine core and renders it.
 // Non-2xx becomes an UpstreamFailed coded error carrying the response body.
-func (rt *runtime) fire(ctx context.Context, method, url string, body []byte, contentType, query, output string) error {
+func (rt *runtime) fire(ctx context.Context, desc opDescriptor, method, url string, body []byte, contentType, query, output string) error {
 	_, respBody, status, err := rt.FireCapture(ctx, method, url, body, contentType)
 	if err != nil {
 		return err
+	}
+	if desc.RawResponse {
+		return writeRawResponse(respBody, query, method, url, status)
 	}
 	rendered, rerr := respfmt.Render(respBody, query, output)
 	if rerr != nil {
@@ -472,6 +475,27 @@ func (rt *runtime) fire(ctx context.Context, method, url string, body []byte, co
 		return nil
 	}
 	fmt.Print(string(rendered))
+	return nil
+}
+
+// writeRawResponse emits a non-JSON success body byte for byte. A projection is
+// refused rather than ignored: the caller asked to filter a payload the engine
+// cannot parse, and silently returning everything would answer a different
+// question than the one asked.
+func writeRawResponse(body []byte, query, method, url, status string) error {
+	if strings.TrimSpace(query) != "" {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("--%s cannot project a non-JSON response", flagQuery),
+			"this verb returns raw bytes; drop the query and filter downstream")
+	}
+	if len(body) == 0 {
+		// empty 2xx: confirm the call landed, matching the parsed path.
+		fmt.Printf("ok: %s %s -> %s\n", method, url, status)
+		return nil
+	}
+	if _, err := os.Stdout.Write(body); err != nil {
+		return exitcode.New(exitcode.Internal, "internal", err, "")
+	}
 	return nil
 }
 

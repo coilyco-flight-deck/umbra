@@ -36,6 +36,37 @@ type operation struct {
 	op          *openapi3.Operation
 }
 
+// rawResponseOp reports whether the operation's success response declares a
+// media type the engine must not parse. A spec that says text/plain or
+// application/zip is describing bytes, so reformatting them would corrupt the
+// payload the caller asked for. Anything JSON-shaped, and anything the spec
+// leaves unsaid, keeps the parsed path.
+func rawResponseOp(op *openapi3.Operation) bool {
+	if op == nil || op.Responses == nil {
+		return false
+	}
+	for _, code := range []string{"200", "206"} {
+		ref := op.Responses.Value(code)
+		if ref == nil || ref.Value == nil {
+			continue
+		}
+		for media := range ref.Value.Content {
+			if !jsonMediaType(media) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// jsonMediaType matches the JSON family, including suffixed types such as
+// application/vnd.api+json, and ignores any parameters after a semicolon.
+func jsonMediaType(media string) bool {
+	base, _, _ := strings.Cut(media, ";")
+	base = strings.ToLower(strings.TrimSpace(base))
+	return base == "application/json" || strings.HasSuffix(base, "+json")
+}
+
 // param is one promoted spec input the engine reads off the resolved model: a
 // scalar query parameter, or a form-body property (a "file" upload or a scalar).
 type param struct {
