@@ -1,10 +1,14 @@
 # cli-guard
 
+a config driven occlusion framework for your CLIs and APIs
+
+## About
+
 [![Go Reference][goreference_badge]][goreference_link]
 [![Go Report Card][goreportcard_badge]][goreportcard_link]
 [![Tests status][test_badge]][test_link]
 
-cli-guard is a **security-boundary** framework for [urfave/cli][urfave/cli] v3 applications, designed to sit between AI agents (or any semi-trusted automation) and the host system, featuring:
+Designed to sit between AI agents (or any semi-trusted automation) and the host system, featuring:
 
 - argv validation rejecting shell metacharacters before they reach `execve`
 - append-only JSONL audit log with lumberjack rotation
