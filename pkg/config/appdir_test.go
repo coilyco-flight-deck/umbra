@@ -39,7 +39,7 @@ func TestCacheDirEnv_DerivedFromAppDir(t *testing.T) {
 		want   string
 	}{
 		{".ward", "WARD_CACHE_DIR"},
-		{"", "CLI_GUARD_CACHE_DIR"}, // fallback app dir ".cli-guard"
+		{"", "UMBRA_CACHE_DIR"}, // fallback app dir ".umbra"
 		{".my-app", "MY_APP_CACHE_DIR"},
 	}
 	for _, tc := range cases {

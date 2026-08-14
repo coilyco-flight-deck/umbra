@@ -12,7 +12,7 @@ import (
 
 // FallbackAppDir is the app dir used when the consumer never calls SetAppDir.
 // It is the framework's own name, so an unconfigured deployment owns nobody.
-const FallbackAppDir = ".cli-guard"
+const FallbackAppDir = ".umbra"
 
 // CacheSubdir is the subdirectory under the app dir holding the ttl caches.
 const CacheSubdir = "cache"
@@ -54,12 +54,12 @@ func BaseName() string {
 }
 
 // EnvName derives a consumer-scoped env var from the app dir base (".ward" +
-// "_CACHE_DIR" -> "WARD_CACHE_DIR"); unset falls back to the "CLI_GUARD" token.
+// "_CACHE_DIR" -> "WARD_CACHE_DIR"); unset falls back to the "UMBRA" token.
 func EnvName(suffix string) string {
 	base := envSanitizer.ReplaceAllString(strings.ToUpper(BaseName()), "_")
 	base = strings.Trim(base, "_")
 	if base == "" {
-		base = "CLI_GUARD"
+		base = "UMBRA"
 	}
 	return base + suffix
 }

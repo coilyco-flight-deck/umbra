@@ -8,7 +8,6 @@ require (
 	github.com/jmespath-community/go-jmespath v1.1.1
 	github.com/olekukonko/tablewriter v1.1.4
 	github.com/urfave/cli/v3 v3.9.0
-	golang.org/x/sys v0.44.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -31,5 +30,6 @@ require (
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	golang.org/x/exp v0.0.0-20230314191032-db074128a8ec // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
