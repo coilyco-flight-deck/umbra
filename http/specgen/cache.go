@@ -12,11 +12,11 @@ import (
 	"sort"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
 )
 
 // cacheSubdir namespaces the specverb caches under the framework cache root, so
-// they sit beside (not inside) any other cli-guard cache.
+// they sit beside (not inside) any other umbra cache.
 const cacheSubdir = "specverb"
 
 // stampName is the per-cache staleness sentinel: the hashes the last build was

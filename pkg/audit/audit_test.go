@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
 )
 
 func tempWriter(t *testing.T) *audit.Writer {

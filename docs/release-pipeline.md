@@ -1,8 +1,8 @@
 # Release pipeline
 
-Forgejo is the canonical and only publication surface for cli-guard. GitHub
+Forgejo is the canonical and only publication surface for umbra. GitHub
 does not build or publish releases and does not deploy documentation.
-cli-guard is the base library of the cli-guard / ward stack (coily, the
+umbra is the base library of the umbra / ward stack (coily, the
 original third member, has been retired).
 
 ## Flow
@@ -33,24 +33,24 @@ last-known-good, and only gate-green shas release.
   infrastructure's bot-token scripts.
 
 The release assets cover Linux, macOS, and Windows on amd64 and arm64. The
-stamped `specgen` version is also the default cli-guard ref frozen by
+stamped `specgen` version is also the default umbra ref frozen by
 `specgen lock`. A tagged `go install` is the source-install alternative.
 Homebrew and Scoop metadata carry the same release URLs and hashes as the
 attached binaries. `make release-check` verifies that contract before
 publication.
 
-## Tag-only by design: cli-guard does not bump its consumers
+## Tag-only by design: umbra does not bump its consumers
 
-The stack's dependency direction is cli-guard -> ward. cli-guard is
+The stack's dependency direction is umbra -> ward. umbra is
 the base, so its automation must not reach up into its consumers. Having
-cli-guard open dependency-bump PRs on ward would reverse the
+umbra open dependency-bump PRs on ward would reverse the
 `dependsOn` edge (a dependency mutating its dependents), which couples the
 tree backwards.
 
 Downstream bumps belong to the consumers, pulled along the dependency arrow:
-ward watches cli-guard's tags and opens its own self-bump PR.
+ward watches umbra's tags and opens its own self-bump PR.
 That keeps every cross-repo write pointing from a consumer toward what it
 depends on. The tree-direction rule is being made enforceable as a linter in
 the consumer self-bump policy.
 
-See [cli-guard release automation](https://forgejo.coilysiren.me/coilyco-flight-deck/cli-guard).
+See [umbra release automation](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra).

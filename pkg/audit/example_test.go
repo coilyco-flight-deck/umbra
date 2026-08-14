@@ -6,13 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
 )
 
 // The most basic shape: open a writer, append one record, close.
 // The writer creates and rotates the JSONL file under the hood.
 func ExampleNewWriter() {
-	path := filepath.Join(os.TempDir(), "cli-guard-example.jsonl")
+	path := filepath.Join(os.TempDir(), "umbra-example.jsonl")
 	w := audit.NewWriter(path)
 	defer func() { _ = w.Close() }()
 
@@ -33,7 +33,7 @@ func ExampleNewWriter() {
 // Wrap runs a function and records one audit row per invocation,
 // regardless of whether the function returns an error.
 func ExampleWriter_Wrap() {
-	w := audit.NewWriter(filepath.Join(os.TempDir(), "cli-guard-wrap-example.jsonl"))
+	w := audit.NewWriter(filepath.Join(os.TempDir(), "umbra-wrap-example.jsonl"))
 	defer func() { _ = w.Close() }()
 	_ = w.Preflight()
 

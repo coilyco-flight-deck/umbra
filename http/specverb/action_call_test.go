@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 // callActionGuardfile grants issue create + close and declares a two-step call

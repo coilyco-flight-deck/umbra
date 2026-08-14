@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 // writeGuardfile drops src at dir/name and returns the path.

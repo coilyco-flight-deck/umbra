@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 const fixture = `wrap ward-kdl ops forgejo {
@@ -340,7 +340,7 @@ func TestRenderWiresProvidersByUsage(t *testing.T) {
 			t.Errorf("generated source missing %q", want)
 		}
 	}
-	// env is a cli-guard built-in: no codegen, and no store SDK in use.
+	// env is a umbra built-in: no codegen, and no store SDK in use.
 	for _, absent := range []string{"ssmTokenResolver", "aws-sdk-go-v2", `"ssm":`} {
 		if strings.Contains(src, absent) {
 			t.Errorf("generated source should not contain %q (no ssm in use)", absent)

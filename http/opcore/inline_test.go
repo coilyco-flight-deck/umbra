@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
 )
 
 // inlineSrc is a full ward-mcp inline source exercising the frozen grammar: wrap

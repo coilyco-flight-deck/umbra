@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/policy"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 	kdl "github.com/calico32/kdl-go"
 )
 

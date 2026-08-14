@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen"
 )
 
 func TestVersionReportsDriverAndDefaultCLIGuardRef(t *testing.T) {
@@ -18,7 +18,7 @@ func TestVersionReportsDriverAndDefaultCLIGuardRef(t *testing.T) {
 	}
 
 	want := fmt.Sprintf(
-		"specgen version %s (cli-guard ref %s)\n",
+		"specgen version %s (umbra ref %s)\n",
 		specgen.DriverVersion(),
 		specgen.DefaultCLIGuardRef(),
 	)

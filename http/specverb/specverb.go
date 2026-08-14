@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/opcore"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/stepflow"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/stepflow"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/urfave/cli/v3"
 )
@@ -28,7 +28,7 @@ type Config struct {
 	Wrap func(verb.Spec) cli.ActionFunc
 
 	// Providers registers the value resolvers a `value <provider>` source names;
-	// cli-guard merges its built-ins (env, file, literal). See specverb-policy.md.
+	// umbra merges its built-ins (env, file, literal). See specverb-policy.md.
 	Providers map[string]Provider
 
 	// HTTPClient fires the live request. nil uses http.DefaultClient.

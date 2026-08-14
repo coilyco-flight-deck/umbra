@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/shell"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/examples/treebuilders"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/shell"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/examples/treebuilders"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
 )
 
 func main() {
-	auditPath := filepath.Join(os.TempDir(), "cli-guard-passthrough.jsonl")
+	auditPath := filepath.Join(os.TempDir(), "umbra-passthrough.jsonl")
 	writer := audit.NewWriter(auditPath)
 	defer func() { _ = writer.Close() }()
 	if err := writer.Preflight(); err != nil {

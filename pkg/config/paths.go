@@ -1,5 +1,5 @@
 // Path defaults and per-repo audit derivation, rooted at the consumer's
-// app dir (see appdir.go) so cli-guard hardcodes no consumer's directory.
+// app dir (see appdir.go) so umbra hardcodes no consumer's directory.
 package config
 
 import (

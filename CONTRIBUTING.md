@@ -1,4 +1,4 @@
-# Contributing to cli-guard
+# Contributing to umbra
 
 Thank you for your interest! :wave:
 

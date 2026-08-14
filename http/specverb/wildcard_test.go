@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 )
 
 // wildcardBuild parses body into a Guardfile over the proving slice and builds it.

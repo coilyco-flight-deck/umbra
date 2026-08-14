@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/sandbox"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox"
 )
 
 // jailSpec is a usable Spec so Wrap actually rewrites the cmd (vs no-op).

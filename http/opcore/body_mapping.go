@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 	kdl "github.com/calico32/kdl-go"
 )
 

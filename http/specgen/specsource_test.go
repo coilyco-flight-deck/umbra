@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
 )
 
 func TestReadSpecSourceDecodesGzipAndKeepsPlainCompatible(t *testing.T) {

@@ -46,11 +46,11 @@ Tagged Forgejo releases also publish raw `specgen` binaries for Linux, macOS,
 and Windows on amd64 and arm64, plus `SHA256SUMS`. Go users can install directly:
 
 ```sh
-GOPRIVATE=forgejo.coilysiren.me go install forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cmd/specgen@vX.Y.Z
+GOPRIVATE=forgejo.coilysiren.me go install forgejo.coilysiren.me/coilyco-flight-deck/umbra/cmd/specgen@vX.Y.Z
 ```
 
 `specgen --version` reports both the installed driver version and the
-cli-guard module ref that `lock` will freeze by default. The driver invokes the
+umbra module ref that `lock` will freeze by default. The driver invokes the
 Go toolchain when it resolves locks and builds generated CLIs.
 
 ## Documentation

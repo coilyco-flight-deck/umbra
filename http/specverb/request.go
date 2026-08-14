@@ -15,11 +15,11 @@ import (
 	"strconv"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/opcore"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/respfmt"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/stepflow"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/respfmt"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/stepflow"
 	"github.com/urfave/cli/v3"
 )
 

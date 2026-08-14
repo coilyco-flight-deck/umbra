@@ -3,7 +3,7 @@ package scan_test
 import (
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/scan"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/scan"
 )
 
 func TestDiffVendored(t *testing.T) {

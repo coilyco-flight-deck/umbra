@@ -52,5 +52,5 @@ permission, resolves no credential, and does not replace runtime policy.
 * [mixed transports](specverb-mixed-transports.md) - one binary across both
   transport dialects.
 
-This is cli-guard's independent boundary in
+This is umbra's independent boundary in
 [inbox#267](https://forgejo.coilysiren.me/coilysiren/inbox/issues/267).

@@ -1,6 +1,6 @@
-# cli-guard
+# umbra
 
-cli-guard is a security-boundary framework for [urfave/cli](https://github.com/urfave/cli) v3 applications, designed to sit between AI agents (or any semi-trusted automation) and the host system.
+umbra is a security-boundary framework for [urfave/cli](https://github.com/urfave/cli) v3 applications, designed to sit between AI agents (or any semi-trusted automation) and the host system.
 
 It provides:
 

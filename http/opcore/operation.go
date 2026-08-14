@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"strconv"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/respfmt"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/policy"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/respfmt"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 )
 
 // Operation is one resolved leaf plus the runtime that fires it: the unit a

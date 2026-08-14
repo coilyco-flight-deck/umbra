@@ -17,7 +17,7 @@ Please disclose any vulnerabilities by emailing [coilysiren@gmail.com](mailto:co
 
 ## What counts as a vulnerability
 
-cli-guard is a security-boundary framework. Issues here can have outsized impact on every downstream consumer. Specifically interested in reports of:
+umbra is a security-boundary framework. Issues here can have outsized impact on every downstream consumer. Specifically interested in reports of:
 
 - argv passing through `policy.ValidateArgSlice` that should have been rejected (shell metacharacter escapes, encoding tricks, locale-dependent bypasses)
 - audit log entries that are unparseable, truncatable, or omittable by the wrapped action

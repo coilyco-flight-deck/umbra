@@ -14,7 +14,7 @@ case "$version" in
 esac
 
 bare=${version#v}
-base="https://forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/releases/download/${version}"
+base="https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/releases/download/${version}"
 
 sha() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -34,7 +34,7 @@ windows_arm64=$(sha "$dist/specgen-windows-arm64.exe")
 cat > "$dist/specgen.rb" <<EOF
 class Specgen < Formula
   desc "Generate guarded CLIs from KDL policy and committed API locks"
-  homepage "https://forgejo.coilysiren.me/coilyco-flight-deck/cli-guard"
+  homepage "https://forgejo.coilysiren.me/coilyco-flight-deck/umbra"
   version "${bare}"
   license "MIT"
 
@@ -73,7 +73,7 @@ cat > "$dist/specgen.json" <<EOF
 {
     "version": "${bare}",
     "description": "Generate guarded CLIs from KDL policy and committed API locks",
-    "homepage": "https://forgejo.coilysiren.me/coilyco-flight-deck/cli-guard",
+    "homepage": "https://forgejo.coilysiren.me/coilyco-flight-deck/umbra",
     "license": "MIT",
     "architecture": {
         "64bit": {

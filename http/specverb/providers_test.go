@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
-// TestBuiltinEnvProviderResolves proves cli-guard's built-in `env` provider
+// TestBuiltinEnvProviderResolves proves umbra's built-in `env` provider
 // resolves an auth secret end to end with zero consumer wiring (no Config.Providers).
 func TestBuiltinEnvProviderResolves(t *testing.T) {
 	spec := readSpec(t, "tailscale.openapi.yaml")

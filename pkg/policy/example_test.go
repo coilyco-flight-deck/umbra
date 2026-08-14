@@ -3,7 +3,7 @@ package policy_test
 import (
 	"fmt"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/policy"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 )
 
 // Safe input: a positional argument with no shell metacharacters.

@@ -25,7 +25,7 @@ wrap ward git {
 - **`passthrough <bin>`** - funnel sugar (`exec` + `can run "*"`) with wrap-level `never pass`/`only pass` guards. See [passthrough.md](passthrough.md).
 - **Flag policy per grant** - `deny-flag` (default-allow minus denials) or `allow-flag` (strict allowlist). `describe` adds a note.
 - **`when <selector> matches <glob...>`** / **`deny-when ...`** - argv guards. `when` passes only on a match, `deny-when` refuses on one. The selector names an argv slot: a **flag name** (`secret-id` reads `--secret-id`), **`any-arg`** (all positionals), or **`argN`** (Nth positional, 0-based). It takes no qualifiers. A `*` glob needs quoting.
-- **`gate <name> { ... }`** - a registered preflight gate for logic not sayable declaratively (`pattern`, `allow`). The registry ships empty - cli-guard registers no gates of its own - so every name fails closed until a consumer registers one.
+- **`gate <name> { ... }`** - a registered preflight gate for logic not sayable declaratively (`pattern`, `allow`). The registry ships empty - umbra registers no gates of its own - so every name fails closed until a consumer registers one.
 - **`never run`** - an explicit denial; parses for docs, mounts none.
 - **`allow <bin...>`** - inspect-list sugar: N read-only funnels per wrap. See [execverb-inspect.md](execverb-inspect.md).
 - **`action` / `bin`** - complex actions + the per-grant binary override. See [execverb-actions.md](execverb-actions.md).

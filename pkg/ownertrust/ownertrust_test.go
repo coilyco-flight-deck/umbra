@@ -3,7 +3,7 @@ package ownertrust_test
 import (
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/ownertrust"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/ownertrust"
 )
 
 func TestAllowedSingle(t *testing.T) {

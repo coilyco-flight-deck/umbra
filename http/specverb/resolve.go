@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 // errResolve formats a fail-closed resolution error with the package prefix.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
 )
 
 func TestSpecLockEncodingIsDeterministicAndRoundTrips(t *testing.T) {

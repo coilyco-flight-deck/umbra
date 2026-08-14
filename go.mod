@@ -1,4 +1,4 @@
-module forgejo.coilysiren.me/coilyco-flight-deck/cli-guard
+module forgejo.coilysiren.me/coilyco-flight-deck/umbra
 
 go 1.25.5
 

@@ -3,23 +3,23 @@ package issueref_test
 import (
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/issueref"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/issueref"
 )
 
 const base = "https://forgejo.example.me"
 
 func TestParseShort(t *testing.T) {
-	r, err := issueref.Parse("coilyco-flight-deck/cli-guard"+"#"+"166", base)
+	r, err := issueref.Parse("coilyco-flight-deck/umbra"+"#"+"166", base)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if r.Owner != "coilyco-flight-deck" || r.Repo != "cli-guard" || r.Number != 166 {
+	if r.Owner != "coilyco-flight-deck" || r.Repo != "umbra" || r.Number != 166 {
 		t.Errorf("unexpected ref: %+v", r)
 	}
-	if r.String() != "coilyco-flight-deck/cli-guard"+"#"+"166" {
+	if r.String() != "coilyco-flight-deck/umbra"+"#"+"166" {
 		t.Errorf("String = %q", r.String())
 	}
-	if r.RepoSlug() != "coilyco-flight-deck/cli-guard" {
+	if r.RepoSlug() != "coilyco-flight-deck/umbra" {
 		t.Errorf("RepoSlug = %q", r.RepoSlug())
 	}
 }

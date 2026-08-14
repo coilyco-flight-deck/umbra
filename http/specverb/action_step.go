@@ -6,8 +6,8 @@ package specverb
 import (
 	"context"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/stepflow"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/stepflow"
 	"github.com/urfave/cli/v3"
 )
 

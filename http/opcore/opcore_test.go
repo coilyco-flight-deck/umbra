@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/opcore"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/valuesource"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
 )
 
 // kindOf extracts the coded error's stable token, or "" for a nil/uncoded error.

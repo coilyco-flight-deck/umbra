@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
 )
 
 // withAppDir sets the app dir for the test and restores the unset state

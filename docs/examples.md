@@ -1,6 +1,6 @@
 # Examples
 
-Each subdirectory under [`examples/`](https://github.com/coilysiren/cli-guard/tree/main/examples) is a self-contained urfave/cli app that exercises one feature of cli-guard end-to-end. Every example writes its audit rows under `$TMPDIR`.
+Each subdirectory under [`examples/`](https://github.com/coilysiren/cli-guard/tree/main/examples) is a self-contained urfave/cli app that exercises one feature of umbra end-to-end. Every example writes its audit rows under `$TMPDIR`.
 
 | Example | Demonstrates |
 | ------- | ------------ |
@@ -14,7 +14,7 @@ Each subdirectory under [`examples/`](https://github.com/coilysiren/cli-guard/tr
 
 ## Running
 
-From the cli-guard repo root:
+From the umbra repo root:
 
 ```bash
 go run ./examples/audit hello world
@@ -25,10 +25,10 @@ go run ./examples/exitcode policy ; echo "exit: $?"
 
 ## Reading order
 
-If you are new to cli-guard:
+If you are new to umbra:
 
 1. **audit** - the minimum useful program.
-2. **policy** - what cli-guard refuses by default.
+2. **policy** - what umbra refuses by default.
 3. **scope** - how audit rows bind to git history.
 4. **passthrough** - the most common production usage.
 5. **exitcode** - the contract with orchestrators.

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/ttlcache"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/ttlcache"
 )
 
 // gitToplevelCache memoizes (cwd -> toplevel) so the per-invocation

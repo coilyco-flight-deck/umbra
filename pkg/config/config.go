@@ -1,5 +1,5 @@
 // Package config carries the layered-config primitives shared across
-// cli-guard consumers: path helpers, repo-slug derivation, the Audit
+// umbra consumers: path helpers, repo-slug derivation, the Audit
 package config
 
 import (

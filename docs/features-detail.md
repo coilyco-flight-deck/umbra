@@ -1,4 +1,4 @@
-# cli-guard features (detail)
+# umbra features (detail)
 
 Per-primitive detail behind the [FEATURES.md](FEATURES.md) index.
 

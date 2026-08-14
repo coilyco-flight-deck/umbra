@@ -100,7 +100,7 @@ type ProfileDecision struct {
 	Reason     string     `json:"reason,omitempty"`
 }
 
-// Coordinate mirrors cli-guard/profile.Coordinate as a JSON-stable
+// Coordinate mirrors umbra/profile.Coordinate as a JSON-stable
 // snapshot. Duplicated here so audit.Record (the wire format) does not
 type Coordinate struct {
 	DataSecurity    string `json:"data_security,omitempty"`

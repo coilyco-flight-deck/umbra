@@ -1,5 +1,5 @@
 // App-dir namespacing. The consumer-supplied directory name (e.g. ward
-// ".ward") roots every per-user path; cli-guard hardcodes no consumer.
+// ".ward") roots every per-user path; umbra hardcodes no consumer.
 package config
 
 import (

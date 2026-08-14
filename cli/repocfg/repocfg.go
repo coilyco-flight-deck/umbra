@@ -11,13 +11,13 @@ import (
 	"sort"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/policy"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 	"gopkg.in/yaml.v3"
 )
 
 // Filename is the discovery name, derived from the app dir so no consumer is
-// baked in: ".ward" -> "ward.yaml", unset -> "cli-guard.yaml".
+// baked in: ".ward" -> "ward.yaml", unset -> "umbra.yaml".
 func Filename() string { return config.BaseName() + ".yaml" }
 
 // LocalDirName is the preferred per-repo overlay dir - the consumer's app dir

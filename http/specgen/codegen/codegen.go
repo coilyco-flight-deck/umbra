@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 // Transport is the dialect one merged member speaks: spec (HTTP/specverb) or
@@ -239,14 +239,14 @@ import (
 	"net/http"
 	"time"
 {{end}}
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/valuesource"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
-{{if .HasSpec}}	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specverb"
-{{end}}{{if .HasExec}}	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/execverb"
-{{end}}{{if .HasEmbeds}}	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen/embedfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
+{{if .HasSpec}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
+{{end}}{{if .HasExec}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
+{{end}}{{if .HasEmbeds}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/embedfile"
 {{end}}	"github.com/urfave/cli/v3"
 {{if .HasSSM}}	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -313,7 +313,7 @@ func embeddedSources() map[int]map[string]embedfile.Source {
 }
 {{end}}
 
-// providerRegistry wires the store-backed resolvers in use; cli-guard merges its
+// providerRegistry wires the store-backed resolvers in use; umbra merges its
 // no-SDK built-ins (env, file, literal) underneath. Shared by both transports.
 func providerRegistry() map[string]valuesource.Provider {
 	return map[string]valuesource.Provider{

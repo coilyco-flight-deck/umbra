@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/examples/treebuilders"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/examples/treebuilders"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 )
 
 func main() {

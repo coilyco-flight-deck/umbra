@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/execverb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen/codegen"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specverb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/skillgen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/skillgen"
 	kdl "github.com/calico32/kdl-go"
 	"github.com/urfave/cli/v3"
 )
@@ -31,8 +31,8 @@ type Options struct {
 	BinaryName      string   // gen/build/run: generated CLI/binary name (empty = Guardfile wrap binary)
 	Out             string   // gen: main.go output path (debug; cache when empty). build: binary output dir or path
 	Args            []string // run: arguments passed through to the materialized binary
-	CLIGuardRef     string   // lock: cli-guard module query to pin (version/commit); empty = auto
-	CLIGuardReplace string   // lock: local cli-guard checkout to replace with (dev locks only)
+	CLIGuardRef     string   // lock: umbra module query to pin (version/commit); empty = auto
+	CLIGuardReplace string   // lock: local umbra checkout to replace with (dev locks only)
 	Version         string   // build: release version stamped into the binary via -ldflags (empty = "dev")
 	SkillsOut       string   // explicit skill root; empty writes no agent-facing artifacts
 }
@@ -691,7 +691,7 @@ func Lock(opts Options) error {
 	if err := writeDepLock(filepath.Join(g.Dir, LockName), dl); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "specgen: locked %s (cli-guard %s)\n", LockName, dl.CLIGuard)
+	fmt.Fprintf(os.Stderr, "specgen: locked %s (umbra %s)\n", LockName, dl.CLIGuard)
 	return emitSkill(g, opts.SkillsOut)
 }
 
