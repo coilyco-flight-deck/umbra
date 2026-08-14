@@ -1,4 +1,4 @@
-# cli-guard
+# umbra
 
 a config driven occlusion framework for your CLIs and APIs
 
