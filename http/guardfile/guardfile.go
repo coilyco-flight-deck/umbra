@@ -225,6 +225,17 @@ type Guardfile struct {
 	Restrict     []Restriction
 	Actions      []Action
 	Fetches      []Fetch
+
+	// Providers are consumer-declared value resolvers: `provider <name> { exec ... }`.
+	// umbra ships no store SDK, so a store-backed source is an exec contract.
+	ProviderDecls []ProviderDecl
+}
+
+// ProviderDecl is one `provider <name> { exec <argv...> }` declaration. The
+// address being resolved is appended to Exec as the final argument.
+type ProviderDecl struct {
+	Name string
+	Exec []string
 }
 
 // modals is the closed set of grant verbs; anything else fails closed.
@@ -340,6 +351,13 @@ func (gf *Guardfile) applyListNode(n *kdl.Node, name string) error {
 			return err
 		}
 		gf.Fetches = append(gf.Fetches, fetch)
+		return nil
+	case "provider":
+		pd, err := parseProvider(n)
+		if err != nil {
+			return err
+		}
+		gf.ProviderDecls = append(gf.ProviderDecls, pd)
 		return nil
 	default:
 		return unknownWrapNode(name)
@@ -1402,4 +1420,42 @@ func singleArg(n *kdl.Node) (string, error) {
 		return "", fmt.Errorf("%s expects exactly one value, got %d", n.Name(), len(args))
 	}
 	return args[0].String(), nil
+}
+
+// parseProvider reads `provider <name> { exec <argv...> }`: the consumer's
+// store-backed resolver, run as a subprocess with the address appended.
+func parseProvider(n *kdl.Node) (ProviderDecl, error) {
+	name, err := singleArg(n)
+	if err != nil {
+		return ProviderDecl{}, fmt.Errorf("guardfile: provider: %w", err)
+	}
+	pd := ProviderDecl{Name: name}
+	for _, c := range n.Children().Nodes {
+		if c.Name() != "exec" {
+			return ProviderDecl{}, fmt.Errorf("guardfile: provider %s: unknown field %q (want exec; fail-closed)", name, c.Name())
+		}
+		for _, a := range c.Arguments() {
+			pd.Exec = append(pd.Exec, argText(a))
+		}
+	}
+	if len(pd.Exec) == 0 {
+		return ProviderDecl{}, fmt.Errorf("guardfile: provider %s requires `exec <argv...>`", name)
+	}
+	return pd, nil
+}
+
+// ParseProviderNode exposes the provider grammar to the exec dialect, so both
+// dialects declare store-backed resolvers the same way.
+func ParseProviderNode(n *kdl.Node) (ProviderDecl, error) { return parseProvider(n) }
+
+// argText renders a KDL argument as the literal token a shell would receive.
+// Value.String() debug-formats non-string kinds, so a bare `-4` needs this.
+func argText(v kdl.Value) string {
+	if v.Kind() == kdl.String {
+		return v.String()
+	}
+	if lit, ok := v.Literal(); ok {
+		return lit
+	}
+	return fmt.Sprintf("%v", v.RawValue())
 }

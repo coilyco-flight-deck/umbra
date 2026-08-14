@@ -32,7 +32,7 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
 - **policy** - Argv validation rejecting shell metachars.
 - **scope** - Resolve cwd to git root for audit.
 - **exitcode** - Public exit-code taxonomy.
-- **valuesource** - Shared `value <provider>` resolution.
+- **valuesource** - Shared `value <provider>` resolution: env/file/literal built in, store-backed resolvers declared by the consumer. See [value-providers.md](value-providers.md).
 - **config** - Layered-config primitives + `OverlayFile[T]`.
 - **stepflow** - Transport-agnostic ordered sequence engine with explicit data threading.
 - **ttlcache** - Generic TTL-keyed cache.

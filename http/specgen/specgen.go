@@ -164,7 +164,7 @@ func readMember(path, identity string) (member, error) {
 		if err != nil {
 			return member{}, fmt.Errorf("specgen: parse exec guardfile %s: %w", path, err)
 		}
-		p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity)
+		p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity, egf.ProviderDecls)
 		if err != nil {
 			return member{}, err
 		}

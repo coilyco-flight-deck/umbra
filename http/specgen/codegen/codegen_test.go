@@ -154,7 +154,7 @@ func TestRenderParamsMixed(t *testing.T) {
 		HasSpec: true,
 		HasExec: true,
 		Mounts: []Params{
-			{Transport: TransportSpec, Binary: "ward-kdl", GuardfileName: "forgejo.guardfile.kdl", SpecLockName: "forgejo.swagger.lock.json.gz", SpecURL: "https://forgejo.coilysiren.me/swagger.v1.json", SpecEnvVar: "WARD_KDL_OPS_FORGEJO_SPEC", Providers: []string{"ssm"}},
+			{Transport: TransportSpec, Binary: "ward-kdl", GuardfileName: "forgejo.guardfile.kdl", SpecLockName: "forgejo.swagger.lock.json.gz", SpecURL: "https://forgejo.coilysiren.me/swagger.v1.json", SpecEnvVar: "WARD_KDL_OPS_FORGEJO_SPEC", Providers: []string{"ssm"}, ProviderDecls: []guardfile.ProviderDecl{{Name: "ssm", Exec: []string{"aws", "ssm", "get-parameter"}}}},
 			{Transport: TransportExec, Binary: "ward-kdl", GuardfileName: "aws.guardfile.kdl"},
 		},
 	})
@@ -167,7 +167,7 @@ func TestRenderParamsMixed(t *testing.T) {
 	src := string(out)
 	for _, want := range []string{
 		"specverb.Mount(app", "execverb.Mount(app",
-		"//go:embed forgejo.swagger.lock.json.gz", "//go:embed aws.guardfile.kdl", "ssmTokenResolver",
+		"//go:embed forgejo.swagger.lock.json.gz", "//go:embed aws.guardfile.kdl", `"ssm": execProvider(`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("mixed source missing %q", want)
@@ -183,7 +183,7 @@ func TestRenderParamsMixed(t *testing.T) {
 }
 
 func TestPlanExecDerivesParams(t *testing.T) {
-	p, err := PlanExec([]string{"ward-kdl", "ops", "aws"}, []string{"ssm"}, "aws.guardfile.kdl")
+	p, err := PlanExec([]string{"ward-kdl", "ops", "aws"}, []string{"ssm"}, "aws.guardfile.kdl", nil)
 	if err != nil {
 		t.Fatalf("PlanExec: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestPlanExecDerivesParams(t *testing.T) {
 }
 
 func TestPlanExecRejectsEmptyGroup(t *testing.T) {
-	if _, err := PlanExec(nil, nil, "x.kdl"); err == nil {
+	if _, err := PlanExec(nil, nil, "x.kdl", nil); err == nil {
 		t.Fatal("expected error for an exec Guardfile with no group")
 	}
 }
@@ -315,11 +315,14 @@ func TestPlanRejectsNoBase(t *testing.T) {
 	}
 }
 
-// TestRenderWiresProvidersByUsage proves the codegen wires only the resolvers in
-// use: a tailscale base-url + env token pulls in tailscale, no ssm/AWS SDK.
+// TestRenderWiresProvidersByUsage proves the codegen wires only the declared
+// resolvers a member actually names; built-ins and undeclared names emit nothing.
 func TestRenderWiresProvidersByUsage(t *testing.T) {
 	gf, err := guardfile.Parse([]byte(`wrap ward-kdl ops owui {
 		spec owui.openapi.json
+		provider tailscale {
+			exec tailscale ip -4
+		}
 		base-url { value tailscale "open-webui" }
 		auth bearer { value env "OWUI_TOKEN" }
 		can get session { op "get_session" }
@@ -335,13 +338,13 @@ func TestRenderWiresProvidersByUsage(t *testing.T) {
 		t.Fatalf("generated source does not parse: %v\n%s", err, out)
 	}
 	src := string(out)
-	for _, want := range []string{"providerRegistry", "tailscaleResolver", `"tailscale": tailscaleResolver`} {
+	for _, want := range []string{"providerRegistry", "execProvider(", `"tailscale": execProvider("tailscale", []string{"tailscale", "ip", "-4"})`} {
 		if !strings.Contains(src, want) {
 			t.Errorf("generated source missing %q", want)
 		}
 	}
 	// env is a umbra built-in: no codegen, and no store SDK in use.
-	for _, absent := range []string{"ssmTokenResolver", "aws-sdk-go-v2", `"ssm":`} {
+	for _, absent := range []string{"aws-sdk-go-v2", "awsconfig", `"ssm":`} {
 		if strings.Contains(src, absent) {
 			t.Errorf("generated source should not contain %q (no ssm in use)", absent)
 		}
