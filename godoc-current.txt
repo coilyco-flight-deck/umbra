@@ -1,59 +1,3 @@
-## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/awsgate
-
-package awsgate // import "forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/awsgate"
-
-Package awsgate denies read-only aws invocations touching sensitive resources,
-pre-send. Extracted from the original read gate; see docs/execverb.md.
-
-VARIABLES
-
-var DefaultSensitivePatterns = []string{
-	"*secret*",
-	"*credential*",
-	"*-private*",
-	"*private-*",
-	"*tfstate*",
-	"*terraform-state*",
-	"*-backup*",
-	"*-backups*",
-	"arn:aws:iam::*:role/*admin*",
-	"arn:aws:iam::*:role/*root*",
-}
-    DefaultSensitivePatterns is the baked-in default-deny set: secrets,
-    terraform state, backups, admin/root ARNs. Meaningful-name globs only.
-
-
-FUNCTIONS
-
-func GlobMatch(pattern, s string) bool
-    GlobMatch reports whether s matches pattern, where `*` matches any run of
-    characters (crossing `/` and `:`, unlike filepath.Match), the rest literal.
-
-func IsReadOnly(argv []string) bool
-    IsReadOnly reports whether argv is a read-only aws invocation: a service
-    plus an operation named by the CLI's read convention (describe-*, ls, ...).
-
-func Positionals(argv []string) []string
-    Positionals returns argv with flags (and the values of known value-taking
-    global flags) removed, preserving order.
-
-
-TYPES
-
-type Gate struct {
-	// Patterns are the sensitive globs; empty means DefaultSensitivePatterns.
-	Patterns []string
-
-	// AllowPatterns are globs naming tokens explicitly allowed through.
-	AllowPatterns []string
-}
-    Gate is one configured sensitive-read policy.
-
-func (g Gate) Check(argv []string) (token, pattern string, denied bool)
-    Check returns a denial (token, pattern, denied=true) when argv is a
-    read-only aws invocation touching a sensitive token no allow glob clears.
-
-
 ## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/execverb
 
 package execverb // import "forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/execverb"
@@ -124,7 +68,7 @@ type EnvVar struct {
     See docs/execverb.md.
 
 type GateSpec struct {
-	Name     string   // registry key, e.g. "aws-read"
+	Name     string   // registry key; consumers register their own gates
 	Patterns []string // gate-specific deny globs; empty = gate defaults
 	Allow    []string // explicit allow globs
 }
@@ -269,9 +213,6 @@ type WhenClause struct {
 	// `when` / `only pass` (refuse on no match).
 	Deny bool
 
-	// OnlyReads scopes the guard to read-only aws operations.
-	OnlyReads bool
-
 	// Describe is the optional teaching note rendered in the describe surface.
 	Describe string
 }
@@ -361,10 +302,6 @@ func WithEnvFunc(fn func() (map[string]string, error)) Option
     returned keys win over the parent env, resolved once per run just before
     exec.
 
-func WithReadCache(classifier ReadCacheClassifier) Option
-    WithReadCache wires the pass-through into ghcache so reads matching the
-    supplied classifier are served from cache without exec, and
-
 func WithSkipPolicy() Option
     WithSkipPolicy disables the shell-metacharacter check for this binary.
     Use only for tools whose argv goes through execve straight to the
@@ -372,10 +309,6 @@ func WithSkipPolicy() Option
 func WithVerbName(name string) Option
     WithVerbName overrides the dotted verb name used for audit logging.
     The user-visible cli command name (and the binary actually executed)
-
-type ReadCacheClassifier func(argv []string) (path string, maxAge time.Duration, ok bool)
-    ReadCacheClassifier inspects the post-WithArgvRewriter argv and returns the
-    gh-api-style path the call would read, a per-call max-age
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/repocfg
@@ -789,59 +722,6 @@ func (p *Proxy) Start(_ context.Context) (string, error)
 func (p *Proxy) Stop() []audit.EgressRow
     Stop shuts the listener and returns the collected rows, one per host.
     Safe to call once. After Stop the Proxy is not reusable.
-
-
-## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/ghcache
-
-package ghcache // import "forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/ghcache"
-
-Package ghcache caches GitHub REST `GET` responses keyed by method, path, body,
-and token fingerprint, with method-aware write-through
-
-CONSTANTS
-
-const (
-	// TTLVolatile covers fast-moving issue/PR/CI surfaces. Sized to absorb a
-	// `watch -n 2` loop across ~10 repos (~10 calls/min, well under the
-	TTLVolatile = 1 * time.Minute
-
-	// TTLBranchHead covers head-of-branch reads, ref/tree/content lookups,
-	// and search. Slower turnover than issues; long enough to collapse
-	TTLBranchHead = 10 * time.Minute
-
-	// TTLRepoMeta covers repo-level metadata: the repo body, labels,
-	// milestones, releases, tags, topics, languages, contributors,
-	TTLRepoMeta = 1 * time.Hour
-
-	// TTLIdentity covers the identity surface: user, org, teams. Picked
-	// at 25 (not 24) hours so a daily cron always sees a miss across
-	TTLIdentity = 25 * time.Hour
-)
-    Default TTLs by tier. Exported so callers and tests can reference the same
-    constants the path-classifier uses internally.
-
-
-FUNCTIONS
-
-func GetJSON(path string, fetch func() ([]byte, error)) ([]byte, error)
-    GetJSON fetches the response body for a `GET <path>` GitHub REST call,
-    served from cache if a fresh entry exists. On miss it invokes fetch
-
-func Invalidate(method, path string)
-    Invalidate drops cache entries that a `method <path>` write would affect.
-    Idempotent and safe to call on paths that have no cached
-
-func MaybeServe(path string) ([]byte, bool)
-    MaybeServe is the lookup-only half of the cache. Returns (cached bytes,
-    true) on a fresh hit, (nil, false) on miss or unclassified
-
-func MaybeServeMaxAge(path string, maxAge time.Duration) ([]byte, bool)
-    MaybeServeMaxAge is the per-call-freshness variant of MaybeServe. Returns
-    (cached bytes, true) only when a cached entry exists AND its
-
-func Store(path string, data []byte) bool
-    Store puts data under path using the TTL derived from the path's tier.
-    Returns false if the path is unclassified (caller should be
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile
@@ -1931,69 +1811,6 @@ FUNCTIONS
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int
     Run executes the specgen command tree and returns its process exit code.
-
-
-## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/agentid
-
-package agentid // import "forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/agentid"
-
-Package agentid is the Go port of the canonical o2r agent-id generator:
-a short id for naming agents (o2r channels, container tags, dozzle rows)
-built as two lowercase letters then two digits (`ab54`, `cd97`). The alphabet
-drops the visually and phonetically ambiguous characters - the dictatable
-set first used by the archived o2r channel protocol and documented in aos'
-docs/dictatable-id-alphabet.md.
-
-aos owns the canonical definition (agentic_os/agent_id.py); this package
-is the verified Go port ward and cli-guard mint ids with. The alphabet, the
-two-letters-then-two-digits shape, and the seeded variant are a cross-language
-contract, pinned byte-for-byte by the vendored agent_id_vectors.json and
-asserted in the drift test. A change here that diverges from that vector fails
-CI, which is the point.
-
-Seed algorithm (the portable parity contract): digest = sha256(utf-8(seed)),
-then id = Letters[digest[0]%22] + Letters[digest[1]%22] + Digits[digest[2]%6] +
-Digits[digest[3]%6]. The seeded form is a test anchor only; real ids come from
-NewID, which is crypto/rand-backed and uniform, not reproducible.
-
-CONSTANTS
-
-const (
-	// Letters is the 22-letter dictatable set the id's first two chars draw from.
-	Letters = "abcdefghjkmpqrstuvwxyz"
-	// Digits is the 6-digit dictatable set the id's last two chars draw from.
-	Digits = "456789"
-	// Alphabet is the full dictatable alphabet (letters then digits).
-	Alphabet = Letters + Digits
-	// Len is the total id length.
-	Len = 4
-	// LetterLen is how many leading chars are letters (the rest are digits).
-	LetterLen = 2
-)
-    Alphabet ground truth, lowercased: the confusable/homophone characters (i l
-    n o, 0 1 2 3) are dropped. Rationale in aos docs/dictatable-id-alphabet.md.
-
-
-FUNCTIONS
-
-func IsValid(raw string) bool
-    IsValid reports whether raw is already a canonical id (lowercase, correct
-    shape: LetterLen letters then the balance in digits).
-
-func NewID() (string, error)
-    NewID returns a fresh crypto/rand-backed id, uniform over the alphabet:
-    2 dictatable letters then 2 digits. Not reproducible - use SeededID for
-    parity.
-
-func Normalize(raw string) (string, error)
-    Normalize canonicalizes a spoken/typed id (trim + lowercase) into the
-    lowercase stored form, or returns an error when the result is not a valid
-    id.
-
-func SeededID(seed string) string
-    SeededID is the deterministic seed->id parity anchor (algorithm in
-    the package doc). Not for real ids - use NewID; this only reproduces
-    agent_id_vectors.json.
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/attribution
