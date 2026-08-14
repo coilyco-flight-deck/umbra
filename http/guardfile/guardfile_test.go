@@ -764,3 +764,54 @@ func TestRemovedDeploymentSyntaxFailsClosed(t *testing.T) {
 		})
 	}
 }
+
+// TestParseProviderDecl proves `provider <name> { exec ... }` parses, and that a
+// bare numeric flag survives as its literal token rather than a debug repr.
+func TestParseProviderDecl(t *testing.T) {
+	gf, err := Parse([]byte(`wrap ward ops x {
+		spec x.openapi.json
+		base-url "https://example.test/api"
+		auth bearer { value env "TOK" }
+		provider ssm {
+			exec aws ssm get-parameter --with-decryption --output text --name
+		}
+		provider tailscale {
+			exec tailscale ip -4
+		}
+		can get thing { op "get_thing" }
+	}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(gf.ProviderDecls) != 2 {
+		t.Fatalf("ProviderDecls = %d, want 2", len(gf.ProviderDecls))
+	}
+	if got := gf.ProviderDecls[0].Name; got != "ssm" {
+		t.Errorf("first provider = %q, want ssm", got)
+	}
+	// `-4` lexes as a KDL Int; it must reach argv as "-4", not "<kdl.Int -4>".
+	ts := gf.ProviderDecls[1].Exec
+	if len(ts) != 3 || ts[2] != "-4" {
+		t.Errorf("tailscale exec = %#v, want [tailscale ip -4] with a literal -4", ts)
+	}
+}
+
+// TestParseProviderFailsClosed proves a provider with no exec, or an unknown
+// child, is a parse error rather than a silently unresolvable value source.
+func TestParseProviderFailsClosed(t *testing.T) {
+	for name, body := range map[string]string{
+		"no exec":       `provider ssm { }`,
+		"unknown child": `provider ssm { shell "aws ssm get-parameter" }`,
+	} {
+		src := []byte(`wrap ward ops x {
+			spec x.openapi.json
+			base-url "https://example.test/api"
+			auth bearer { value env "TOK" }
+			` + body + `
+			can get thing { op "get_thing" }
+		}`)
+		if _, err := Parse(src); err == nil {
+			t.Errorf("%s: expected a fail-closed parse error, got nil", name)
+		}
+	}
+}

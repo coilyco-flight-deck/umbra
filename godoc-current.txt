@@ -113,7 +113,7 @@ func (g Grant) ExecBin(wrapBin string) string
     wrap's.
 
 type GrantInfo struct {
-	Name       string   `json:"name"`                  // dotted audit name, e.g. <cli>.ops.aws.s3.ls
+	Name       string   `json:"name"`                  // dotted audit name, e.g. <cli>.ops.<tool>.<sub>.<verb>
 	Subcommand []string `json:"subcommand,omitempty"`  // e.g. ["s3","ls"]; empty for the wildcard
 	Bin        string   `json:"bin,omitempty"`         // the funnel's own binary, set only for an inspect-list (`allow`) leaf
 	Exec       []string `json:"exec,omitempty"`        // tokens appended after the binary: the argv override when set, else the subcommand
@@ -152,6 +152,10 @@ type Guardfile struct {
 	// docs/execverb-actions.md.
 	Actions []guardfile.Action
 
+	// ProviderDecls are consumer-declared value resolvers shared with the spec
+	// dialect: `provider <name> { exec ... }`. See docs/value-providers.md.
+	ProviderDecls []guardfile.ProviderDecl
+
 	// Has unexported fields.
 }
     Guardfile is the parsed form of one exec-dialect wrap block.
@@ -178,7 +182,7 @@ type Runner func(ctx context.Context, bin string, argv, env []string) error
     real.
 
 type Surface struct {
-	Group       []string    `json:"group"`                 // command path, e.g. ["<cli>","ops","aws"]
+	Group       []string    `json:"group"`                 // command path, e.g. ["<cli>","ops","<tool>"]
 	Description string      `json:"description,omitempty"` // the guardfile's top-level `description` prose, "" when none
 	Bin         string      `json:"bin"`                   // the wrapped binary, fixed at parse; empty for an inspect list
 	ArgvPrefix  []string    `json:"argv_prefix,omitempty"` // unoverridable leading argv
@@ -903,6 +907,10 @@ type Guardfile struct {
 	Restrict     []Restriction
 	Actions      []Action
 	Fetches      []Fetch
+
+	// Providers are consumer-declared value resolvers: `provider <name> { exec ... }`.
+	// umbra ships no store SDK, so a store-backed source is an exec contract.
+	ProviderDecls []ProviderDecl
 }
     Guardfile is the parsed form of one wrap block.
 
@@ -942,6 +950,17 @@ type Poll struct {
     Poll re-fires a granted leaf (Verb+Resource) until Until settles or
     Timeout elapses, sampling Every; the last response binds to As. See
     specverb-actions.md.
+
+type ProviderDecl struct {
+	Name string
+	Exec []string
+}
+    ProviderDecl is one `provider <name> { exec <argv...> }` declaration.
+    The address being resolved is appended to Exec as the final argument.
+
+func ParseProviderNode(n *kdl.Node) (ProviderDecl, error)
+    ParseProviderNode exposes the provider grammar to the exec dialect, so both
+    dialects declare store-backed resolvers the same way.
 
 type QueryAuthParam struct {
 	Name  string
@@ -1511,6 +1530,10 @@ type Params struct {
 	// so the codegen wires exactly the resolvers in play. Empty for an exec member.
 	Providers []string
 
+	// ProviderDecls are the member's `provider <name> { exec ... }` declarations,
+	// the consumer-supplied resolvers for any non-builtin provider it names.
+	ProviderDecls []guardfile.ProviderDecl
+
 	// EmbeddedFiles are fixed build-time sources used as typed argv by an exec
 	// member. Empty for spec members.
 	EmbeddedFiles []EmbeddedFile
@@ -1523,7 +1546,7 @@ func Plan(gf *guardfile.Guardfile, guardfileName string) (Params, error)
     Plan derives the per-consumer Params from gf without rendering, the shared
     derivation behind both Render and the driver. guardfileName feeds the embed.
 
-func PlanExec(group, providers []string, guardfileName string) (Params, error)
+func PlanExec(group, providers []string, guardfileName string, decls []guardfile.ProviderDecl) (Params, error)
     PlanExec derives an exec member's Params from its wrap group and the
     provider names its env injections use; no upstream spec. See specgen.md.
 
@@ -1533,10 +1556,9 @@ type SetParams struct {
 	HasSpec   bool
 	HasExec   bool
 	HasEmbeds bool
-	// HasSSM / HasTailscale gate the consumer-side resolver blocks (and the AWS SDK
-	// import) the template emits, derived from the members' Providers by RenderParams.
-	HasSSM       bool
-	HasTailscale bool
+	// ExecProviders are the consumer-declared resolvers actually named by some
+	// member, deduped. umbra itself ships none. See docs/value-providers.md.
+	ExecProviders []guardfile.ProviderDecl
 }
     SetParams binds the merged-binary template: one shared Binary and N mounts.
     HasSpec/HasExec gate the per-transport imports the template emits.

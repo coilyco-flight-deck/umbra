@@ -8,6 +8,7 @@ nav:
   - Architecture: architecture.md
   - Features: FEATURES.md
   - Examples: examples.md
+  - Value providers: value-providers.md
   - CLI reference: https://coilysiren.github.io/cli-guard/cli/
   - Contributing: CONTRIBUTING.md
   - Code of Conduct: CODE_OF_CONDUCT.md

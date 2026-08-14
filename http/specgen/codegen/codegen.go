@@ -34,6 +34,10 @@ type Params struct {
 	// so the codegen wires exactly the resolvers in play. Empty for an exec member.
 	Providers []string
 
+	// ProviderDecls are the member's `provider <name> { exec ... }` declarations,
+	// the consumer-supplied resolvers for any non-builtin provider it names.
+	ProviderDecls []guardfile.ProviderDecl
+
 	// EmbeddedFiles are fixed build-time sources used as typed argv by an exec
 	// member. Empty for spec members.
 	EmbeddedFiles []EmbeddedFile
@@ -75,14 +79,15 @@ func Plan(gf *guardfile.Guardfile, guardfileName string) (Params, error) {
 		SpecURL:       specURL,
 		// Keyed on the full wrap group, not the binary, so two specs merged
 		// into one binary get distinct overrides (see docs/specgen.md).
-		SpecEnvVar: strings.ToUpper(strings.ReplaceAll(strings.Join(gf.Group, "_"), "-", "_")) + "_SPEC",
-		Providers:  gf.Providers(),
+		SpecEnvVar:    strings.ToUpper(strings.ReplaceAll(strings.Join(gf.Group, "_"), "-", "_")) + "_SPEC",
+		Providers:     gf.Providers(),
+		ProviderDecls: gf.ProviderDecls,
 	}, nil
 }
 
 // PlanExec derives an exec member's Params from its wrap group and the provider
 // names its env injections use; no upstream spec. See specgen.md.
-func PlanExec(group, providers []string, guardfileName string) (Params, error) {
+func PlanExec(group, providers []string, guardfileName string, decls []guardfile.ProviderDecl) (Params, error) {
 	if len(group) == 0 {
 		return Params{}, fmt.Errorf("codegen: exec Guardfile has no command group")
 	}
@@ -91,6 +96,7 @@ func PlanExec(group, providers []string, guardfileName string) (Params, error) {
 		Binary:        group[0],
 		GuardfileName: guardfileName,
 		Providers:     providers,
+		ProviderDecls: decls,
 	}, nil
 }
 
@@ -102,10 +108,9 @@ type SetParams struct {
 	HasSpec   bool
 	HasExec   bool
 	HasEmbeds bool
-	// HasSSM / HasTailscale gate the consumer-side resolver blocks (and the AWS SDK
-	// import) the template emits, derived from the members' Providers by RenderParams.
-	HasSSM       bool
-	HasTailscale bool
+	// ExecProviders are the consumer-declared resolvers actually named by some
+	// member, deduped. umbra itself ships none. See docs/value-providers.md.
+	ExecProviders []guardfile.ProviderDecl
 }
 
 // PlanSet derives the merged params for guardfiles that share a binary name. It
@@ -163,17 +168,18 @@ func RenderParams(sp SetParams) ([]byte, error) {
 	}
 	// Derive which consumer-side resolvers to wire from the members' providers, so
 	// a hand-assembled SetParams (the driver) and a planned one agree.
+	seenProv := map[string]bool{}
 	for _, m := range sp.Mounts {
 		if len(m.EmbeddedFiles) > 0 {
 			sp.HasEmbeds = true
 		}
 		for _, prov := range m.Providers {
-			switch prov {
-			case "ssm":
-				sp.HasSSM = true
-			case "tailscale":
-				sp.HasTailscale = true
+			decl, ok := declByName(sp.Mounts, prov)
+			if !ok || seenProv[prov] {
+				continue
 			}
+			seenProv[prov] = true
+			sp.ExecProviders = append(sp.ExecProviders, decl)
 		}
 	}
 	var buf bytes.Buffer
@@ -232,9 +238,8 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-{{if .HasTailscale}}	"os/exec"
+{{if .ExecProviders}}	"os/exec"
 	"strings"
-{{end}}{{if .HasSSM}}	"errors"
 {{end}}{{if .HasSpec}}	"io"
 	"net/http"
 	"time"
@@ -248,9 +253,7 @@ import (
 {{end}}{{if .HasExec}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
 {{end}}{{if .HasEmbeds}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/embedfile"
 {{end}}	"github.com/urfave/cli/v3"
-{{if .HasSSM}}	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-{{end}})
+)
 
 // Each member embeds its policy; a spec member also embeds its committed spec
 // lock. Refresh both with 'specgen lock'.
@@ -317,10 +320,27 @@ func embeddedSources() map[int]map[string]embedfile.Source {
 // no-SDK built-ins (env, file, literal) underneath. Shared by both transports.
 func providerRegistry() map[string]valuesource.Provider {
 	return map[string]valuesource.Provider{
-{{if .HasSSM}}		"ssm": ssmTokenResolver,
-{{end}}{{if .HasTailscale}}		"tailscale": tailscaleResolver,
+{{range .ExecProviders}}		"{{.Name}}": execProvider("{{.Name}}", []string{ {{range .Exec}}"{{.}}", {{end}}}),
 {{end}}	}
 }
+{{if .ExecProviders}}
+// execProvider runs a consumer-declared resolver, appending the address as the
+// final argument. Only stdout is read, so the value never reaches argv or logs.
+func execProvider(name string, argv []string) valuesource.Provider {
+	return func(ctx context.Context, address string) (string, error) {
+		args := append(append([]string{}, argv[1:]...), address)
+		out, err := exec.CommandContext(ctx, argv[0], args...).Output()
+		if err != nil {
+			return "", fmt.Errorf("provider %s: %s: %w", name, argv[0], err)
+		}
+		v := strings.TrimSpace(string(out))
+		if v == "" {
+			return "", fmt.Errorf("provider %s returned no value for %q", name, address)
+		}
+		return v, nil
+	}
+}
+{{end}}
 {{if .HasSpec}}
 // mountSpec parses one spec member's policy, resolves its spec, and mounts the
 // specverb tree onto app. The value providers resolve lazily at request time.
@@ -394,52 +414,17 @@ func auditWriter() *audit.Writer {
 func wrapWith(w *audit.Writer) func(verb.Spec) cli.ActionFunc {
 	return func(s verb.Spec) cli.ActionFunc { return verb.Wrap(s, w) }
 }
-{{if .HasTailscale}}
-// tailscaleResolver resolves a tailnet device name to its IPv4 via the local
-// tailscaled, so a base-url or host need not be committed. Read-only.
-func tailscaleResolver(ctx context.Context, device string) (string, error) {
-	out, err := exec.CommandContext(ctx, "tailscale", "ip", "-4", device).Output()
-	if err != nil {
-		return "", fmt.Errorf("tailscale ip -4 %s: %w", device, err)
-	}
-	ip := strings.TrimSpace(string(out))
-	if ip == "" {
-		return "", fmt.Errorf("tailscale returned no address for %q", device)
-	}
-	return ip, nil
-}
-{{end}}{{if .HasSSM}}
-func ssmTokenResolver(ctx context.Context, ssmPath string) (string, error) {
-	val, err := getSSMParam(ctx, ssmPath)
-	if err == nil {
-		return val, nil
-	}
-	// Stale static keys in ~/.aws/credentials shadow a same-name SSO profile, so
-	// retry without the credentials file. See docs/codegen-ssm-resolver.md.
-	if ssoVal, ssoErr := getSSMParam(ctx, ssmPath, awsconfig.WithSharedCredentialsFiles([]string{})); ssoErr == nil {
-		fmt.Fprintln(os.Stderr, "{{.Binary}}: note: ignored ~/.aws/credentials (it was shadowing an SSO profile); remove the stale static keys to silence this")
-		return ssoVal, nil
-	}
-	return "", err
-}
+`))
 
-func getSSMParam(ctx context.Context, ssmPath string, opts ...func(*awsconfig.LoadOptions) error) (string, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
-	if err != nil {
-		return "", fmt.Errorf("load aws config: %w", err)
+// declByName finds a declared provider across every member, so one member may
+// declare a resolver another member names. Builtins are absent by design.
+func declByName(mounts []Params, name string) (guardfile.ProviderDecl, bool) {
+	for _, m := range mounts {
+		for _, d := range m.ProviderDecls {
+			if d.Name == name {
+				return d, true
+			}
+		}
 	}
-	out, err := ssm.NewFromConfig(cfg).GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           &ssmPath,
-		WithDecryption: boolPtr(true),
-	})
-	if err != nil {
-		return "", fmt.Errorf("ssm get-parameter %s: %w", ssmPath, err)
-	}
-	if out.Parameter == nil || out.Parameter.Value == nil {
-		return "", errors.New("ssm get-parameter returned no value")
-	}
-	return *out.Parameter.Value, nil
+	return guardfile.ProviderDecl{}, false
 }
-
-func boolPtr(b bool) *bool { return &b }
-{{end}}`))

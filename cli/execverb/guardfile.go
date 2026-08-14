@@ -37,6 +37,10 @@ type Guardfile struct {
 	// docs/execverb-actions.md.
 	Actions []guardfile.Action
 
+	// ProviderDecls are consumer-declared value resolvers shared with the spec
+	// dialect: `provider <name> { exec ... }`. See docs/value-providers.md.
+	ProviderDecls []guardfile.ProviderDecl
+
 	// passthrough marks the `passthrough <bin>` sugar: exec + an implicit
 	// `can run *` funnel. It can never coexist with `exec` or a `can run` grant.
 	passthrough bool
@@ -279,8 +283,24 @@ func (gf *Guardfile) applyNode(n *kdl.Node) error {
 		return gf.appendPassClause(n, false)
 	case "when", "deny-when":
 		return gf.appendWrapWhen(n)
+	default:
+		return gf.applyTailNode(n)
+	}
+}
+
+// applyTailNode handles the remaining wrap-body nodes and the fail-closed
+// unknown fallback, split off to hold the cyclo cap.
+func (gf *Guardfile) applyTailNode(n *kdl.Node) error {
+	switch n.Name() {
 	case "action":
 		return gf.appendAction(n)
+	case "provider":
+		pd, err := guardfile.ParseProviderNode(n)
+		if err != nil {
+			return err
+		}
+		gf.ProviderDecls = append(gf.ProviderDecls, pd)
+		return nil
 	default:
 		return fmt.Errorf("execverb: unknown node %q in wrap body (fail-closed)", n.Name())
 	}
