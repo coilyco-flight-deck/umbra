@@ -10,14 +10,9 @@ Per-primitive detail behind the [FEATURES.md](FEATURES.md) index.
 - **exitcode** - Public exit-code taxonomy (success / generic / policy-denied / upstream-failed / internal / user-error) for orchestrators.
 - **gittree** - Clean+synced gate refusing repo-shaped verbs on a dirty tree.
 - **passthrough** - Thin wrapper that embeds an existing binary (aws, gh, kubectl, ...) as an audited urfave subcommand.
-- **repocfg** - Per-repo command allowlist loaded from a configurable YAML file.
-- **catalog** - Port of agentic-os's catalog-block-present hook. `Check` uses the first existing candidate path and asserts a top-level `catalog:` mapping with the required descriptor keys (kind, type, system, owner, lifecycle, description, dependsOn). Returns `[]Problem` like allowlist.
+- **repocfg** - Per-repo config loaded from a consumer-chosen YAML filename.
 - **egress** - Per-invocation CONNECT proxy with consumer-supplied allowlist. Enforce / observe modes.
-- **sudo** - Policy-free plumbing for driving interactive sudo over any stdin-piping transport without carrying a password at rest or leaking it through argv. /dev/tty prompt, in-place buffer wipe, `sudo -n` denial sentinel.
 - **respfmt** - JSON response renderer with optional JMESPath projection and five output formats (yaml, yaml-stream, json, text, table). Mirrors aws CLI's `--query` / `--output` surface; default flipped to yaml for editor-friendly piped output.
 - **skillgen** - Render an urfave/cli command tree into a deterministic markdown lookup table or yaml document. Pairs with verb: every wrapped Action is reachable by name from the output, so the rendered file mirrors the invocation surface.
 - **config** - Layered-config primitives: `~/<app-dir>` and `./<app-dir>` path helpers, `ExpandHome`, audit-slug derivation from `git remote get-url origin`, the `Audit` rotation-knobs struct, and a generic `OverlayFile[T]` helper.
-- **profiles** - Per-host lockdown profile registry. Loads `~/<app-dir>/<file>`, validates each declared profile against the profile axis vocabulary, resolves a name to a Coordinate. Missing file or unknown name falls back to `profile.Strictest()`.
-- **decision** - Per-call profile-aware evaluator. Resolves a session profile through profiles and returns an `audit.ProfileDecision` ready to attach to an audit row. Plug in via `verb.Spec.OnEvaluate`. Ships a default `audit.RedactPolicy` covering common secret-flag names and identifier patterns.
-- **shim**, **doctor** - Deny-by-structure pair (PATH-shim UX + basename-target enforcement with optional real-path integrity hints). See [deny-by-structure.md](deny-by-structure.md).
 - **guardfile**, **specverb**, **opcore** - Spec-driven verb subsystem, exact nested-string request body projection, and the frozen inline MCP proxy grammar. See [specverb.md](specverb.md) and [opcore-inline.md](opcore-inline.md).

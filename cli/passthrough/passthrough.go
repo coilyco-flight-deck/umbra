@@ -3,25 +3,18 @@
 package passthrough
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/shell"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/egress"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/ghcache"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
 	"github.com/urfave/cli/v3"
 )
-
-// ReadCacheClassifier inspects the post-WithArgvRewriter argv and
-// returns the gh-api-style path the call would read, a per-call max-age
-type ReadCacheClassifier func(argv []string) (path string, maxAge time.Duration, ok bool)
 
 // Option configures a pass-through Command. Use the With* helpers below
 // rather than setting fields directly.
@@ -34,7 +27,6 @@ type config struct {
 	egressMode   egress.Mode
 	verbName     string
 	argvRewriter func(argv []string) []string
-	readCache    ReadCacheClassifier
 	envFunc      func() (map[string]string, error)
 }
 
@@ -70,14 +62,6 @@ func WithArgvRewriter(fn func(argv []string) []string) Option {
 	}
 }
 
-// WithReadCache wires the pass-through into ghcache so reads matching
-// the supplied classifier are served from cache without exec, and
-func WithReadCache(classifier ReadCacheClassifier) Option {
-	return func(c *config) {
-		c.readCache = classifier
-	}
-}
-
 // WithEnvFunc injects extra env vars into the wrapped binary at exec time;
 // returned keys win over the parent env, resolved once per run just before exec.
 func WithEnvFunc(fn func() (map[string]string, error)) Option {
@@ -105,9 +89,9 @@ func Command(bin string, r *shell.Runner, w *audit.Writer, opts ...Option) *cli.
 		SkipPolicy: cfg.skipPolicy,
 	}
 	if cfg.egressOn {
-		spec.Action, spec.OnComplete = withEgressAction(bin, r, cfg.egressList, cfg.egressMode, cfg.argvRewriter, cfg.readCache, cfg.envFunc)
+		spec.Action, spec.OnComplete = withEgressAction(bin, r, cfg.egressList, cfg.egressMode, cfg.argvRewriter, cfg.envFunc)
 	} else {
-		spec.Action, spec.OnComplete = withStderrTail(bin, r, cfg.argvRewriter, cfg.readCache, cfg.envFunc)
+		spec.Action, spec.OnComplete = withStderrTail(bin, r, cfg.argvRewriter, cfg.envFunc)
 	}
 	return &cli.Command{
 		Name:            bin,
@@ -119,16 +103,12 @@ func Command(bin string, r *shell.Runner, w *audit.Writer, opts ...Option) *cli.
 
 // withStderrTail wraps the standard exec action so the wrapped tool's
 // stderr is tee'd into a bounded ring buffer. On non-zero exit the captured
-func withStderrTail(bin string, base *shell.Runner, rewriter func([]string) []string, readCache ReadCacheClassifier, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
+func withStderrTail(bin string, base *shell.Runner, rewriter func([]string) []string, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
 	tail := newTailBuffer(audit.MaxStderrTailBytes)
 	action := func(ctx context.Context, c *cli.Command) error {
 		argv := c.Args().Slice()
 		if rewriter != nil {
 			argv = rewriter(argv)
-		}
-		plan, hit := readCachePlan(base.Stdout, readCache, argv)
-		if hit {
-			return nil
 		}
 		shadow := *base
 		if err := applyEnvFunc(&shadow, envFunc); err != nil {
@@ -141,9 +121,7 @@ func withStderrTail(bin string, base *shell.Runner, rewriter func([]string) []st
 		} else {
 			shadow.Stderr = tail
 		}
-		plan.installStdoutTee(&shadow)
 		err := shadow.Exec(ctx, bin, argv...)
-		plan.storeIfSuccess(err)
 		return err
 	}
 	hook := func(rec *audit.Record) {
@@ -159,19 +137,13 @@ func withStderrTail(bin string, base *shell.Runner, rewriter func([]string) []st
 
 // withEgressAction wraps the standard exec action to start a per-invocation
 // proxy, inject HTTPS_PROXY/HTTP_PROXY into a per-call shadow Runner so
-func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode egress.Mode, rewriter func([]string) []string, readCache ReadCacheClassifier, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
+func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode egress.Mode, rewriter func([]string) []string, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
 	var rows []audit.EgressRow
 	tail := newTailBuffer(audit.MaxStderrTailBytes)
 	action := func(ctx context.Context, c *cli.Command) error {
 		argv := c.Args().Slice()
 		if rewriter != nil {
 			argv = rewriter(argv)
-		}
-		// Pre-exec read-cache check. On hit, skip the proxy and the
-		// subprocess - the cached body is already correct and the
-		plan, hit := readCachePlan(base.Stdout, readCache, argv)
-		if hit {
-			return nil
 		}
 		p := egress.New(allowlist, mode)
 		proxyURL, err := p.Start(ctx)
@@ -195,10 +167,8 @@ func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode e
 		} else {
 			shadow.Stderr = tail
 		}
-		plan.installStdoutTee(&shadow)
 		execErr := shadow.Exec(ctx, bin, argv...)
 		rows = p.Stop()
-		plan.storeIfSuccess(execErr)
 		return execErr
 	}
 	hook := func(rec *audit.Record) {
@@ -321,52 +291,4 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 
 func (t *tailBuffer) String() string {
 	return string(t.buf)
-}
-
-// readCachePlan is the per-invocation state produced by inspecting argv
-// against a ReadCacheClassifier. On hit, cached bytes are already
-type readCachePlanState struct {
-	path    string
-	capture *bytes.Buffer
-}
-
-// readCachePlan runs the classifier (if any) and acts on the result.
-// Hit: writes cached bytes to baseStdout, returns (_, true).
-func readCachePlan(baseStdout io.Writer, classifier ReadCacheClassifier, argv []string) (readCachePlanState, bool) {
-	if classifier == nil {
-		return readCachePlanState{}, false
-	}
-	path, maxAge, ok := classifier(argv)
-	if !ok {
-		return readCachePlanState{}, false
-	}
-	if data, hit := ghcache.MaybeServeMaxAge(path, maxAge); hit {
-		if baseStdout != nil {
-			_, _ = baseStdout.Write(data)
-		}
-		return readCachePlanState{}, true
-	}
-	return readCachePlanState{path: path, capture: &bytes.Buffer{}}, false
-}
-
-// installStdoutTee wires the plan's capture buffer into shadow.Stdout
-// so subprocess stdout is mirrored to both the operator's terminal
-func (p readCachePlanState) installStdoutTee(shadow *shell.Runner) {
-	if p.capture == nil {
-		return
-	}
-	if shadow.Stdout != nil {
-		shadow.Stdout = io.MultiWriter(shadow.Stdout, p.capture)
-	} else {
-		shadow.Stdout = p.capture
-	}
-}
-
-// storeIfSuccess writes the captured bytes back to ghcache iff the
-// subprocess exited successfully. A non-zero exit leaves the cache
-func (p readCachePlanState) storeIfSuccess(execErr error) {
-	if p.capture == nil || execErr != nil {
-		return
-	}
-	_ = ghcache.Store(p.path, p.capture.Bytes())
 }

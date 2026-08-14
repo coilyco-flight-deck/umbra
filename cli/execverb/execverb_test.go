@@ -179,8 +179,7 @@ const awsGuardfile = `wrap ward ops aws {
 	exec aws
 
 	can run "*" {
-		gate aws-read
-		describe "open aws passthrough behind the sensitive-read gate"
+		describe "open passthrough"
 	}
 }`
 
@@ -196,48 +195,21 @@ func TestWildcardPassthrough(t *testing.T) {
 	}
 }
 
-// TestAWSReadGateDeniesSensitiveRead proves the declared gate refuses a
-// read-only verb touching a sensitive token before any exec happens.
-func TestAWSReadGateDeniesSensitiveRead(t *testing.T) {
-	var cp capture
-	err := runArgv(t, awsGuardfile, &cp, "ops", "aws", "s3", "ls", "s3://prod-secrets-bucket")
-	if err == nil {
-		t.Fatal("expected the sensitive read to be denied, got nil")
-	}
-	if cp.bin != "" {
-		t.Errorf("denied invocation still executed: %s %v", cp.bin, cp.argv)
-	}
-	if !strings.Contains(err.Error(), "*secret*") {
-		t.Errorf("denial should name the matched pattern: %v", err)
-	}
-}
-
-// TestAWSReadGatePassesWrites proves write verbs skip the read gate.
-func TestAWSReadGatePassesWrites(t *testing.T) {
-	var cp capture
-	if err := runArgv(t, awsGuardfile, &cp, "ops", "aws", "ssm", "put-parameter", "--name", "/x/secret-thing"); err != nil {
-		t.Fatalf("write verb must pass the read gate: %v", err)
-	}
-}
-
-// awsWhenGuardfile is the shipped shape: `gate aws-read` replaced by a
-// self-describing `deny-when` over the aws CLI's read convention.
+// awsWhenGuardfile is the shipped shape: a self-describing `deny-when` over
+// the wrapped binary's argv.
 const awsWhenGuardfile = `wrap ward ops aws {
 	exec aws
 
 	can run "*" {
 		deny-when any-arg matches \
-			"*secret*" "*tfstate*" "arn:aws:iam::*:role/*admin*" \
-		{
-			only-reads
-		}
-		describe "open aws passthrough; sensitive reads denied pre-send"
+			"*secret*" "*tfstate*"
+		describe "open passthrough; sensitive tokens denied pre-send"
 	}
 }`
 
-// TestDenyWhenScopesToSensitiveReads proves the deny-when guard refuses a
-// sensitive read and passes writes (only-reads).
-func TestDenyWhenScopesToSensitiveReads(t *testing.T) {
+// TestDenyWhenDeniesSensitiveToken proves the deny-when guard refuses an
+// invocation naming a token that matches a sensitive glob, pre-send.
+func TestDenyWhenDeniesSensitiveToken(t *testing.T) {
 	var cp capture
 	err := runArgv(t, awsWhenGuardfile, &cp, "ops", "aws", "s3", "ls", "s3://prod-secrets-bucket")
 	if err == nil {
@@ -248,11 +220,6 @@ func TestDenyWhenScopesToSensitiveReads(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "*secret*") {
 		t.Errorf("denial should name the matched pattern: %v", err)
-	}
-
-	// a write naming the same sensitive token passes: the guard is read-scoped
-	if err := runArgv(t, awsWhenGuardfile, &cp, "ops", "aws", "ssm", "put-parameter", "--name", "/x/secret-thing"); err != nil {
-		t.Fatalf("write verb must skip the read-scoped guard: %v", err)
 	}
 }
 

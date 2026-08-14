@@ -10,18 +10,10 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
 
 - **passthrough** - Audited urfave subcommand around an existing binary.
 - **execverb** - Exec-dialect KDL verbs + the `passthrough <bin>` funnel. See [execverb.md](execverb.md); actions: [execverb-actions.md](execverb-actions.md).
-- **awsgate** - Deny sensitive-glob aws reads.
 - **verb** - Middleware around every `*cli.Command.Action`.
 - **shell** / **sandbox** - Subprocess exec + seccomp/namespace jail (Linux). See [sandbox](sandbox.md).
 - **gittree** - Clean+synced gate for repo-shaped verbs.
-- **repocfg** / **allowlist** - Per-repo command allowlist YAML, validated vs the Makefile.
-- **catalog** - Assert a repo config carries a `catalog:` block with required keys.
-- **hook** / **hookcfg** - PreToolUse engine expanding `repocfg.Security` into the guard registry + installer.
-- **shim** - PATH shim per protected binary basename. See [deny-by-structure.md](deny-by-structure.md).
-- **doctor** - Verify the basename target floor and integrity hints.
-- **sudo** - Policy-free sudo plumbing over any stdin transport.
-- **profiles** / **profile** / **decision** - Profiles and per-call evaluation.
-- **cmd/cli-guard-hook** - PreToolUse binary for shell-only consumers.
+- **repocfg** - Per-repo config file loading under a consumer-chosen filename.
 
 ### HTTP request surface (`http/`)
 
@@ -33,7 +25,6 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
   [body mapping](opcore-body-mapping.md) and [inline operations](opcore-inline.md).
 - **complex actions** - `poll`/`call`/`collect`. See [actions](specverb-actions.md).
 - **respfmt** - JSON renderer + JMESPath, five formats.
-- **ghcache** / **ghidcache** / **ghratelimit** / **stscache** - Response, id, rate-limit, STS caches.
 
 ### Shared core (`pkg/`)
 
@@ -43,17 +34,12 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
 - **exitcode** - Public exit-code taxonomy.
 - **valuesource** - Shared `value <provider>` resolution.
 - **config** - Layered-config primitives + `OverlayFile[T]`.
-- **agentclaim** - Versioned KDL and JSON identity contract. See
-  [agent-claim.md](agent-claim.md).
-- **fleetconfig** - Typed KDL fleet configuration. See [fleetconfig.md](fleetconfig.md).
 - **stepflow** - Transport-agnostic ordered sequence engine with explicit data threading.
 - **ttlcache** - Generic TTL-keyed cache.
-- **workdir** - Working-directory resolver.
 - **skillgen** - Render deterministic native agent skills from CLI command trees.
 - **broker** / **credseed** - Credential broker and env seeder. See [broker.md](broker.md).
 - **scan** / **attribution** / **flock** / **version** / **issueref** /
   **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
-- **agentid** - Canonical agent-id generator (Go port).
 
 ## Repo development
 

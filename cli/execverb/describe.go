@@ -111,9 +111,6 @@ func guardSentence(wc WhenClause) string {
 		selector = "shell " + strings.Join(wc.SourceCmd, " ")
 	}
 	clause := fmt.Sprintf("%s %s matches %s", verb, selector, strings.Join(wc.Patterns, " or "))
-	if wc.OnlyReads {
-		clause += " (read-only calls only)"
-	}
 	if wc.Describe != "" {
 		clause += " - " + wc.Describe
 	}

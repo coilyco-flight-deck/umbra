@@ -15,7 +15,7 @@ Designed to sit between AI agents (or any semi-trusted automation) and the host 
 - read / write / delete scope tokens, validated per verb
 - best-effort RepoRoot stamping that records each audit row's git toplevel (empty outside any repo)
 - clean+synced gate refusing repo-shaped verbs on a dirty tree
-- per-repo command allowlist loaded from per-repo YAML config files (e.g. `.<app>/<app>.yaml`)
+- per-repo config loaded from a consumer-chosen YAML filename (e.g. `.<app>/<app>.yaml`)
 - thin pass-through wrapper for embedding existing CLIs as audited subcommands
 - per-invocation CONNECT proxy with consumer-supplied egress allowlist
 - public exit-code taxonomy for orchestrators

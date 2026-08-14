@@ -170,16 +170,13 @@ type WhenClause struct {
 	// `when` / `only pass` (refuse on no match).
 	Deny bool
 
-	// OnlyReads scopes the guard to read-only aws operations.
-	OnlyReads bool
-
 	// Describe is the optional teaching note rendered in the describe surface.
 	Describe string
 }
 
 // GateSpec names a registered preflight gate plus its declarative config.
 type GateSpec struct {
-	Name     string   // registry key, e.g. "aws-read"
+	Name     string   // registry key; consumers register their own gates
 	Patterns []string // gate-specific deny globs; empty = gate defaults
 	Allow    []string // explicit allow globs
 }
@@ -718,8 +715,8 @@ func singleGrantArg(c *kdl.Node) (string, error) {
 	return args[0].String(), nil
 }
 
-// parseWhen reads a `when|deny-when <selector> matches <glob...>` guard and its
-// optional `{ only-reads }` qualifier block.
+// parseWhen reads a `when|deny-when <selector> matches <glob...>` guard. It
+// takes no qualifiers; any child node fails closed.
 func parseWhen(c *kdl.Node) (WhenClause, error) {
 	args := c.Arguments()
 	if len(args) < 3 || args[1].String() != "matches" {
@@ -729,16 +726,8 @@ func parseWhen(c *kdl.Node) (WhenClause, error) {
 	for _, a := range args[2:] {
 		wc.Patterns = append(wc.Patterns, a.String())
 	}
-	for _, n := range c.Children().Nodes {
-		switch n.Name() {
-		case "only-reads":
-			if len(n.Arguments()) != 0 {
-				return WhenClause{}, fmt.Errorf("execverb: %s: `only-reads` takes no value", c.Name())
-			}
-			wc.OnlyReads = true
-		default:
-			return WhenClause{}, fmt.Errorf("execverb: %s: unknown qualifier %q (fail-closed)", c.Name(), n.Name())
-		}
+	if nodes := c.Children().Nodes; len(nodes) > 0 {
+		return WhenClause{}, fmt.Errorf("execverb: %s: unknown qualifier %q (fail-closed)", c.Name(), nodes[0].Name())
 	}
 	return wc, nil
 }

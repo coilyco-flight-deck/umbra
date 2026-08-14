@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/awsgate"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
 	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/valuesource"
@@ -271,21 +270,7 @@ type gateFunc func(argv []string) error
 
 // gateRegistry maps Guardfile gate names onto builders. Unknown names fail
 // closed at build time, so a typo can never become a silently absent gate.
-var gateRegistry = map[string]func(GateSpec) gateFunc{
-	"aws-read": awsReadGate,
-}
-
-// awsReadGate adapts awsgate's sensitive-read denial to the gate contract.
-func awsReadGate(gs GateSpec) gateFunc {
-	g := awsgate.Gate{Patterns: gs.Patterns, AllowPatterns: gs.Allow}
-	return func(argv []string) error {
-		token, pattern, denied := g.Check(argv)
-		if !denied {
-			return nil
-		}
-		return fmt.Errorf("read-only aws denied: %q matched the sensitive-read pattern %q (add an allow glob to proceed deliberately)", token, pattern)
-	}
-}
+var gateRegistry = map[string]func(GateSpec) gateFunc{}
 
 // buildGates resolves a grant's gate specs against the registry, fail-closed.
 func buildGates(g Grant) ([]gateFunc, error) {
@@ -394,12 +379,6 @@ func checkWhens(ctx context.Context, whens []WhenClause, g Grant, args []string,
 // evalWhen applies a guard's match rule: only/when refuses on no match, never/
 // deny-when on a match. Selector is argv or a `shell <cmd>` fact. See docs.
 func evalWhen(ctx context.Context, wc WhenClause, g Grant, args []string, host HostResolver) error {
-	if wc.OnlyReads {
-		full := append(append([]string{}, g.Subcommand...), args...)
-		if !awsgate.IsReadOnly(full) {
-			return nil // guard is scoped to reads; this is not one
-		}
-	}
 	values, err := selectorValues(ctx, wc, args, host)
 	if err != nil {
 		return err // a shell source that fails to resolve fails the guard closed
@@ -449,11 +428,11 @@ func whenLabel(wc WhenClause, g Grant) string {
 }
 
 // firstMatch returns the first (value, pattern) pair where a selector value
-// matches a glob, case-insensitively, with the aws-read gate's `*` semantics.
+// matches a glob, case-insensitively, with globMatch's `*` semantics.
 func firstMatch(values, patterns []string) (val, pat string, ok bool) {
 	for _, v := range values {
 		for _, p := range patterns {
-			if awsgate.GlobMatch(strings.ToLower(p), strings.ToLower(v)) {
+			if globMatch(strings.ToLower(p), strings.ToLower(v)) {
 				return v, p, true
 			}
 		}
@@ -466,10 +445,10 @@ func firstMatch(values, patterns []string) (val, pat string, ok bool) {
 func resolveSelector(sel string, args []string) []string {
 	switch {
 	case sel == "any-arg":
-		return awsgate.Positionals(args)
+		return positionals(args)
 	case strings.HasPrefix(sel, "arg") && isAllDigits(sel[len("arg"):]):
 		idx, _ := strconv.Atoi(sel[len("arg"):])
-		pos := awsgate.Positionals(args)
+		pos := positionals(args)
 		if idx >= 0 && idx < len(pos) {
 			return []string{pos[idx]}
 		}
