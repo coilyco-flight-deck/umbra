@@ -489,77 +489,6 @@ type SudoPolicy struct {
     SudoPolicy carries sudo-posture expectations doctor checks against.
 
 
-## forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox
-
-package sandbox // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox"
-
-Package sandbox jails a consumer's gate-spawned child in a Linux user+mount
-namespace so the child and its descendants re-enter the gate; no-op off Linux.
-
-CONSTANTS
-
-const (
-	// EnvJailed is "1" inside the jail; re-entrant gate calls then skip
-	// re-cloning and resolve the real binary instead of the shim.
-	EnvJailed = "CLIGUARD_JAILED"
-
-	// EnvNoSandbox, when truthy, opts out of the jail: Wrap no-ops, tools run
-	// directly (for containers / namespace-denying shells). See docs/sandbox.md.
-	EnvNoSandbox = "CLIGUARD_NO_SANDBOX"
-)
-    Env keys shared between the launcher (parent) and the jail helper (child).
-
-
-FUNCTIONS
-
-func IsJailInvocation(argv []string) bool
-    IsJailInvocation reports whether argv is the internal jail-helper re-exec;
-    the consumer's main calls RunJail when true.
-
-func Jailed() bool
-    Jailed reports whether the current process is already running inside a jail.
-
-func NoSandbox() bool
-    NoSandbox reports whether the operator opted out of the jail via
-    EnvNoSandbox. Accepts 1/true/yes/on (case-insensitive).
-
-func RealBin(bin string) string
-    RealBin returns the stashed real path for bin inside a jail (else ""),
-    so the gate execs the real tool rather than looping back into the shim.
-
-func RealBinEnv(tool string) string
-    RealBinEnv returns the env-var name carrying tool's stashed real path,
-    upper-casing the name and mapping non-alphanumerics to '_'.
-
-func RunJail(args []string) error
-    RunJail is the in-namespace helper: it shims the wrapped tools, installs the
-    seccomp denylist, and execs the real tool (args is os.Args[2:]).
-
-func SetupDenied(cmd *exec.Cmd, err error) bool
-    SetupDenied reports whether a jailed cmd failed to *start* on a clone
-    denial (EPERM/EACCES, child never ran), so the caller may retry it.
-    See docs/sandbox.md.
-
-func Wrap(cmd *exec.Cmd, realPath string, argv []string, spec *Spec)
-    Wrap rewrites cmd to re-exec the consumer binary as the jail helper in a
-    fresh user+mount namespace. No-op when jailed, opted out (EnvNoSandbox),
-    or spec nil.
-
-
-TYPES
-
-type Spec struct {
-	// SelfExe is the consumer binary path, re-execed as the jail helper and
-	// bind-mounted over each wrapped tool as the shim (os.Executable()).
-	SelfExe string
-	// Tools is the set of wrapped-tool basenames to shim inside the jail,
-	// e.g. []string{"brew"}; each is bind-mounted over with SelfExe.
-	Tools []string
-}
-    Spec configures the jail applied to a sandboxed child. A nil *Spec on a
-    shell.Runner means "run directly" — the pre-sandbox behavior.
-
-
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/shell
 
 package shell // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/shell"
@@ -594,9 +523,6 @@ type Runner struct {
 	// Env, when non-nil, is appended to os.Environ() and passed to the
 	// child as cmd.Env. Used by the egress-proxy plumbing to inject
 	Env []string
-	// Sandbox, when non-nil, jails the child (Linux) so it and its descendants
-	// re-enter the gate before invoking a wrapped tool. nil = run directly.
-	Sandbox *sandbox.Spec
 }
     Runner executes subprocesses on behalf of consumer verbs. Build one in main
     with the default Resolver and plumb it through to verbs that need it.
@@ -2357,7 +2283,7 @@ const AuditSubdir = "audit"
 const CacheSubdir = "cache"
     CacheSubdir is the subdirectory under the app dir holding the ttl caches.
 
-const FallbackAppDir = ".cli-guard"
+const FallbackAppDir = ".umbra"
     FallbackAppDir is the app dir used when the consumer never calls SetAppDir.
     It is the framework's own name, so an unconfigured deployment owns nobody.
 
@@ -2397,9 +2323,8 @@ func DefaultAuditPath() (string, error)
     derived from the current git repo's origin remote. Falls back to
 
 func EnvName(suffix string) string
-    EnvName derives a consumer-scoped env var from the app dir base (".ward"
-    + "_CACHE_DIR" -> "WARD_CACHE_DIR"); unset falls back to the "CLI_GUARD"
-    token.
+    EnvName derives a consumer-scoped env var from the app dir base (".ward" +
+    "_CACHE_DIR" -> "WARD_CACHE_DIR"); unset falls back to the "UMBRA" token.
 
 func ExpandHome(p string) string
     ExpandHome turns a leading "~/" or "~" into the user's home directory.

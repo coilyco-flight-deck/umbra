@@ -10,9 +10,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync"
-
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox"
 )
 
 // Resolver turns a binary name into an executable path. Pluggable so tests
@@ -39,9 +36,6 @@ type Runner struct {
 	// Env, when non-nil, is appended to os.Environ() and passed to the
 	// child as cmd.Env. Used by the egress-proxy plumbing to inject
 	Env []string
-	// Sandbox, when non-nil, jails the child (Linux) so it and its descendants
-	// re-enter the gate before invoking a wrapped tool. nil = run directly.
-	Sandbox *sandbox.Spec
 }
 
 // ErrEmptyBinary is returned when Exec or Capture is called with "".
@@ -54,12 +48,8 @@ func (r *Runner) resolver() Resolver {
 	return PathResolver
 }
 
-// resolvePath resolves bin, preferring the jail's stashed real binary so the
-// gate execs the tool itself rather than looping back into the shim.
+// resolvePath resolves bin through the Runner's resolver.
 func (r *Runner) resolvePath(bin string) (string, error) {
-	if p := sandbox.RealBin(bin); p != "" {
-		return p, nil
-	}
 	return r.resolver()(bin)
 }
 
@@ -96,33 +86,7 @@ func (r *Runner) execIn(ctx context.Context, dir, bin string, argv ...string) er
 		}
 		return cmd
 	}
-	cmd := build()
-	if r.Sandbox != nil {
-		// Linux + not-already-jailed: re-exec through the jail helper; else no-op.
-		sandbox.Wrap(cmd, path, argv, r.Sandbox)
-	}
-	runErr := cmd.Run()
-	if sandbox.SetupDenied(cmd, runErr) {
-		// The environment denied the jail (restricted shell / container without
-		// userns). Degrade to an unsandboxed run rather than dying. See docs/sandbox.md.
-		r.warnSandboxDenied()
-		return build().Run()
-	}
-	return runErr
-}
-
-// sandboxDenyWarnOnce ensures the degrade warning prints at most once per
-// process, not per exec (the reaper shells out several times).
-var sandboxDenyWarnOnce sync.Once
-
-// warnSandboxDenied emits the one-time degrade notice to the Runner's Stderr.
-func (r *Runner) warnSandboxDenied() {
-	sandboxDenyWarnOnce.Do(func() {
-		if r.Stderr == nil {
-			return
-		}
-		_, _ = fmt.Fprintf(r.Stderr, "umbra: namespace sandbox unavailable here; running tools unsandboxed (set %s=1 to silence). See docs/sandbox.md.\n", sandbox.EnvNoSandbox)
-	})
+	return build().Run()
 }
 
 // Capture runs bin with argv and returns stdout as bytes. Stderr is forwarded

@@ -33,7 +33,7 @@ Pre-commit runs the Go checks (vet, golangci-lint, go-mod-tidy, godoc-current) p
 
 ## Safety
 
-umbra ships no embedded denylist. It is a policy-free engine: the policy lives in the consumer's own KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`, `sandbox`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`). See [architecture.md](docs/architecture.md).
+umbra ships no embedded denylist. It is a policy-free engine: the policy lives in the consumer's own KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`). See [architecture.md](docs/architecture.md).
 
 ## Cross-repo contracts
 
