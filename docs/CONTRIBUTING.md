@@ -1,4 +1,4 @@
-# Contributing to cli-guard
+# Contributing to umbra
 
 Thank you for your interest! :wave:
 
@@ -8,7 +8,7 @@ This project is run on volunteer time, so please have patience.
 
 1. **Open an issue first.** Every commit in this repo closes a same-repo issue (`closes #N` in the commit body). Discussion happens in the issue; the PR is the change itself. This applies even to trivial fixes - the issue gives the change a stable URL.
 2. **Stay close to scope.** The four cli-* repos are intentionally small. Features that pull this package out of its lane will get pushed back, even when well-intentioned. The [README](https://github.com/coilysiren/cli-guard#readme) and [docs/FEATURES.md](https://github.com/coilysiren/cli-guard/blob/main/docs/FEATURES.md) describe the surface; if your idea expands it, lead with an issue arguing for the expansion.
-3. **Run the dev verbs before pushing.** Local dev routes straight through `make` (cli-guard is the framework itself, not a guarded consumer):
+3. **Run the dev verbs before pushing.** Local dev routes straight through `make` (umbra is the framework itself, not a guarded consumer):
 
    ```
    make build

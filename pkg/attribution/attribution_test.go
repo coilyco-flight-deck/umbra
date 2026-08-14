@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/attribution"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/attribution"
 )
 
 func TestLabel(t *testing.T) {

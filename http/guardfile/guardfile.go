@@ -870,7 +870,7 @@ func applyActionStep(act *Action, c *kdl.Node) error {
 		act.Calls = append(act.Calls, call)
 		return nil
 	case "canary":
-		return fmt.Errorf("`canary` is no longer supported: cli-guard sequences authorized calls but does not own health policy (fail-closed)")
+		return fmt.Errorf("`canary` is no longer supported: umbra sequences authorized calls but does not own health policy (fail-closed)")
 	default:
 		if reservedActionKeywords[c.Name()] {
 			return fmt.Errorf("%q is reserved for a future version, not implemented in v1 (fail-closed)", c.Name())
@@ -1245,7 +1245,7 @@ func parseCall(n *kdl.Node) (Call, error) {
 			}
 			cl.As = v
 		case "compensate":
-			return Call{}, fmt.Errorf("`compensate` is no longer supported: cli-guard does not perform automatic rollback (fail-closed)")
+			return Call{}, fmt.Errorf("`compensate` is no longer supported: umbra does not perform automatic rollback (fail-closed)")
 		default:
 			if reservedActionKeywords[c.Name()] {
 				return Call{}, fmt.Errorf("call: %q is reserved for a future version (fail-closed)", c.Name())

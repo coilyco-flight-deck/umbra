@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"sync"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/sandbox"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox"
 )
 
 // Resolver turns a binary name into an executable path. Pluggable so tests
@@ -121,7 +121,7 @@ func (r *Runner) warnSandboxDenied() {
 		if r.Stderr == nil {
 			return
 		}
-		_, _ = fmt.Fprintf(r.Stderr, "cli-guard: namespace sandbox unavailable here; running tools unsandboxed (set %s=1 to silence). See docs/sandbox.md.\n", sandbox.EnvNoSandbox)
+		_, _ = fmt.Fprintf(r.Stderr, "umbra: namespace sandbox unavailable here; running tools unsandboxed (set %s=1 to silence). See docs/sandbox.md.\n", sandbox.EnvNoSandbox)
 	})
 }
 

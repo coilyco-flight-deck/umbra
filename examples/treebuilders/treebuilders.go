@@ -14,15 +14,15 @@ import (
 	"os/exec"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/gittree"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/passthrough"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/repocfg"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/shell"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/egress"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/policy"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/gittree"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/passthrough"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/repocfg"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/shell"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/egress"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 	"github.com/urfave/cli/v3"
 )
 
@@ -31,13 +31,13 @@ import (
 func Audit(writer *audit.Writer) *cli.Command {
 	return &cli.Command{
 		Name:    "demo",
-		Usage:   "tiny cli-guard demo app",
+		Usage:   "tiny umbra demo app",
 		Version: "v0.0.0",
-		Description: `demo is the smallest end-to-end exercise of the cli-guard pipeline:
+		Description: `demo is the smallest end-to-end exercise of the umbra pipeline:
 
     1. The wrapped Action runs through policy.ValidateArg over every
        user-supplied string before execve.
-    2. An append-only JSONL row lands in $TMPDIR/cli-guard-demo.jsonl
+    2. An append-only JSONL row lands in $TMPDIR/umbra-demo.jsonl
        with timestamp, argv, cwd, exit code, and the forensic RepoRoot
        (git toplevel of cwd, or empty outside any repo).
 
@@ -54,14 +54,14 @@ Operating model for an agent calling these commands:
       not retry; the host is broken (disk full, perms wrong, dir not
       writable). Surface to the operator.
     - Inspect the audit row after the call to reconstruct what
-      happened: ` + "`tail -1 \"$TMPDIR/cli-guard-demo.jsonl\" | jq`" + `.`,
+      happened: ` + "`tail -1 \"$TMPDIR/umbra-demo.jsonl\" | jq`" + `.`,
 		Commands: []*cli.Command{
 			{
 				Name:      "hello",
 				Usage:     "print a greeting",
 				ArgsUsage: "<name>",
 				Description: `Audited greeting verb. Demonstrates verb.Wrap composing every
-cli-guard primitive on a single Action.
+umbra primitive on a single Action.
 
 Examples:
 
@@ -155,7 +155,7 @@ func Egress() *cli.Command {
 		Usage:   "show the CONNECT-proxy allowlist gate",
 		Version: "v0.0.0",
 		Description: `egress-demo exercises the per-invocation HTTP CONNECT proxy that
-cli-guard stands up for the duration of a wrapped subprocess. The
+umbra stands up for the duration of a wrapped subprocess. The
 child inherits HTTPS_PROXY / HTTP_PROXY pointing at a local proxy on
 127.0.0.1:<random-port>. The proxy logs every CONNECT, joins the
 rows back to the parent invocation's audit row, and either enforces a
@@ -240,7 +240,7 @@ Examples:
 
 What the child sees: a normal-looking HTTP 403 from its proxy. From
 the child's perspective the upstream simply did not respond. There
-is no special signal that cli-guard caused the failure, and that is
+is no special signal that umbra caused the failure, and that is
 intentional: we do not want to teach hostile code to fingerprint the
 gate and route around it. The forensic trail lives in the audit row,
 not in the child's error message.
@@ -279,7 +279,7 @@ load-bearing telemetry.
 Operating model: a row with decision=observe is not an alert; it is
 expected. Anomaly detection on the observed-row stream is a
 downstream concern, not a consumer-internal one. Tools that aggregate
-these rows belong in the telemetry repo, not in cli-guard.`,
+these rows belong in the telemetry repo, not in umbra.`,
 				Action: func(ctx context.Context, _ *cli.Command) error {
 					return egressRun(ctx, "https://www.iana.org/", egress.ModeObserve)
 				},
@@ -537,7 +537,7 @@ Examples:
     # forward to /bin/echo
     passthrough-demo -- echo hello world
     # hello world
-    # audit log: $TMPDIR/cli-guard-passthrough.jsonl
+    # audit log: $TMPDIR/umbra-passthrough.jsonl
 
     # rejected by policy
     passthrough-demo -- echo 'hello; rm -rf /'
@@ -560,7 +560,7 @@ wrapper script that pre-tokenizes the input, not a runtime escape.`
 		Name:    "passthrough-demo",
 		Usage:   "wrap an existing binary as an audited subcommand",
 		Version: "v0.0.0",
-		Description: `passthrough-demo exercises cli-guard's thin pass-through. The pattern
+		Description: `passthrough-demo exercises umbra's thin pass-through. The pattern
 wraps any external CLI (aws, gh, kubectl, docker, tailscale, plus
 every package manager) as a single consumer verb with two properties:
 
@@ -611,13 +611,13 @@ func Policy() *cli.Command {
 		Name:    "policy-demo",
 		Usage:   "show shell-metacharacter argv rejection",
 		Version: "v0.0.0",
-		Description: `policy-demo exercises cli-guard's argv pre-validation gate. Every call
+		Description: `policy-demo exercises umbra's argv pre-validation gate. Every call
 into a wrapped Action passes through policy.ValidateArg before execve.
 The gate rejects any string containing one of these bytes:
 
     ` + "`" + `  $  ;  &  |  <  >  (  )  {  }  \  \n  \r  \t
 
-Why this exists, even though cli-guard always builds an explicit argv
+Why this exists, even though umbra always builds an explicit argv
 slice and never invokes /bin/sh: a non-trivial fraction of downstream
 tools hand their last positional argument to a remote shell. Examples:
 
@@ -625,7 +625,7 @@ tools hand their last positional argument to a remote shell. Examples:
     kubectl exec pod -- sh -c '<command>'
     git config --global core.editor '<editor-cmd>'
 
-If the agent driving cli-guard never sanitizes inputs and the wrapped
+If the agent driving umbra never sanitizes inputs and the wrapped
 tool unsplats argv into a shell on the other side, a single semicolon
 in an argument turns a benign verb into a chained injection. Rejecting
 the metacharacters at the consumer boundary keeps that one-layer leak
@@ -690,7 +690,7 @@ least one value.`,
 				Description: `Identical Action body to ` + "`safe`" + `. Named "unsafe" only because the docs
 expect the operator to feed it a metacharacter-bearing input. Useful
 for an agent verifying the gate is wired before trusting the rest of
-cli-guard's audit chain.
+umbra's audit chain.
 
 Examples:
 
@@ -737,7 +737,7 @@ func Repocfg(cfg *repocfg.Config) *cli.Command {
 		Name:    "repocfg-demo",
 		Usage:   "show per-repo command allowlist loading",
 		Version: "v0.0.0",
-		Description: `repocfg-demo exercises the per-repo command allowlist. cli-guard
+		Description: `repocfg-demo exercises the per-repo command allowlist. umbra
 walks up from cwd looking for a .ward/ward.yaml that declares
 named verbs (build, test, lint, deploy, ...). Each verb is a fixed
 argv. Each argv token is policy.ValidateArg'd at load time, so the

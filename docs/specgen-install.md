@@ -14,7 +14,7 @@ scoop bucket add coilyco https://forgejo.coilysiren.me/coilyco-flight-deck/scoop
 scoop install coilyco/specgen
 ```
 
-Each cli-guard tag also publishes raw `specgen` binaries for Linux, macOS, and
+Each umbra tag also publishes raw `specgen` binaries for Linux, macOS, and
 Windows on amd64 and arm64. Verify the selected binary against the release's
 `SHA256SUMS`, rename it to `specgen` (or `specgen.exe`), and place it on
 `PATH`.
@@ -22,11 +22,11 @@ Windows on amd64 and arm64. Verify the selected binary against the release's
 Go users can install the tagged command directly:
 
 ```sh
-GOPRIVATE=forgejo.coilysiren.me go install forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cmd/specgen@vX.Y.Z
+GOPRIVATE=forgejo.coilysiren.me go install forgejo.coilysiren.me/coilyco-flight-deck/umbra/cmd/specgen@vX.Y.Z
 ```
 
 The packaged driver still invokes the Go toolchain for `lock`, `build`, and
-`run`. `specgen --version` prints the driver version and the cli-guard module
+`run`. `specgen --version` prints the driver version and the umbra module
 ref that an unqualified `lock` will freeze. Release binaries and tagged
 `go install` builds report the same tag for both values. A source checkout
 reports `(devel)` and defaults the lock ref to `latest`.

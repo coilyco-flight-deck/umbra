@@ -14,7 +14,7 @@ const (
 	DataSecurityMax    = "max"
 )
 
-// RedactPolicy carries the patterns the consumer wants applied. cli-guard
+// RedactPolicy carries the patterns the consumer wants applied. umbra
 // supplies the mechanism; the consumer supplies the patterns.
 type RedactPolicy struct {
 	// SecretFlagPatterns is a list of flag-name prefixes (with leading

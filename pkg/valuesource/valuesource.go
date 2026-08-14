@@ -1,4 +1,4 @@
-// Package valuesource is cli-guard's shared value-resolution layer: a Provider
+// Package valuesource is umbra's shared value-resolution layer: a Provider
 // reads a named address at request time, so neither engine imports a store SDK.
 package valuesource
 
@@ -13,7 +13,7 @@ import (
 // registers store-backed resolvers; the same func type drives both engines.
 type Provider func(ctx context.Context, address string) (string, error)
 
-// Builtins are the store-agnostic resolvers cli-guard ships itself: no SDK, no
+// Builtins are the store-agnostic resolvers umbra ships itself: no SDK, no
 // wiring. A consumer entry of the same name overrides one via Merge.
 func Builtins() map[string]Provider {
 	return map[string]Provider{

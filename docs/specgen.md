@@ -29,7 +29,7 @@ compiles their bytes into the binary and supplies absolute runtime paths.
 ## The five verbs
 
 - **`gen`** - render merged `main.go` into the cache, or use `--out` to inspect it.
-- **`lock`** - the deliberate online step. For each member, reads a [vendored source](specgen-vendored-sources.md) or fetches upstream Swagger, **prunes it to the granted surface**, and writes the deterministic gzip lock. It then resolves and freezes the merged module graph in `specverb.lock`. `--cli-guard-ref` pins the framework version; `--cli-guard-replace` points at a local checkout.
+- **`lock`** - the deliberate online step. For each member, reads a [vendored source](specgen-vendored-sources.md) or fetches upstream Swagger, **prunes it to the granted surface**, and writes the deterministic gzip lock. It then resolves and freezes the merged module graph in `specverb.lock`. `--umbra-ref` pins the framework version; `--umbra-replace` points at a local checkout.
 - **`skew`** - prune live upstream to the granted surface and diff it against each committed lock. Exit 3 on drift and never write.
 - **`build`** - materialize the binary **out-of-band** (same cache + staleness path as `run`) and copy it to `--out` (default `bin`) instead of execing it. `--out` follows `go build -o`: a directory (or trailing `/`) takes the generated binary name, else it is the explicit file path. Windows adds `.exe` to either form when it is absent. `--binary <name>` sets that generated name, defaulting to the Guardfile-derived binary. `--set-version <v>` stamps the binary's `--version` via `-ldflags`, default `dev`. Refuses without committed locks.
 - **`run`** - materialize the consumer binary **out-of-band** and exec it with passed-through args.

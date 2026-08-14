@@ -27,7 +27,7 @@ The argv gate (`verb.Wrap` → `policy.ValidateArg`) refuses shell metacharacter
 
 ## Firing
 
-- **Auth** (header-token) resolves the secret through the value-provider registry (`value <provider> "addr"`), keeping the AWS SDK and other store clients out of cli-guard - the consumer registers the real `ssm`/`tailscale` resolvers, tests inject a fake or lean on the `env`/`file`/`literal` built-ins.
+- **Auth** (header-token) resolves the secret through the value-provider registry (`value <provider> "addr"`), keeping the AWS SDK and other store clients out of umbra - the consumer registers the real `ssm`/`tailscale` resolvers, tests inject a fake or lean on the `env`/`file`/`literal` built-ins.
 - **`--dry-run`** prints the resolved request with the secret redacted and fires nothing.
 - Live responses render through the `respfmt` `--query`/`--output` rail; an empty 2xx prints an `ok:` confirmation line.
 - The default client refuses redirects for mutating methods, so a renamed or transferred target cannot silently swallow a write.

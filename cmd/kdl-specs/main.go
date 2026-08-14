@@ -6,7 +6,7 @@ import (
 	"context"
 	"os"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/internal/specgencli"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/internal/specgencli"
 )
 
 func main() {

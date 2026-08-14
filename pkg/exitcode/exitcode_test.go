@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 )
 
 func TestCodedError_RoundTrip(t *testing.T) {

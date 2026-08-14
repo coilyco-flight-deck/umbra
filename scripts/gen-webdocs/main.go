@@ -1,4 +1,4 @@
-// Command gen-webdocs renders each cli-guard example's CLI tree as a
+// Command gen-webdocs renders each umbra example's CLI tree as a
 // static HTML site under ../../site/cli/<example>/ via cli-web-docs.
 package main
 
@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/examples/treebuilders"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/examples/treebuilders"
 	webdocs "github.com/coilysiren/cli-web-docs"
 	"github.com/coilysiren/cli-web-docs/layout"
 	"github.com/urfave/cli/v3"
@@ -22,13 +22,13 @@ type entry struct {
 
 func main() {
 	entries := []entry{
-		{"audit", "cli-guard examples/audit", func() *cli.Command { return treebuilders.Audit(nil) }},
-		{"egress", "cli-guard examples/egress", treebuilders.Egress},
-		{"exitcode", "cli-guard examples/exitcode", treebuilders.Exitcode},
-		{"gittree", "cli-guard examples/gittree", treebuilders.Gittree},
-		{"passthrough", "cli-guard examples/passthrough", func() *cli.Command { return treebuilders.Passthrough(nil, nil) }},
-		{"policy", "cli-guard examples/policy", treebuilders.Policy},
-		{"repocfg", "cli-guard examples/repocfg", func() *cli.Command { return treebuilders.Repocfg(nil) }},
+		{"audit", "umbra examples/audit", func() *cli.Command { return treebuilders.Audit(nil) }},
+		{"egress", "umbra examples/egress", treebuilders.Egress},
+		{"exitcode", "umbra examples/exitcode", treebuilders.Exitcode},
+		{"gittree", "umbra examples/gittree", treebuilders.Gittree},
+		{"passthrough", "umbra examples/passthrough", func() *cli.Command { return treebuilders.Passthrough(nil, nil) }},
+		{"policy", "umbra examples/policy", treebuilders.Policy},
+		{"repocfg", "umbra examples/repocfg", func() *cli.Command { return treebuilders.Repocfg(nil) }},
 	}
 
 	outRoot := "../../site/cli"
@@ -65,7 +65,7 @@ func writeIndex(outRoot string, entries []entry) error {
 	}
 	body := layout.BuildNavList(items)
 	page := layout.Page{
-		Title:    "cli-guard CLI reference",
+		Title:    "umbra CLI reference",
 		Subtitle: "Rendered command tree for every example.",
 		Body:     template.HTML(`<p>Pick an example:</p>` + string(body)),
 	}

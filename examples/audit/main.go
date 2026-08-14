@@ -1,5 +1,5 @@
 // Command demo is a tiny urfave/cli v3 application that exercises the
-// cli-guard framework primitives. Run with:
+// umbra framework primitives. Run with:
 package main
 
 import (
@@ -8,22 +8,22 @@ import (
 	"os"
 	"path/filepath"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/examples/treebuilders"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/audit"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/examples/treebuilders"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit"
 )
 
 func main() {
-	auditPath := filepath.Join(os.TempDir(), "cli-guard-demo.jsonl")
+	auditPath := filepath.Join(os.TempDir(), "umbra-demo.jsonl")
 	writer := audit.NewWriter(auditPath)
 	defer func() { _ = writer.Close() }()
 	if err := writer.Preflight(); err != nil {
-		fmt.Fprintln(os.Stderr, "cli-guard-demo: audit preflight:", err)
+		fmt.Fprintln(os.Stderr, "umbra-demo: audit preflight:", err)
 		_ = writer.Close()
 		os.Exit(1) //nolint:gocritic // intentional: failed preflight cannot proceed
 	}
 
 	if err := treebuilders.Audit(writer).Run(context.Background(), os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, "cli-guard-demo:", err)
+		fmt.Fprintln(os.Stderr, "umbra-demo:", err)
 		_ = writer.Close()
 		os.Exit(1) //nolint:gocritic // intentional: defer handled above
 	}

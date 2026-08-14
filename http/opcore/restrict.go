@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 )
 
 // CheckRestrictions enforces every wrap-level restriction against a leaf's bound

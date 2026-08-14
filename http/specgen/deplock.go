@@ -23,15 +23,15 @@ const LockName = "specverb.lock"
 const depLockVersion = 2
 
 // cliGuardModule is the framework's own module path. The driver is part of
-// cli-guard, so it pins this module into every consumer's build.
-const cliGuardModule = "forgejo.coilysiren.me/coilyco-flight-deck/cli-guard"
+// umbra, so it pins this module into every consumer's build.
+const cliGuardModule = "forgejo.coilysiren.me/coilyco-flight-deck/umbra"
 
 // buildModule is the throwaway local module path the cache dir builds under;
 // it never resolves over the network, so the name is arbitrary but stable.
 const buildModule = "specverbgen.local/build"
 
 // buildGoDirective is the `go` directive seeded into the build module, tracking
-// cli-guard's floor so the build never auto-downloads a toolchain; sync with go.mod.
+// umbra's floor so the build never auto-downloads a toolchain; sync with go.mod.
 const buildGoDirective = "1.25.5"
 
 // DepLock is specverb.lock: the frozen build module. GoMod and GoSum are
@@ -39,7 +39,7 @@ const buildGoDirective = "1.25.5"
 type DepLock struct {
 	Version  int      `json:"version"`  // schema version
 	Go       string   `json:"go"`       // go directive of the build module
-	CLIGuard string   `json:"cliGuard"` // resolved cli-guard module query (version, commit, or replace path)
+	CLIGuard string   `json:"cliGuard"` // resolved umbra module query (version, commit, or replace path)
 	GoMod    []string `json:"goMod"`    // go.mod lines, order preserved
 	GoSum    []string `json:"goSum"`    // sorted go.sum lines
 }
@@ -90,13 +90,13 @@ func DriverVersion() string {
 	return "(devel)"
 }
 
-// DefaultCLIGuardRef is the cli-guard module query a lock operation will freeze
-// when the caller does not pass --cli-guard-ref.
+// DefaultCLIGuardRef is the umbra module query a lock operation will freeze
+// when the caller does not pass --umbra-ref.
 func DefaultCLIGuardRef() string {
 	return cliGuardVersion("")
 }
 
-// cliGuardVersion resolves the cli-guard module query to freeze into the lock:
+// cliGuardVersion resolves the umbra module query to freeze into the lock:
 // the explicit ref, else the driver's build version, else "latest" for a dev checkout.
 func cliGuardVersion(ref string) string {
 	if ref != "" {
@@ -109,7 +109,7 @@ func cliGuardVersion(ref string) string {
 }
 
 // goEnv returns the environment for `go` subprocesses: the inherited env plus
-// GOPRIVATE so the Forgejo-hosted cli-guard module is fetched direct.
+// GOPRIVATE so the Forgejo-hosted umbra module is fetched direct.
 func goEnv() []string {
 	return append(os.Environ(), "GOPRIVATE="+cliGuardModule)
 }
@@ -130,7 +130,7 @@ func runGo(dir string, args ...string) error {
 }
 
 // resolveDepLock runs `go mod tidy` in a seeded build dir and captures the
-// resolved go.mod + go.sum. ref pins cli-guard; replace points it at a local checkout.
+// resolved go.mod + go.sum. ref pins umbra; replace points it at a local checkout.
 func resolveDepLock(dir, ref, replace string) (*DepLock, error) {
 	cgVersion := cliGuardVersion(ref)
 	var b strings.Builder
@@ -138,7 +138,7 @@ func resolveDepLock(dir, ref, replace string) (*DepLock, error) {
 	if replace != "" {
 		abs, err := filepath.Abs(replace)
 		if err != nil {
-			return nil, fmt.Errorf("specgen: resolve cli-guard replace path: %w", err)
+			return nil, fmt.Errorf("specgen: resolve umbra replace path: %w", err)
 		}
 		fmt.Fprintf(&b, "\nreplace %s => %s\n", cliGuardModule, abs)
 	}

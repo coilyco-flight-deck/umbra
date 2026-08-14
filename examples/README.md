@@ -1,6 +1,6 @@
-# cli-guard examples
+# umbra examples
 
-Each subdirectory is a self-contained urfave/cli app that exercises one feature of cli-guard end-to-end. Every example writes its audit rows somewhere under `$TMPDIR` so nothing pollutes the working directory.
+Each subdirectory is a self-contained urfave/cli app that exercises one feature of umbra end-to-end. Every example writes its audit rows somewhere under `$TMPDIR` so nothing pollutes the working directory.
 
 | Example | Demonstrates |
 | ------- | ------------ |
@@ -16,7 +16,7 @@ Every feature is built on top of `audit`. The other examples wire `audit` in imp
 
 ## Running
 
-From the cli-guard root:
+From the umbra root:
 
 ```
 go run ./examples/audit hello world
@@ -30,10 +30,10 @@ go run ./examples/egress allowed
 
 ## Reading order
 
-If you are new to cli-guard, read in this order:
+If you are new to umbra, read in this order:
 
 1. `audit/` - the minimum useful program
-2. `policy/` - what cli-guard refuses by default
+2. `policy/` - what umbra refuses by default
 3. `passthrough/` - the most common production usage
 4. `exitcode/` - the contract with orchestrators
 5. `gittree/` and `repocfg/` - the repo-verb pattern

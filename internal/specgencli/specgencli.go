@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/specgen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen"
 	"github.com/urfave/cli/v3"
 )
 
@@ -39,7 +39,7 @@ func app() *cli.Command {
 	return &cli.Command{
 		Name:    "specgen",
 		Usage:   "no-code driver for a spec-driven consumer CLI (gen / lock / skew / build / run)",
-		Version: fmt.Sprintf("%s (cli-guard ref %s)", specgen.DriverVersion(), specgen.DefaultCLIGuardRef()),
+		Version: fmt.Sprintf("%s (umbra ref %s)", specgen.DriverVersion(), specgen.DefaultCLIGuardRef()),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "guardfile",
@@ -99,15 +99,15 @@ func lockCmd() *cli.Command {
 		Name:  "lock",
 		Usage: "fetch the upstream spec and freeze the build (writes the spec lock + specverb.lock)",
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "cli-guard-ref", Usage: "cli-guard module version/commit to pin (default: the driver's own version, else latest)"},
-			&cli.StringFlag{Name: "cli-guard-replace", Usage: "local cli-guard checkout to build against (dev locks only)"},
+			&cli.StringFlag{Name: "umbra-ref", Usage: "umbra module version/commit to pin (default: the driver's own version, else latest)"},
+			&cli.StringFlag{Name: "umbra-replace", Usage: "local umbra checkout to build against (dev locks only)"},
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
 			return specgen.Lock(specgen.Options{
 				GuardfilePath:   resolveGuardfile(c),
 				ProjectRoot:     c.String("project-root"),
-				CLIGuardRef:     c.String("cli-guard-ref"),
-				CLIGuardReplace: c.String("cli-guard-replace"),
+				CLIGuardRef:     c.String("umbra-ref"),
+				CLIGuardReplace: c.String("umbra-replace"),
 				SkillsOut:       c.String("skills-out"),
 			})
 		},

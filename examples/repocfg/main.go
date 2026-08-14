@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"os"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/repocfg"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/examples/treebuilders"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/config"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/repocfg"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/examples/treebuilders"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"
 )
 
 func main() {
 	// A consumer names its own app dir; repocfg derives the overlay filename
-	// from it (".ward" -> .ward/ward.yaml). cli-guard hardcodes no consumer.
+	// from it (".ward" -> .ward/ward.yaml). umbra hardcodes no consumer.
 	config.SetAppDir(".ward")
 
 	cfg, err := repocfg.LoadDefault()

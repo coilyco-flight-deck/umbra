@@ -61,7 +61,7 @@ esac
 
 if [ -n "$native" ]; then
   actual=$("$native" --version)
-  expected="specgen version ${version} (cli-guard ref ${version})"
+  expected="specgen version ${version} (umbra ref ${version})"
   if [ "$actual" != "$expected" ]; then
     echo "native binary reports $actual, expected $expected" >&2
     exit 1

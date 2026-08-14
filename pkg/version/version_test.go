@@ -3,7 +3,7 @@ package version_test
 import (
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/version"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/version"
 )
 
 func TestLooksReleased(t *testing.T) {

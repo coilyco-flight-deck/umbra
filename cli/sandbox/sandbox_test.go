@@ -3,7 +3,7 @@ package sandbox_test
 import (
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/sandbox"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/sandbox"
 )
 
 func TestNoSandbox(t *testing.T) {

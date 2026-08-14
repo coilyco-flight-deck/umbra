@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
 // TestPruneKeepsOnlyGrantedSurface prunes to the repo trio and asserts only the

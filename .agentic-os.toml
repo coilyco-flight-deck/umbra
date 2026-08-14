@@ -1,7 +1,7 @@
-# cli-guard is deliberately unguarded: it is the cli-guard framework itself,
+# umbra is deliberately unguarded: it is the umbra framework itself,
 # not a consumer of it. It carries no .ward catalog config and does not
 # route dev verbs through a guard (dev verbs are plain `make`). Disable the
-# catalog hooks that require a catalog config. See the cli-guard
+# catalog hooks that require a catalog config. See the umbra
 # unguarding decision (structural validation of the consumer flow).
 
 [catalog-block-present]

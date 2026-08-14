@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/cli/verb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/valuesource"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
 	"github.com/urfave/cli/v3"
 )
 
@@ -36,7 +36,7 @@ type Config struct {
 	Wrap func(verb.Spec) cli.ActionFunc
 
 	// Providers registers the value resolvers a guardfile `env` source names;
-	// cli-guard merges its built-ins (env, file, literal). Resolved at exec time.
+	// umbra merges its built-ins (env, file, literal). Resolved at exec time.
 	Providers map[string]valuesource.Provider
 
 	// EmbeddedFiles maps each build-time `embed` source to the absolute runtime

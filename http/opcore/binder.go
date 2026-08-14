@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/cli-guard/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 )
 
 // OwnerRepoArg is the documented `args` sugar: a single `owner/name` value
