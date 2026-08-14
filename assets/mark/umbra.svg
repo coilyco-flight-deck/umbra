@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-label="umbra">
+  <title>umbra</title>
+  <desc>Four uneven strips laid over a lit opening, with a pair of slits cut into the deepest one.</desc>
+  <defs><clipPath id="form"><path d="M141.2 143.65 H258.8 L285.75 170.6 V229.4 L258.8 256.35 H141.2 L114.25 229.4 V170.6 Z"/></clipPath></defs>
+  <rect width="400" height="400" fill="#14111b"/>
+  <circle cx="200" cy="200" r="165.5" fill="none" stroke="#4bcdd1" stroke-width="12"/>
+  <circle cx="200" cy="200" r="153" fill="none" stroke="#baa6d9" stroke-width="13"/>
+  <path d="M141.2 143.65 H258.8 L285.75 170.6 V229.4 L258.8 256.35 H141.2 L114.25 229.4 V170.6 Z" fill="#baa6d9"/>
+  <g clip-path="url(#form)"><rect x="104.45" y="224.5" width="191.1" height="41.65" fill="#14111b"/><rect x="114.25" y="234.3" width="171.5" height="22.05" fill="#4bcdd1"/><rect x="256.35" y="133.85" width="39.2" height="132.3" fill="#14111b"/><rect x="266.15" y="143.65" width="19.6" height="112.7" fill="#4bcdd1"/><rect x="104.45" y="133.85" width="191.1" height="56.35" fill="#14111b"/><rect x="114.25" y="143.65" width="171.5" height="36.75" fill="#4bcdd1"/><rect x="104.45" y="133.85" width="53.9" height="132.3" fill="#14111b"/><rect x="114.25" y="143.65" width="34.3" height="112.7" fill="#4bcdd1"/><path d="M163.25 157.125 H185.3 L195.1 166.925 H163.25 Z" fill="#14111b"/><path d="M236.75 157.125 H214.7 L204.9 166.925 H236.75 Z" fill="#14111b"/></g>
+</svg>
