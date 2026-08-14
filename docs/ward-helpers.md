@@ -54,18 +54,6 @@ needs before it fans out into a repo (an empty owner is never allowed).
 `Label` renders the accepted set for a refusal message: `primary/*` for one
 owner, `{primary, a, b}/*` when `Extra` adds more.
 
-## `cli/hook` - registry + settings-installer
-
-Two additions to the PreToolUse engine. A guard `Registry` maps detectable
-guards (name + config `Marker` + Route / IntegrityRule tables); `Detect`
-walks up from a directory to the nearest marker and returns the guard name,
-falling back to `Default`. A settings `Installer` idempotently registers a
-PreToolUse hook command in a Claude Code `settings.json`: `Ensure` does the
-additive merge (other hooks and unrelated keys preserved), with
-`LoadSettings` / `MarshalSettings` / `WriteSettings` / `ResolveSettingsPath`
-around it. The consumer supplies the matcher and command, so any harness
-registers its own hook line.
-
 ## See also
 
 - [FEATURES.md](FEATURES.md) - inventory index.

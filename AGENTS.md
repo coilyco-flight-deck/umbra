@@ -33,7 +33,7 @@ Pre-commit runs the Go checks (vet, golangci-lint, go-mod-tidy, godoc-current) p
 
 ## Safety
 
-cli-guard ships no embedded denylist. It is a policy-free engine: a consumer declares its protected tools in a `repocfg.Security` literal that the deny-by-structure engine expands into a hook deny (`cli/hook`), a PATH shim per binary (`cli/shim`), and a doctor floor (`cli/doctor`). See [deny-by-structure.md](docs/deny-by-structure.md).
+cli-guard ships no embedded denylist. It is a policy-free engine: the policy lives in the consumer's own KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`, `sandbox`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`). See [architecture.md](docs/architecture.md).
 
 ## Cross-repo contracts
 

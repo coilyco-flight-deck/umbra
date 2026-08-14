@@ -9,7 +9,6 @@ require (
 	github.com/olekukonko/tablewriter v1.1.4
 	github.com/urfave/cli/v3 v3.9.0
 	golang.org/x/sys v0.44.0
-	golang.org/x/term v0.43.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )

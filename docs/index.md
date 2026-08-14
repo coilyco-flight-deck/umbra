@@ -9,7 +9,7 @@ It provides:
 - read / write / delete scope tokens
 - best-effort RepoRoot stamping that records each audit row's git toplevel (empty outside any repo)
 - clean+synced gate refusing repo-shaped verbs on a dirty tree
-- per-repo command allowlist
+- per-repo config under a consumer-chosen filename
 - thin pass-through wrapper for embedding existing CLIs as audited subcommands
 - per-invocation CONNECT proxy with consumer-supplied egress allowlist
 - public exit-code taxonomy for orchestrators
