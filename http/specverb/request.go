@@ -458,12 +458,18 @@ func (rt *runtime) previewURL(url string) string {
 // fire captures the response through the engine core and renders it.
 // Non-2xx becomes an UpstreamFailed coded error carrying the response body.
 func (rt *runtime) fire(ctx context.Context, desc opDescriptor, method, url string, body []byte, contentType, query, output string) error {
+	// Chosen before the call, not after. Decoding first fails on a declared
+	// plaintext or ZIP body, which left this branch unreachable. See #289.
+	if desc.RawResponse {
+		respBody, status, rerr := rt.FireCaptureRaw(ctx, method, url, body, contentType)
+		if rerr != nil {
+			return rerr
+		}
+		return writeRawResponse(respBody, query, method, url, status)
+	}
 	_, respBody, status, err := rt.FireCapture(ctx, method, url, body, contentType)
 	if err != nil {
 		return err
-	}
-	if desc.RawResponse {
-		return writeRawResponse(respBody, query, method, url, status)
 	}
 	rendered, rerr := respfmt.Render(respBody, query, output)
 	if rerr != nil {

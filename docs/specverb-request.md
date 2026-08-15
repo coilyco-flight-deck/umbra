@@ -32,6 +32,9 @@ The argv gate (`verb.Wrap` → `policy.ValidateArg`) refuses shell metacharacter
 - Live responses render through the `respfmt` `--query`/`--output` rail; an empty 2xx prints an `ok:` confirmation line.
 - The default client refuses redirects for mutating methods, so a renamed or transferred target cannot silently swallow a write.
 
+A spec-declared non-JSON media type skips the decode and the render rail, see
+[specverb-raw-responses.md](specverb-raw-responses.md).
+
 ## Fetch overlays
 
 Fetch overlays are the raw-stdout sibling of the spec-driven leaf path:
