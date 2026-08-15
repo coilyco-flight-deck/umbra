@@ -179,16 +179,38 @@ func chainSources(chain guardfile.ValueChain) []valuesource.Source { return Chai
 // FireCapture sends one request and returns the decoded JSON value plus raw
 // body, rendering nothing: the "fire and capture" path complex actions feed on.
 func (rt *Runtime) FireCapture(ctx context.Context, method, url string, body []byte, contentType string) (decoded any, raw []byte, status string, err error) {
+	respBody, status, serr := rt.send(ctx, method, url, body, contentType)
+	if serr != nil {
+		return nil, nil, status, serr
+	}
+	if len(bytes.TrimSpace(respBody)) == 0 {
+		return nil, respBody, status, nil
+	}
+	if jerr := json.Unmarshal(respBody, &decoded); jerr != nil {
+		return nil, respBody, status, exitcode.New(exitcode.Internal, "internal", jerr, "the response was not valid JSON")
+	}
+	return decoded, respBody, status, nil
+}
+
+// FireCaptureRaw sends one request and returns the body undecoded, for an op
+// declaring a non-JSON media type. See docs/specverb-request.md.
+func (rt *Runtime) FireCaptureRaw(ctx context.Context, method, url string, body []byte, contentType string) (raw []byte, status string, err error) {
+	return rt.send(ctx, method, url, body, contentType)
+}
+
+// send performs the request and returns the success body. It never inspects the
+// payload, so a plaintext log or a ZIP survives it intact.
+func (rt *Runtime) send(ctx context.Context, method, url string, body []byte, contentType string) ([]byte, string, error) {
 	var reqBody io.Reader
 	if body != nil {
 		reqBody = bytes.NewReader(body)
 	}
 	req, rerr := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if rerr != nil {
-		return nil, nil, "", exitcode.New(exitcode.Internal, "internal", rerr, "")
+		return nil, "", exitcode.New(exitcode.Internal, "internal", rerr, "")
 	}
 	if aerr := rt.Authorize(ctx, req); aerr != nil {
-		return nil, nil, "", aerr
+		return nil, "", aerr
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", contentType)
@@ -196,22 +218,15 @@ func (rt *Runtime) FireCapture(ctx context.Context, method, url string, body []b
 
 	resp, derr := rt.Client.Do(req)
 	if derr != nil {
-		return nil, nil, "", exitcode.New(exitcode.UpstreamFailed, "upstream_failed", derr, "the API was unreachable")
+		return nil, "", exitcode.New(exitcode.UpstreamFailed, "upstream_failed", derr, "the API was unreachable")
 	}
 	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 400 {
-		return nil, nil, resp.Status, exitcode.New(exitcode.UpstreamFailed, "upstream_failed",
+		return nil, resp.Status, exitcode.New(exitcode.UpstreamFailed, "upstream_failed",
 			fmt.Errorf("%s %s -> %s: %s", method, url, resp.Status, strings.TrimSpace(string(respBody))),
 			"the API rejected the request")
 	}
-
-	if len(bytes.TrimSpace(respBody)) == 0 {
-		return nil, respBody, resp.Status, nil
-	}
-	if jerr := json.Unmarshal(respBody, &decoded); jerr != nil {
-		return nil, respBody, resp.Status, exitcode.New(exitcode.Internal, "internal", jerr, "the response was not valid JSON")
-	}
-	return decoded, respBody, resp.Status, nil
+	return respBody, resp.Status, nil
 }

@@ -1234,6 +1234,10 @@ func (rt *Runtime) FireCapture(ctx context.Context, method, url string, body []b
     body, rendering nothing: the "fire and capture" path complex actions feed
     on.
 
+func (rt *Runtime) FireCaptureRaw(ctx context.Context, method, url string, body []byte, contentType string) (raw []byte, status string, err error)
+    FireCaptureRaw sends one request and returns the body undecoded, for an op
+    declaring a non-JSON media type. See docs/specverb-request.md.
+
 type RuntimeConfig struct {
 	BaseURL      string
 	Auth         guardfile.Auth

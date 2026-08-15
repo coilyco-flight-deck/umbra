@@ -60,6 +60,15 @@ func (o Operation) Execute(ctx context.Context, a Args) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
+	// A declared non-JSON body has no decoded form, so it never reaches the
+	// decode or the fail-when postcondition. Raw carries it out.
+	if o.Desc.RawResponse {
+		raw, status, rerr := o.RT.FireCaptureRaw(ctx, req.Method, req.URL, req.Body, req.ContentType)
+		if rerr != nil {
+			return Response{}, rerr
+		}
+		return Response{Raw: raw, Status: status}, nil
+	}
 	decoded, raw, status, err := o.RT.FireCapture(ctx, req.Method, req.URL, req.Body, req.ContentType)
 	if err != nil {
 		return Response{}, err
