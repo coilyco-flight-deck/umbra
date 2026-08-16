@@ -37,23 +37,33 @@ type operation struct {
 }
 
 // rawResponseOp reports whether the operation's success response declares a
-// media type the engine must not parse. A spec that says text/plain or
-// application/zip is describing bytes, so reformatting them would corrupt the
-// payload the caller asked for. Anything JSON-shaped, and anything the spec
-// leaves unsaid, keeps the parsed path.
+// media type the engine must not parse, which is one offering no JSON at all.
+// See docs/specverb-raw-responses.md.
 func rawResponseOp(op *openapi3.Operation) bool {
 	if op == nil || op.Responses == nil {
 		return false
 	}
+	raw := false
 	for _, code := range []string{"200", "206"} {
 		ref := op.Responses.Value(code)
-		if ref == nil || ref.Value == nil {
+		if ref == nil || ref.Value == nil || len(ref.Value.Content) == 0 {
 			continue
 		}
-		for media := range ref.Value.Content {
-			if !jsonMediaType(media) {
-				return true
-			}
+		// Offering JSON among others is content negotiation, not a statement
+		// that the body is HTML. See docs/specverb-raw-responses.md.
+		if offersJSON(ref.Value.Content) {
+			return false
+		}
+		raw = true
+	}
+	return raw
+}
+
+// offersJSON reports whether a response lists any JSON media type at all.
+func offersJSON(content map[string]*openapi3.MediaType) bool {
+	for media := range content {
+		if jsonMediaType(media) {
+			return true
 		}
 	}
 	return false

@@ -230,3 +230,66 @@ func TestRawResponseOpDefaultsToParsed(t *testing.T) {
 		t.Error("a non-success response must not decide the success path")
 	}
 }
+
+// A shared `$ref` response carries the root `produces` rather than the
+// operation's, so one non-JSON entry there refused --query fleet-wide. This is
+// Forgejo's real shape. See umbra#293.
+func TestASharedResponseDoesNotMakeEveryLeafRaw(t *testing.T) {
+	const swagger = `{
+	  "swagger": "2.0",
+	  "info": {"title": "t", "version": "1"},
+	  "produces": ["application/json", "text/html"],
+	  "responses": {
+	    "Repository": {"description": "ok", "schema": {"type": "object"}}
+	  },
+	  "paths": {
+	    "/repos/{owner}": {
+	      "get": {
+	        "operationId": "repoGet",
+	        "produces": ["application/json"],
+	        "parameters": [{"name": "owner", "in": "path", "required": true, "type": "string"}],
+	        "responses": {"200": {"$ref": "#/responses/Repository"}}
+	      }
+	    },
+	    "/repos/{owner}/logs": {
+	      "get": {
+	        "operationId": "repoLogs",
+	        "produces": ["text/plain"],
+	        "parameters": [{"name": "owner", "in": "path", "required": true, "type": "string"}],
+	        "responses": {"200": {"description": "ok", "schema": {"type": "string"}}}
+	      }
+	    }
+	  }
+	}`
+	parsed, err := parseSwagger([]byte(swagger))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	byID := map[string]*openapi3.Operation{}
+	for _, methods := range parsed.ops {
+		for _, entry := range methods {
+			byID[entry.op.OperationID] = entry.op
+		}
+	}
+	if rawResponseOp(byID["repoGet"]) {
+		t.Error("a JSON operation was flagged raw, so --query is refused on every object read")
+	}
+	if !rawResponseOp(byID["repoLogs"]) {
+		t.Error("a text/plain operation stopped being raw, so a log would be JSON-parsed")
+	}
+}
+
+// A response offering JSON beside something else is negotiating content, not
+// declaring bytes. The fail-safe direction is to parse it.
+func TestAResponseOfferingJSONAmongOthersIsParsed(t *testing.T) {
+	op := &openapi3.Operation{Responses: openapi3.NewResponses()}
+	op.Responses.Set("200", &openapi3.ResponseRef{Value: openapi3.NewResponse().WithContent(
+		openapi3.Content{
+			"application/json": openapi3.NewMediaType(),
+			"text/html":        openapi3.NewMediaType(),
+		},
+	)})
+	if rawResponseOp(op) {
+		t.Error("a response offering JSON was treated as raw")
+	}
+}
