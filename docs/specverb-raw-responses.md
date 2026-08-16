@@ -1,8 +1,14 @@
 # Declared non-JSON responses
 
-An operation whose success response declares a non-JSON media type, `text/plain`
-for a CI job log or `application/zip` for a run archive, writes its body to
-stdout byte for byte instead of parsing it. `Descriptor.RawResponse` carries the
+An operation whose success response offers **no JSON at all** - `text/plain`
+for a CI job log, `application/zip` for a run archive - writes its body to
+stdout byte for byte instead of parsing it.
+
+A response listing JSON beside something else is negotiating content rather
+than declaring bytes, so it is parsed. That matters because a Swagger 2.0
+shared `$ref` response inherits the document's root `produces`, and Forgejo's
+root lists `text/html`: reading "any non-JSON type" as raw refused `--query` on
+every object read in the fleet. See umbra#293. `Descriptor.RawResponse` carries the
 decision, and the engine sets it from the resolved spec's declared media type.
 
 Nothing in the Guardfile declares this, and nothing needs to. A spec that

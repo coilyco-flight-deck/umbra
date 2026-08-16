@@ -1066,9 +1066,8 @@ type Descriptor struct {
 	Describe       string         // optional Guardfile describe "..." note, "" if none
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
-	// RawResponse marks an operation whose success response is not JSON,
-	// read from the spec's declared response media type. Such a body is
-	// written through untouched instead of being parsed and reformatted.
+	// RawResponse marks a success response offering no JSON, written through
+	// untouched. See docs/specverb-raw-responses.md.
 	RawResponse bool
 }
     Descriptor is the tiny per-operation payload the generic action binds to,
@@ -1509,9 +1508,8 @@ process lifetime.
 FUNCTIONS
 
 func Materialize(prefix string, sources map[int]map[string]Source) (map[int]map[string]string, func() error, error)
-    Materialize writes sources beneath one private absolute temporary directory.
-    The first map key identifies an exec member and the second is the
-    guardfile-relative source reference that execverb resolves.
+    Materialize writes sources beneath one private temporary directory.
+    Key shape and resolution: docs/specgen-embedded-files.md.
 
 
 TYPES

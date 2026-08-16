@@ -484,10 +484,8 @@ func (rt *runtime) fire(ctx context.Context, desc opDescriptor, method, url stri
 	return nil
 }
 
-// writeRawResponse emits a non-JSON success body byte for byte. A projection is
-// refused rather than ignored: the caller asked to filter a payload the engine
-// cannot parse, and silently returning everything would answer a different
-// question than the one asked.
+// writeRawResponse emits a non-JSON success body byte for byte, refusing a
+// projection rather than ignoring it. See docs/specverb-raw-responses.md.
 func writeRawResponse(body []byte, query, method, url, status string) error {
 	if strings.TrimSpace(query) != "" {
 		return exitcode.New(exitcode.UserError, "user_error",

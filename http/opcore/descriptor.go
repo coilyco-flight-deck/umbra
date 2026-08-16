@@ -25,9 +25,8 @@ type Descriptor struct {
 	Describe       string         // optional Guardfile describe "..." note, "" if none
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
-	// RawResponse marks an operation whose success response is not JSON,
-	// read from the spec's declared response media type. Such a body is
-	// written through untouched instead of being parsed and reformatted.
+	// RawResponse marks a success response offering no JSON, written through
+	// untouched. See docs/specverb-raw-responses.md.
 	RawResponse bool
 }
 
