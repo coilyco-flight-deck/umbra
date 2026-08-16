@@ -17,9 +17,8 @@ type Source struct {
 	Data []byte
 }
 
-// Materialize writes sources beneath one private absolute temporary directory.
-// The first map key identifies an exec member and the second is the
-// guardfile-relative source reference that execverb resolves.
+// Materialize writes sources beneath one private temporary directory. Key
+// shape and resolution: docs/specgen-embedded-files.md.
 func Materialize(prefix string, sources map[int]map[string]Source) (map[int]map[string]string, func() error, error) {
 	root, err := os.MkdirTemp("", prefix+"-embedded-*")
 	if err != nil {

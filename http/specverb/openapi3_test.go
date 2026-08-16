@@ -183,10 +183,8 @@ func TestBuildOpenAPI3Tailscale(t *testing.T) {
 	}
 }
 
-// TestRawResponseOpReadsDeclaredMediaType proves the engine decides raw-vs-parsed
-// from the spec rather than from the bytes that come back. Forgejo's Actions job
-// log is the motivating case: it declares text/plain, and parsing it as JSON
-// fails on the first timestamp.
+// The engine decides raw-vs-parsed from the spec rather than from the bytes.
+// A job log declares text/plain and fails JSON on its first timestamp.
 func TestRawResponseOpReadsDeclaredMediaType(t *testing.T) {
 	cases := map[string]struct {
 		media string
@@ -231,9 +229,8 @@ func TestRawResponseOpDefaultsToParsed(t *testing.T) {
 	}
 }
 
-// A shared `$ref` response carries the root `produces` rather than the
-// operation's, so one non-JSON entry there refused --query fleet-wide. This is
-// Forgejo's real shape. See umbra#293.
+// A shared `$ref` response carries the root `produces`, which refused --query
+// fleet-wide. Forgejo's real shape. See umbra#293.
 func TestASharedResponseDoesNotMakeEveryLeafRaw(t *testing.T) {
 	const swagger = `{
 	  "swagger": "2.0",

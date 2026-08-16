@@ -36,8 +36,7 @@ type operation struct {
 	op          *openapi3.Operation
 }
 
-// rawResponseOp reports whether the operation's success response declares a
-// media type the engine must not parse, which is one offering no JSON at all.
+// rawResponseOp reports a success response offering no JSON at all.
 // See docs/specverb-raw-responses.md.
 func rawResponseOp(op *openapi3.Operation) bool {
 	if op == nil || op.Responses == nil {

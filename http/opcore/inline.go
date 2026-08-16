@@ -194,9 +194,8 @@ func (p *inlineParser) parseProxy(n *kdl.Node) error {
 	return nil
 }
 
-// applyInlineGrantChild dispatches one child of a `can` operation body onto d,
-// failing closed on anything outside path | query | body | set | fail-when |
-// describe.
+// applyInlineGrantChild dispatches one child of a `can` body onto d, failing
+// closed outside the grammar in docs/opcore-inline.md.
 func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 	switch c.Name() {
 	case "path":

@@ -2,13 +2,8 @@ package execverb
 
 import "strings"
 
-// valueFlags are the long flags whose value is a separate argv token, so
-// `--region us-east-1` does not leave its value masquerading as a positional.
-//
-// TODO(#282): this table is still shaped by one vendor's CLI. It belongs in
-// the guardfile, declared by the spec that knows its own binary, not here.
-// Until it moves, dropping an entry silently weakens any `argN` guard on a
-// binary that takes that flag.
+// valueFlags are the long flags whose value is a separate argv token.
+// See docs/execverb-value-flags.md.
 var valueFlags = map[string]bool{
 	"--region": true, "--profile": true, "--output": true,
 	"--endpoint-url": true, "--cli-read-timeout": true,

@@ -27,6 +27,13 @@ invocation-specific temporary path.
 embedded file can be sealed. An unsealed grant still appends validated caller
 arguments after every fixed token.
 
+## The source map
+
+`Materialize` takes `map[int]map[string]Source`. The outer key identifies an
+exec member and the inner is the guardfile-relative source reference that
+execverb resolves, so two members may ship a file of the same name without
+colliding. Everything lands beneath one private absolute temporary directory.
+
 ## Build boundary
 
 The source path is relative to the declaring guardfile. It must be normalized,
