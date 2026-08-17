@@ -28,8 +28,14 @@ No baked-in agent roster: the caller supplies who signs.
 
 `Exclusive` / `Unlock` over a shared lock `*os.File`, wrapping BSD advisory
 `flock(2)` (LOCK_EX / LOCK_UN) for cross-process mutual exclusion - one
-warm-cache writer at a time. Unix-only; the non-unix build degrades both to a
-no-op, since the syscall does not exist there.
+warm-cache writer at a time.
+
+**Unix-only, and it says so.** The syscall exists nowhere else, so a non-unix
+caller is refused with `flock.ErrUnsupported` naming the `GOOS`, never `nil`. A
+no-op reporting success is indistinguishable from a held lock, which is the one
+answer a lock must never give. Match it with `errors.Is`; it is distinct from
+contention, since nobody holds the lock and there is no lock. A non-unix build
+still compiles for every consumer that never takes one.
 
 ## `pkg/version` - release-tag compare
 

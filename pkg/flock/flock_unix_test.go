@@ -1,3 +1,5 @@
+//go:build unix
+
 package flock_test
 
 import (
@@ -45,12 +47,8 @@ func TestUnlockWithoutLock(t *testing.T) {
 	}
 }
 
-// TestExclusiveBlocksAcrossHandles is unix-only (the fallback build is a
-// no-op): a second handle must not acquire the lock until the first releases.
+// A second handle must not acquire the lock until the first releases.
 func TestExclusiveBlocksAcrossHandles(t *testing.T) {
-	if !unixBuild {
-		t.Skip("advisory flock is a no-op on non-unix builds")
-	}
 	path := filepath.Join(t.TempDir(), "lock")
 	first, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
