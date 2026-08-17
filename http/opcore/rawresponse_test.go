@@ -132,6 +132,91 @@ func TestExecuteRawAcceptsAnEmptyBody(t *testing.T) {
 	}
 }
 
+// rawGrantSrc is the hand-written guardfile shape part two exists for: an Atom
+// feed, which no spec media type declares because there is no spec.
+const rawGrantSrc = `wrap ward mcp reddit {
+    auth bearer { value env "T" }
+    can list post {
+        path "/r/{sub}/new.rss"
+        raw-response
+    }
+}`
+
+func TestParseInlineRawResponseNode(t *testing.T) {
+	descs, _ := parseInline(t, rawGrantSrc)
+	if d := descByLeaf(t, descs, "list"); !d.RawResponse {
+		t.Error("`raw-response` did not set Descriptor.RawResponse")
+	}
+}
+
+// The fail-safe direction: a grant that says nothing is parsed exactly as it
+// was before this node existed.
+func TestParseInlineUndeclaredGrantStaysParsed(t *testing.T) {
+	descs, _ := parseInline(t, inlineSrc)
+	for _, leaf := range []string{"create", "close", "delete"} {
+		if descByLeaf(t, descs, leaf).RawResponse {
+			t.Errorf("leaf %q was not declared raw but came back raw", leaf)
+		}
+	}
+}
+
+// A half-specified declaration is a parse error rather than a silent
+// passthrough, matching the rest of the grammar.
+func TestParseInlineRawResponseFailsClosed(t *testing.T) {
+	cases := map[string]string{
+		"argument":  `raw-response "yes"`,
+		"property":  `raw-response enabled=#true`,
+		"block":     "raw-response {\n            format \"atom\"\n        }",
+		"duplicate": "raw-response\n        raw-response",
+		// fail-when needs a decoded response, which a raw body never has, so
+		// the pair would leave the postcondition inert.
+		"with fail-when": "raw-response\n        fail-when \"a == null\"",
+	}
+	for name, decl := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := `wrap ward mcp reddit {
+    auth bearer { value env "T" }
+    can list post {
+        path "/r/{sub}/new.rss"
+        ` + decl + `
+    }
+}`
+			if _, _, err := opcore.ParseInline([]byte(src)); err == nil {
+				t.Fatal("want a parse error, got nil")
+			}
+		})
+	}
+}
+
+// End to end: the node reaches the runtime, which is the whole point of part
+// two. An Atom body would fail a JSON decode on its first character.
+func TestParseInlineRawGrantExecutesRaw(t *testing.T) {
+	const atom = `<?xml version="1.0" encoding="UTF-8"?><feed><title>r/golang</title></feed>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/atom+xml")
+		_, _ = w.Write([]byte(atom))
+	}))
+	defer srv.Close()
+
+	descs, cfg, err := opcore.ParseInline([]byte(rawGrantSrc))
+	if err != nil {
+		t.Fatalf("ParseInline: %v", err)
+	}
+	cfg.BaseURL = srv.URL
+	cfg.Auth = tokenAuth("s3cret")
+	cfg.Providers = valuesource.Merge(nil)
+	cfg.Client = srv.Client()
+
+	op := opcore.Operation{RT: opcore.NewRuntime(cfg), Desc: descs[0]}
+	resp, err := op.Execute(context.Background(), opcore.Args{Path: map[string]string{"sub": "golang"}})
+	if err != nil {
+		t.Fatalf("a guardfile-declared raw body failed the call: %v", err)
+	}
+	if string(resp.Raw) != atom {
+		t.Errorf("Raw = %q, want %q", resp.Raw, atom)
+	}
+}
+
 // The guardfile's restrict gate runs before the request, so a raw leaf gains no
 // exemption from it.
 func TestExecuteRawStillHonorsRestrict(t *testing.T) {

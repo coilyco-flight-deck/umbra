@@ -145,10 +145,8 @@ func (p *inlineParser) parseGrant(n *kdl.Node) error {
 		Destructive:    DestructiveVerb(verb),
 		Grant:          "can " + verb + " " + resource,
 	}
-	// d.Method always carries the convention value, so a duplicate `method` is
-	// counted here rather than detected by an empty field downstream.
-	if countChildren(n, "method") > 1 {
-		return fmt.Errorf("opcore: can %s %s: duplicate `method` (fail-closed)", verb, resource)
+	if err := checkOnceOnlyChildren(n, verb, resource); err != nil {
+		return err
 	}
 	for _, c := range n.Children().Nodes {
 		if err := applyInlineGrantChild(&d, c); err != nil {
@@ -229,6 +227,8 @@ func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 		return applyInlineBody(d, c)
 	case "method":
 		return applyInlineMethod(d, c)
+	case "raw-response":
+		return applyInlineRawResponse(d, c)
 	default:
 		return applyInlineGrantControlChild(d, c)
 	}
@@ -285,12 +285,17 @@ func applyInlineGrantControlChild(d *Descriptor, c *kdl.Node) error {
 		d.FailWhen = expr
 		return nil
 	default:
-		return fmt.Errorf("unknown node %q (want path | query | body | method | set | fail-when | describe; fail-closed)", c.Name())
+		return fmt.Errorf("unknown node %q (want path | query | body | method | raw-response | set | fail-when | describe; fail-closed)", c.Name())
 	}
 }
 
 // validateGrant runs the cross-field checks a finished grant must pass.
 func validateGrant(d Descriptor, verb, resource string) error {
+	// A raw body is never decoded, so fail-when would have nothing to evaluate
+	// and would sit inert rather than guarding anything.
+	if d.RawResponse && d.FailWhen != "" {
+		return fmt.Errorf("opcore: can %s %s: `raw-response` cannot be combined with `fail-when`, which needs a decoded response (fail-closed)", verb, resource)
+	}
 	if err := validateBodyMappings(d.BodyMappings); err != nil {
 		return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
 	}
@@ -306,6 +311,30 @@ func inferredMethodWarning(d Descriptor, verb, resource string) string {
 	return fmt.Sprintf(
 		"opcore: can %s %s: %q is not a known verb, so the method was inferred as %s; state it with `method \"...\"` if that is wrong",
 		verb, resource, verb, d.Method)
+}
+
+// applyInlineRawResponse declares the success body non-JSON, written through
+// undecoded. Bare by design: see docs/specverb-raw-responses.md.
+func applyInlineRawResponse(d *Descriptor, c *kdl.Node) error {
+	if len(c.Arguments()) != 0 || len(c.Properties()) != 0 {
+		return fmt.Errorf("`raw-response` takes no arguments (write it bare; fail-closed)")
+	}
+	if len(c.Children().Nodes) != 0 {
+		return fmt.Errorf("`raw-response` takes no block (write it bare; fail-closed)")
+	}
+	d.RawResponse = true
+	return nil
+}
+
+// checkOnceOnlyChildren refuses a repeated `method` or `raw-response`. Both
+// carry a meaningful zero, so neither is caught by an already-set field.
+func checkOnceOnlyChildren(n *kdl.Node, verb, resource string) error {
+	for _, once := range []string{"method", "raw-response"} {
+		if countChildren(n, once) > 1 {
+			return fmt.Errorf("opcore: can %s %s: duplicate `%s` (fail-closed)", verb, resource, once)
+		}
+	}
+	return nil
 }
 
 // countChildren reports how many direct children of n carry name.

@@ -11,9 +11,27 @@ root lists `text/html`: reading "any non-JSON type" as raw refused `--query` on
 every object read in the fleet. See umbra#293. `Descriptor.RawResponse` carries the
 decision, and the engine sets it from the resolved spec's declared media type.
 
-Nothing in the Guardfile declares this, and nothing needs to. A spec that
-declares no media type stays parsed, which is the fail-safe direction: a body
-that turns out not to be JSON fails loudly rather than passing through unchecked.
+A spec that declares no media type stays parsed, which is the fail-safe
+direction: a body that turns out not to be JSON fails loudly rather than
+passing through unchecked.
+
+## Declaring it by hand
+
+The inline grammar has no media type to infer from, so a `.mcp.kdl` grant says
+it outright with a bare `raw-response` node - the reddit-over-Atom shape, where
+there is no spec at all:
+
+```kdl
+can list post {
+    path "/r/{sub}/new.rss"
+    raw-response
+}
+```
+
+Bare and fail-closed, matching its siblings. An argument, a property, a block, a
+duplicate, or pairing it with `fail-when` is a parse error rather than a silent
+passthrough. That last one because a raw body is never decoded, so the
+postcondition would sit inert instead of guarding anything.
 
 ## The choice precedes the request
 
@@ -41,13 +59,8 @@ bytes that are not JSON has no meaning. An empty body stays a success, since a
 job that produced no output is a real state.
 
 A raw operation has no decoded value, so an inline grant's `fail-when`
-postcondition has nothing to evaluate and does not run.
-
-## Not covered here
-
-The inline grammar has no node that sets `RawResponse`, so a `.mcp.kdl` author
-cannot request it on a hand-written grant. Only the spec-driven path infers it.
-That is part two of umbra#289 and is still open.
+postcondition has nothing to evaluate. Declaring both is refused at parse time
+rather than leaving one of them quietly inert.
 
 ## See also
 
