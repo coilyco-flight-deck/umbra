@@ -36,6 +36,10 @@ type Runtime struct {
 	Client    *http.Client
 	Restrict  []guardfile.Restriction
 
+	// Headers are wrap-declared request headers, applied before the default
+	// User-Agent. See docs/specverb-request.md.
+	Headers map[string]string
+
 	// BaseURLValue (zero = static BaseURL) resolves the host through the first
 	// available source in its chain once, caching it. See specverb-policy.md.
 	BaseURLValue guardfile.ValueChain
@@ -52,6 +56,7 @@ type RuntimeConfig struct {
 	Providers    map[string]Provider
 	Client       *http.Client
 	Restrict     []guardfile.Restriction
+	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
 }
 
@@ -68,6 +73,7 @@ func NewRuntime(c RuntimeConfig) *Runtime {
 		Providers:    c.Providers,
 		Client:       client,
 		Restrict:     c.Restrict,
+		Headers:      c.Headers,
 		BaseURLValue: c.BaseURLValue,
 	}
 }
@@ -217,6 +223,11 @@ func (rt *Runtime) send(ctx context.Context, method, url string, body []byte, co
 	}
 	if aerr := rt.Authorize(ctx, req); aerr != nil {
 		return nil, "", aerr
+	}
+	// Wrap headers first, so a declared User-Agent wins the default below and a
+	// caller can state a contact address where an API asks for one.
+	for name, value := range rt.Headers {
+		req.Header.Set(name, value)
 	}
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", DefaultUserAgent)

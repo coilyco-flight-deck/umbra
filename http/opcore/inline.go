@@ -3,6 +3,7 @@ package opcore
 import (
 	"fmt"
 	"math"
+	"net/http"
 	"strings"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
@@ -74,19 +75,7 @@ type inlineParser struct {
 func (p *inlineParser) applyNode(n *kdl.Node) error {
 	switch n.Name() {
 	case "base-url":
-		raw, chain, err := guardfile.ParseBaseURL(n)
-		if err != nil {
-			return err
-		}
-		// Assign only the form this node carried, so a second base-url node in the
-		// other form accumulates into both fields and validate catches the conflict.
-		if raw != "" {
-			p.cfg.BaseURL = raw
-		}
-		if !chain.IsZero() {
-			p.cfg.BaseURLValue = chain
-		}
-		return nil
+		return p.parseBaseURL(n)
 	case "auth":
 		a, err := guardfile.ParseAuthNode(n)
 		if err != nil {
@@ -94,6 +83,8 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 		}
 		p.cfg.Auth = a
 		return nil
+	case "header":
+		return p.parseHeader(n)
 	case "restrict":
 		r, err := guardfile.ParseRestrictNode(n)
 		if err != nil {
@@ -106,8 +97,54 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 	case "proxy":
 		return p.parseProxy(n)
 	default:
-		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | restrict | can | proxy; fail-closed)", n.Name())
+		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | header | restrict | can | proxy; fail-closed)", n.Name())
 	}
+}
+
+// reservedHeaders name headers the wrap grammar refuses. `auth` owns the first
+// and the runtime sets the second; see docs/specverb-request.md.
+var reservedHeaders = map[string]string{
+	"authorization": "`auth` owns it, and a second path to it would be an unreviewed credential surface",
+	"content-type":  "the runtime sets it from the request body, so a declared one would be overwritten",
+}
+
+// parseHeader states one wrap-level request header, applied to every leaf.
+func (p *inlineParser) parseHeader(n *kdl.Node) error {
+	args := n.Arguments()
+	if len(args) != 2 {
+		return fmt.Errorf("opcore: `header` needs a name and a value, e.g. `header \"User-Agent\" \"app/1.0\"` (got %d arg(s))", len(args))
+	}
+	name, value := args[0].String(), args[1].String()
+	if name == "" || value == "" {
+		return fmt.Errorf("opcore: `header` needs a non-empty name and value")
+	}
+	if why, bad := reservedHeaders[strings.ToLower(name)]; bad {
+		return fmt.Errorf("opcore: `header %q` is refused: %s (fail-closed)", name, why)
+	}
+	if p.cfg.Headers == nil {
+		p.cfg.Headers = map[string]string{}
+	}
+	if _, dup := p.cfg.Headers[http.CanonicalHeaderKey(name)]; dup {
+		return fmt.Errorf("opcore: duplicate `header %q` (fail-closed)", name)
+	}
+	p.cfg.Headers[http.CanonicalHeaderKey(name)] = value
+	return nil
+}
+
+// parseBaseURL assigns only the form this node carried, so a second base-url in
+// the other form accumulates into both fields and validate catches the conflict.
+func (p *inlineParser) parseBaseURL(n *kdl.Node) error {
+	raw, chain, err := guardfile.ParseBaseURL(n)
+	if err != nil {
+		return err
+	}
+	if raw != "" {
+		p.cfg.BaseURL = raw
+	}
+	if !chain.IsZero() {
+		p.cfg.BaseURLValue = chain
+	}
+	return nil
 }
 
 // validate enforces the cross-node invariants after every wrap child is applied.
