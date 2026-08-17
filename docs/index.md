@@ -19,6 +19,6 @@ It provides:
 - **[Features](FEATURES.md)** - feature inventory.
 - **[Examples](examples.md)** - one runnable demo per primitive.
 - **CLI reference** - run `make docs-serve` to render the command tree for every example locally.
-- **[Source on GitHub](https://github.com/coilysiren/cli-guard)** - issues, releases, code.
+- **[Source on Forgejo](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra)** - issues, releases, code.
 
-Sibling repo: [cli-mcp](https://github.com/coilysiren/cli-mcp).
+Sibling repo: [mcp-beaver](https://forgejo.coilysiren.me/coilyco-flight-deck/mcp-beaver).

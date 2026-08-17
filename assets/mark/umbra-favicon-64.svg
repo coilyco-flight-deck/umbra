@@ -4,7 +4,7 @@
   <defs><clipPath id="form"><path d="M19.5 20 H44.5 L50.5 26 V38 L44.5 44 H19.5 L13.5 38 V26 Z"/></clipPath></defs>
   <rect width="64" height="64" fill="#14111b"/>
   <circle cx="32" cy="32" r="26.5" fill="none" stroke="#4bcdd1" stroke-width="2"/>
-  
+
   <path d="M19.5 20 H44.5 L50.5 26 V38 L44.5 44 H19.5 L13.5 38 V26 Z" fill="#baa6d9"/>
   <g clip-path="url(#form)"><rect x="11.5" y="37.5" width="41" height="9" fill="#14111b"/><rect x="13.5" y="39.5" width="37" height="5" fill="#4bcdd1"/><rect x="44.5" y="18" width="8" height="28.5" fill="#14111b"/><rect x="46.5" y="20" width="4" height="24.5" fill="#4bcdd1"/><rect x="11.5" y="18" width="41" height="12" fill="#14111b"/><rect x="13.5" y="20" width="37" height="8" fill="#4bcdd1"/><rect x="11.5" y="18" width="11.5" height="28.5" fill="#14111b"/><rect x="13.5" y="20" width="7.5" height="24.5" fill="#4bcdd1"/><path d="M24 23 H29 L31 25 H24 Z" fill="#14111b"/><path d="M40 23 H35 L33 25 H40 Z" fill="#14111b"/></g>
 </svg>
