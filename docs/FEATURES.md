@@ -38,6 +38,7 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
 - **ttlcache** - Generic TTL-keyed cache.
 - **skillgen** - Render deterministic native agent skills from CLI command trees.
 - **broker** / **credseed** - Credential broker and env seeder. See [broker.md](broker.md).
+- **provenance** - Transport-neutral origin envelope: actor, source, source object, content hash, observation time, and verification state. Policy-free input to a consumer's trust decision. See [provenance.md](provenance.md).
 - **scan** / **attribution** / **flock** / **version** / **issueref** /
   **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
 

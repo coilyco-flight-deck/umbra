@@ -24,7 +24,8 @@ ward-kdl knowledge**, so it is importable by ward without a dependency cycle:
   every request before execution. `Policy` is the default: an owner allowlist
   crossed with the op allowlist, plus the structural invariants every op needs
   (known op, owner+repo present, positive number where required, and a known
-  label mode with at least one label for the label op).
+  label mode with at least one label for the label op). It **fails closed**,
+  described below.
 - **Executor** (`executor.go`) - the injected privileged side. The server holds
   no token; it authorizes a request and delegates execution to the consumer's
   `Executor`, which holds the credential and talks to the forge / dispatch
@@ -36,6 +37,23 @@ ward-kdl knowledge**, so it is importable by ward without a dependency cycle:
   version or unknown op is refused, never guessed.
 - **Client** (`client.go`) - the unprivileged dial-once-per-call side, with
   per-op convenience wrappers. It auto-stamps `ProtocolVersion`.
+
+## Fail-closed policy
+
+A caller declares **both** halves before any write executes, because a policy
+someone forgot to fill in must not be the one granting the write tier:
+
+- `Owners` empty denies every request, unless `AnyOwner` is set. That flag is
+  the named opt-in for a consumer with no owner boundary of its own; leaving a
+  field blank is never the way to get it, and an empty owner is refused even
+  under `AnyOwner`.
+- `Ops` empty denies every operation. Pass `WriteOps` for the full tier.
+- `Validate` reports an under-declared policy, so a consumer fails at startup
+  rather than at its first refused request.
+
+Authorization here is *structural*: which owner, which op. Whether the actor
+who supplied the content is trustworthy is the consumer's decision, and
+[provenance.md](provenance.md) carries the origin claim it reads.
 
 ## Why versioned and minimal
 

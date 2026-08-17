@@ -4,9 +4,16 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 )
+
+// testPolicy is what the round-trip tests declare: Policy fails closed, so an
+// undeclared literal refuses before reaching the behaviour under test.
+func testPolicy() Policy {
+	return Policy{Owners: []string{"acme"}, Ops: WriteOps}
+}
 
 // fakeExecutor records the last call and returns canned results, so a test can
 // assert what the Server delegated and how it folded the result.
@@ -47,11 +54,30 @@ func (f *fakeExecutor) Dispatch(_ context.Context, t Target) (Result, error) {
 	return f.result, f.err
 }
 
-// newTestServer spins a Server on a unix socket under t.TempDir and returns a
+// sunPathMax is the smallest sockaddr_un.sun_path across the platforms this
+// suite runs on: 104 on darwin and the BSDs, 108 on Linux.
+const sunPathMax = 104
+
+// tempSocketDir returns a scratch dir short enough for a socket path. t.TempDir
+// embeds the test name, which overruns sun_path on a long TMPDIR.
+func tempSocketDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "umbra-broker")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
+// newTestServer serves on a unix socket in a short scratch dir, returning a
 // Client wired to it. The server stops when the test's context is cancelled.
 func newTestServer(t *testing.T, ex Executor, auth Authorizer) *Client {
 	t.Helper()
-	sock := filepath.Join(t.TempDir(), "broker.sock")
+	sock := filepath.Join(tempSocketDir(t), "b.sock")
+	if len(sock) > sunPathMax {
+		t.Fatalf("socket path is %d bytes, over the %d-byte sun_path limit: %s", len(sock), sunPathMax, sock)
+	}
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -68,7 +94,7 @@ func newTestServer(t *testing.T, ex Executor, auth Authorizer) *Client {
 
 func TestServerFileIssueRoundTrip(t *testing.T) {
 	ex := &fakeExecutor{result: Result{Number: 42, URL: "https://example/issues/42"}}
-	c := newTestServer(t, ex, Policy{})
+	c := newTestServer(t, ex, testPolicy())
 
 	target := Target{Owner: "acme", Repo: "widget"}
 	resp, err := c.FileIssue(context.Background(), target, "a title", "a body")
@@ -112,7 +138,7 @@ func TestServerAllWriteOpsReachExecutor(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ex := &fakeExecutor{result: Result{Detail: "done"}}
-			c := newTestServer(t, ex, Policy{})
+			c := newTestServer(t, ex, testPolicy())
 			resp, err := tc.call(c)
 			if err != nil {
 				t.Fatalf("transport: %v", err)
@@ -129,7 +155,7 @@ func TestServerAllWriteOpsReachExecutor(t *testing.T) {
 
 func TestServerLabelIssueFoldsModeAndLabels(t *testing.T) {
 	ex := &fakeExecutor{result: Result{Number: 7, URL: "https://example/issues/7"}}
-	c := newTestServer(t, ex, Policy{})
+	c := newTestServer(t, ex, testPolicy())
 
 	target := Target{Owner: "acme", Repo: "widget", Number: 7}
 	resp, err := c.LabelIssue(context.Background(), target, LabelAdd, []string{"headless", "42"})
@@ -150,7 +176,7 @@ func TestServerLabelIssueFoldsModeAndLabels(t *testing.T) {
 func TestServerAuthorizerVetoSkipsExecutor(t *testing.T) {
 	ex := &fakeExecutor{}
 	// Owner allowlist that excludes the request's owner.
-	c := newTestServer(t, ex, Policy{Owners: []string{"trusted"}})
+	c := newTestServer(t, ex, Policy{Owners: []string{"trusted"}, Ops: WriteOps})
 
 	resp, err := c.FileIssue(context.Background(), Target{Owner: "stranger", Repo: "r"}, "t", "b")
 	if err != nil {
@@ -166,7 +192,7 @@ func TestServerAuthorizerVetoSkipsExecutor(t *testing.T) {
 
 func TestServerExecutorErrorFoldsToResponse(t *testing.T) {
 	ex := &fakeExecutor{err: errors.New("forge exploded")}
-	c := newTestServer(t, ex, Policy{})
+	c := newTestServer(t, ex, testPolicy())
 
 	resp, err := c.FileIssue(context.Background(), Target{Owner: "acme", Repo: "r"}, "t", "b")
 	if err != nil {
@@ -182,7 +208,7 @@ func TestServerExecutorErrorFoldsToResponse(t *testing.T) {
 
 func TestServerRejectsProtocolMismatch(t *testing.T) {
 	ex := &fakeExecutor{}
-	c := newTestServer(t, ex, Policy{})
+	c := newTestServer(t, ex, testPolicy())
 
 	// Bypass the Client's auto-stamp by sending the request raw.
 	resp, err := c.Do(context.Background(), Request{Op: OpFileIssue, Target: Target{Owner: "acme", Repo: "r"}, Title: "t"})
@@ -202,7 +228,7 @@ func TestServerRejectsProtocolMismatch(t *testing.T) {
 }
 
 func TestNewServerRejectsNilDeps(t *testing.T) {
-	ln, err := net.Listen("unix", filepath.Join(t.TempDir(), "s.sock"))
+	ln, err := net.Listen("unix", filepath.Join(tempSocketDir(t), "s.sock"))
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}

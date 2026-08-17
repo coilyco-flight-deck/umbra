@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -20,22 +21,38 @@ func (f AuthorizerFunc) Authorize(ctx context.Context, req Request) error {
 }
 
 // Policy is the default [Authorizer]: owner allowlist x op allowlist, plus the
-// structural invariants every op needs. Zero value permits any owner+[WriteOps].
+// structural invariants every op needs. It fails closed - see docs/broker.md.
 type Policy struct {
-	// Owners is the allowlist of issue owners. Empty means any owner.
+	// Owners is the allowlist of issue owners. Empty denies every request
+	// unless AnyOwner is set.
 	Owners []string
-	// Ops is the allowlist of permitted operations. Nil means [WriteOps].
+	// AnyOwner is the named opt-in accepting any non-empty owner, and the only
+	// way an empty Owners permits anything.
+	AnyOwner bool
+	// Ops is the allowlist of permitted operations. Empty denies every
+	// operation; pass [WriteOps] for the full write tier.
 	Ops map[Op]bool
+}
+
+// Validate reports whether the policy declares enough to permit anything, so a
+// consumer can fail at startup rather than at its first refused request.
+func (p Policy) Validate() error {
+	if len(p.Ops) == 0 {
+		return errors.New("broker: policy permits no operations (set Ops, e.g. to WriteOps)")
+	}
+	if len(p.Owners) == 0 && !p.AnyOwner {
+		return errors.New("broker: policy allows no owners (set Owners, or AnyOwner to accept every owner)")
+	}
+	return nil
 }
 
 // Authorize enforces the policy. ctx is accepted for interface conformance;
 // the built-in checks are synchronous.
 func (p Policy) Authorize(_ context.Context, req Request) error {
-	ops := p.Ops
-	if ops == nil {
-		ops = WriteOps
+	if err := p.Validate(); err != nil {
+		return err
 	}
-	if !ops[req.Op] {
+	if !p.Ops[req.Op] {
 		return fmt.Errorf("broker: operation %q not permitted", req.Op)
 	}
 	if req.Target.Owner == "" || req.Target.Repo == "" {
@@ -73,10 +90,13 @@ func labelInvariants(req Request) error {
 	return nil
 }
 
-// ownerAllowed reports whether owner passes the Owners allowlist (empty
-// allowlist permits any owner).
+// ownerAllowed applies the Owners allowlist. An empty owner is never allowed,
+// including under AnyOwner.
 func (p Policy) ownerAllowed(owner string) bool {
-	if len(p.Owners) == 0 {
+	if owner == "" {
+		return false
+	}
+	if p.AnyOwner {
 		return true
 	}
 	for _, o := range p.Owners {
