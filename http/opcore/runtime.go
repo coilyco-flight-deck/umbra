@@ -125,7 +125,9 @@ func (rt *Runtime) BaseForRequest(ctx context.Context, dry bool) (string, error)
 // authorize resolves the scheme's secret(s) and applies them to req: a header
 // for header-token/bearer, or query parameters for query-param.
 func (rt *Runtime) authorize(ctx context.Context, req *http.Request) error {
-	if rt.Auth.Scheme == "" {
+	// `none` is stated credential-free, empty is a spec that forgot; both send
+	// nothing. See docs/specverb-auth-none.md.
+	if rt.Auth.Scheme == "" || rt.Auth.Scheme == guardfile.AuthSchemeNone {
 		return nil
 	}
 	if rt.Auth.Scheme == "query-param" {

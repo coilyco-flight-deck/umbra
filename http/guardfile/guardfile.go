@@ -36,8 +36,12 @@ func (c ValueChain) String() string {
 	return strings.Join(parts, " | ")
 }
 
-// Auth describes how the engine authenticates to the target API. Three schemes:
-// header-token, bearer, query-param (dual-secret). See docs/specverb.md.
+// AuthSchemeNone marks a deliberately credential-free upstream. Distinct from
+// an unset scheme, which is a spec that forgot. See docs/specverb-auth-none.md.
+const AuthSchemeNone = "none"
+
+// Auth describes how the engine authenticates to the target API. Four schemes:
+// header-token, bearer, query-param (dual-secret), none. See docs/specverb.md.
 type Auth struct {
 	Scheme string
 	Header string
@@ -566,8 +570,8 @@ func ParseAuthNode(n *kdl.Node) (Auth, error) { return parseAuth(n) }
 // with the opcore inline source so both sources speak one restrict grammar.
 func ParseRestrictNode(n *kdl.Node) (Restriction, error) { return parseRestrict(n) }
 
-// parseAuth reads the auth block, dispatching on the named scheme. Three are
-// supported: header-token, bearer, query-param. See docs/specverb.md.
+// parseAuth reads the auth block, dispatching on the named scheme. Four are
+// supported: header-token, bearer, query-param, none. See docs/specverb.md.
 func parseAuth(n *kdl.Node) (Auth, error) {
 	scheme, err := singleArg(n)
 	if err != nil {
@@ -580,9 +584,20 @@ func parseAuth(n *kdl.Node) (Auth, error) {
 		return parseBearerAuth(n)
 	case "query-param":
 		return parseQueryParamAuth(n)
+	case "none":
+		return parseNoneAuth(n)
 	default:
-		return Auth{}, fmt.Errorf("guardfile: auth scheme %q unsupported (want header-token | bearer | query-param)", scheme)
+		return Auth{}, fmt.Errorf("guardfile: auth scheme %q unsupported (want header-token | bearer | query-param | none)", scheme)
 	}
+}
+
+// parseNoneAuth reads `auth none`, for a genuinely credential-free upstream.
+// See docs/specverb-auth-none.md.
+func parseNoneAuth(n *kdl.Node) (Auth, error) {
+	if len(n.Children().Nodes) > 0 {
+		return Auth{}, fmt.Errorf("guardfile: auth none takes no block (a credential-free upstream resolves nothing)")
+	}
+	return Auth{Scheme: AuthSchemeNone}, nil
 }
 
 // parseHeaderTokenAuth reads `header-token { header H; prefix "..."; value P A }`.

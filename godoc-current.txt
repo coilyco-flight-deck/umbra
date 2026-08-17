@@ -661,6 +661,14 @@ package guardfile // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/htt
 Package guardfile parses a KDL Guardfile, the human authoring layer (L2) of the
 specverb engine, into a typed model. KDL is parsed, never evaluated.
 
+CONSTANTS
+
+const AuthSchemeNone = "none"
+    AuthSchemeNone marks a deliberately credential-free upstream.
+    Distinct from an unset scheme, which is a spec that forgot. See
+    docs/specverb-auth-none.md.
+
+
 FUNCTIONS
 
 func Flatten(path string) ([]byte, error)
@@ -713,9 +721,8 @@ type Auth struct {
 	// query parameter (Trello's ?key=&token=). Empty for the header schemes.
 	Params []QueryAuthParam
 }
-    Auth describes how the engine authenticates to the target API.
-    Three schemes: header-token, bearer, query-param (dual-secret). See
-    docs/specverb.md.
+    Auth describes how the engine authenticates to the target API. Four schemes:
+    header-token, bearer, query-param (dual-secret), none. See docs/specverb.md.
 
 func ParseAuthNode(n *kdl.Node) (Auth, error)
     ParseAuthNode parses one `auth` KDL node into an Auth: the entry the opcore

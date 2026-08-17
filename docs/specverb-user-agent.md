@@ -3,28 +3,27 @@
 Every request `opcore` fires carries `opcore.DefaultUserAgent` unless something
 already set the header.
 
-## Why a default rather than nothing
+## Why a default
 
-Go's own default is `Go-http-client/1.1`. Several public APIs refuse that
-outright rather than rate-limit it, so a request built correctly in every other
-respect is rejected for a reason nothing in the spec can express.
+Naming your client is the stated etiquette for most of the volunteer and
+nonprofit APIs a Guardfile reads. An unnamed one is bad manners against them
+whether or not they enforce it, and some do enforce it.
 
-Measured against reddit, one request each, spaced to avoid confounding the
-result with rate limiting:
+## Correction: this is not what reddit was blocking
 
-| User-Agent | Response |
-| --- | --- |
-| `Go-http-client/1.1` | 403 blocked due to a network policy |
-| none | 403 blocked due to a network policy |
-| `Go-http-client/2.0` | 429, the ordinary rate limiter |
-| a descriptive agent | 429, the ordinary rate limiter |
+The change originally landed on a measurement that did not support it. The
+first round used `curl`, where `Go-http-client/1.1` and an empty agent both
+answered 403 while any other agent reached the rate limiter - and that was
+generalised to Go's client, which is the one that matters.
 
-The block is on the anonymous client, not on the request. Anything that names
-itself reaches the served path.
+Re-measured from Go's `net/http`, every agent including Go's own default
+reaches the served path. reddit's 403 came from the placeholder
+`Authorization` header a credential-free Guardfile was forced to send, not from
+the agent. That is fixed by [`auth none`](specverb-auth-none.md), and the
+measurements are recorded there.
 
-This is not reddit-specific. A descriptive agent is the stated etiquette for
-most of the volunteer and nonprofit APIs a Guardfile reads, and an unnamed
-client is bad manners against them whether or not they enforce it.
+The default agent stays, on the etiquette argument alone. It is recorded here
+as etiquette rather than as a fix so nobody later reads it as one.
 
 ## What it does not do
 
