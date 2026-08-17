@@ -198,6 +198,10 @@ func (rt *Runtime) FireCaptureRaw(ctx context.Context, method, url string, body 
 	return rt.send(ctx, method, url, body, contentType)
 }
 
+// DefaultUserAgent names this client when nothing else does. Go's default is
+// refused outright by some APIs; see docs/specverb-request.md (umbra#303).
+const DefaultUserAgent = "umbra/1.0 (+https://github.com/coilyco-flight-deck/umbra)"
+
 // send performs the request and returns the success body. It never inspects the
 // payload, so a plaintext log or a ZIP survives it intact.
 func (rt *Runtime) send(ctx context.Context, method, url string, body []byte, contentType string) ([]byte, string, error) {
@@ -211,6 +215,9 @@ func (rt *Runtime) send(ctx context.Context, method, url string, body []byte, co
 	}
 	if aerr := rt.Authorize(ctx, req); aerr != nil {
 		return nil, "", aerr
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", DefaultUserAgent)
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", contentType)

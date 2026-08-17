@@ -956,6 +956,10 @@ const (
 )
     Location constants label where a Property lowers onto the outgoing request.
 
+const DefaultUserAgent = "umbra/1.0 (+https://github.com/coilyco-flight-deck/umbra)"
+    DefaultUserAgent names this client when nothing else does. Go's default is
+    refused outright by some APIs; see docs/specverb-request.md (umbra#303).
+
 const OwnerRepoArg = "owner-repo"
     OwnerRepoArg is the documented `args` sugar: a single `owner/name` value
     split across the leaf's `owner` and `repo` path params.

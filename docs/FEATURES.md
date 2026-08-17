@@ -23,6 +23,8 @@ Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](archi
 - **Inline HTTP contracts** - Typed query, nested-string body projection, and
   JMESPath response postconditions. See
   [body mapping](opcore-body-mapping.md) and [inline operations](opcore-inline.md).
+- **Named client** - every request carries a default User-Agent, because some
+  APIs refuse Go's outright. See [user agent](specverb-user-agent.md).
 - **complex actions** - `poll`/`call`/`collect`. See [actions](specverb-actions.md).
 - **respfmt** - JSON renderer + JMESPath, five formats.
 
