@@ -1,56 +1,26 @@
-# Release pipeline
+# Release pipeline, lint config, and the mark
 
-Forgejo is the canonical and only publication surface for umbra. GitHub
-does not build or publish releases and does not deploy documentation.
-umbra is the base library of the umbra / ward stack (coily, the
-original third member, has been retired).
+Forgejo is the canonical and only publication surface for umbra. GitHub does not build, publish, or deploy anything. umbra is the base library of the umbra / ward stack.
 
-## Flow
+## Two-stage flow
 
-Two-stage (ward#1117): main is the integration branch, `release` is
-last-known-good, and only gate-green shas release.
+`main` is the integration branch, `release` is last-known-good, and only gate-green shas release.
 
-- Push to `main` lands on Forgejo and fires `.forgejo/workflows/promote.yml`
-  (stage 1): the full repo gate (vet, build, race test, godoc-current, mod
-  tidy, golangci-lint, secret scan) runs, then the workflow publishes the
-  commit-scoped draft tag (`draft-${sha}`) and only then fast-forwards
-  `release` to that sha. The promote push uses the `CI_RELEASE_TOKEN` secret
-  (a real-user PAT with `write:repository` + `read:user` from SSM
-  `/forgejo/ci-release-token`, synced by aos `ward exec sync-actions-secrets`):
-  job-token pushes and PATs without `read:user` get an empty actor and
-  silently enqueue no workflow.
-- The `release` push fires `.forgejo/workflows/release.yml` (stage 2) under a
-  no-cancel concurrency queue, so promoted shas release in sequence. The
-  workflow first verifies the matching draft tag exists, then the **release**
-  job: `tag-bump` applies the automatic minor bump (major stays hand-driven),
-  creates the tag, then
-  builds the six-platform `specgen` matrix, renders and verifies the Homebrew
-  formula plus Scoop manifest, creates the Forgejo release, and attaches every
-  binary plus `SHA256SUMS`, `specgen.rb`, and `specgen.json`. It then updates
-  the shared Homebrew tap and Scoop bucket. Release creation uses the
-  auto-issued job token. Package-repository pushes use the repo-scoped
-  `TAP_WRITE_TOKEN` and `SCOOP_WRITE_TOKEN` secrets provisioned by
-  infrastructure's bot-token scripts.
+A push to `main` fires `promote.yml`: the full repo gate (vet, build, race test, godoc-current, mod tidy, golangci-lint, secret scan) runs, then it publishes the commit-scoped draft tag `draft-${sha}` and only then fast-forwards `release` to that sha. The promote push uses a real-user PAT with `write:repository` **and** `read:user`, because job-token pushes and PATs missing `read:user` get an empty actor and silently enqueue no workflow.
 
-The release assets cover Linux, macOS, and Windows on amd64 and arm64. The
-stamped `specgen` version is also the default umbra ref frozen by
-`specgen lock`. A tagged `go install` is the source-install alternative.
-Homebrew and Scoop metadata carry the same release URLs and hashes as the
-attached binaries. `make release-check` verifies that contract before
-publication.
+The `release` push fires `release.yml` under a no-cancel concurrency queue, so promoted shas release in sequence. It verifies the matching draft tag, applies the automatic minor bump (major stays hand-driven), creates the tag, builds the six-platform `specgen` matrix, renders and verifies the Homebrew formula and Scoop manifest, creates the Forgejo release with every binary plus `SHA256SUMS`, then updates the shared tap and bucket.
 
-## Tag-only by design: umbra does not bump its consumers
+## golangci config notes
 
-The stack's dependency direction is umbra -> ward. umbra is
-the base, so its automation must not reach up into its consumers. Having
-umbra open dependency-bump PRs on ward would reverse the
-`dependsOn` edge (a dependency mutating its dependents), which couples the
-tree backwards.
+`.golangci.yaml` is adopted from the cli-* family and leans on cyclomatic-complexity checks, because these packages are security boundaries or wire-protocol layers where tangled branchy code is where the bugs live.
 
-Downstream bumps belong to the consumers, pulled along the dependency arrow:
-ward watches umbra's tags and opens its own self-bump PR.
-That keeps every cross-repo write pointing from a consumer toward what it
-depends on. The tree-direction rule is being made enforceable as a linter in
-the consumer self-bump policy.
+- **G204** fires on every `exec.CommandContext` even with argv properly constructed. Argv validation happens at the umbra policy layer, and refusing it here would defeat the point of the wrappers.
+- **G301/G302/G304/G306** file permissions are managed deliberately per call site, so the per-site choice is trusted over a blanket rule.
+- Generated files and tests relax complexity and a few correctness linters: mechanical or long table-driven code is fine.
+- Examples match on `(^|/)examples/` rather than `^examples/`. In a git worktree golangci-lint reports paths prefixed with the relative hop back to the checkout, which a start-anchored pattern would miss, leaking example-only noise into every dispatched commit.
 
-See [umbra release automation](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra).
+## The mark
+
+Four uneven strips laid over a lit opening, with a pair of tapered slits cut into the deepest one. A sibling of the coilyco org avatars, sharing their ink, mint, and lilac.
+
+The mark says what umbra does: the strips hold the opening's whole rim and never cross its middle, because umbra guards a boundary and leaves the work inside it alone. The slits are the framework looking out from behind that boundary. Files and their canvases live in [assets/mark/README.md](../assets/mark/README.md).

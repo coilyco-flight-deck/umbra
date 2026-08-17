@@ -1,60 +1,45 @@
 # umbra features
 
-Inventory of umbra today. See `examples/<feature>/` for each.
+Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](architecture.md); each primitive ships a runnable `examples/<name>/`.
 
-## Framework primitives
+## CLI passthrough surface (`cli/`)
 
-Grouped by **guarded surface** over a shared `pkg/`. See [architecture.md](architecture.md).
-
-### CLI passthrough surface (`cli/`)
-
-- **passthrough** - Audited urfave subcommand around an existing binary.
-- **execverb** - Exec-dialect KDL verbs + the `passthrough <bin>` funnel. See [execverb.md](execverb.md); actions: [execverb-actions.md](execverb-actions.md).
-- **verb** - Middleware around every `*cli.Command.Action`.
+- **passthrough** - Thin wrapper embedding an existing binary (aws, gh, kubectl) as an audited urfave subcommand. See [passthrough.md](passthrough.md).
+- **execverb** - Exec-dialect KDL verbs plus the `passthrough <bin>` funnel, complex actions, and inspect lists. See [execverb.md](execverb.md).
+- **verb** - Middleware wrapping every `*cli.Command.Action` in the standard validate -> execute -> audit pipeline.
 - **shell** - Subprocess exec with audited argv, stderr tail, and env injection.
-- **gittree** - Clean+synced gate for repo-shaped verbs.
-- **repocfg** - Per-repo config file loading under a consumer-chosen filename.
+- **gittree** - Clean+synced gate refusing repo-shaped verbs on a dirty tree.
+- **repocfg** - Per-repo config loaded from a consumer-chosen YAML filename.
 
-### HTTP request surface (`http/`)
+## HTTP request surface (`http/`)
 
-- **egress** - Per-run CONNECT proxy with consumer allowlist.
-- **Specgen/codegen** - Discovery, locks, generation, and
-  [embedded fixed files](specgen-embedded-files.md).
-- **Inline HTTP contracts** - Typed query, nested-string body projection, and
-  JMESPath response postconditions. See
-  [body mapping](opcore-body-mapping.md) and [inline operations](opcore-inline.md).
-- **Named client** - every request carries a default
-  [User-Agent](specverb-user-agent.md); `auth none` states a credential-free
-  upstream instead of faking one. See [auth none](specverb-auth-none.md).
-- **complex actions** - `poll`/`call`/`collect`. See [actions](specverb-actions.md).
-- **respfmt** - JSON renderer + JMESPath, five formats.
+- **egress** - Per-invocation CONNECT proxy with a consumer-supplied allowlist, in enforce or observe mode.
+- **specverb / guardfile** - Spec-driven verbs: [resolution](specverb-resolution.md), [policy and tiering](specverb-policy.md), [requests](specverb-request.md), [actions](specverb-actions.md), [describe](specverb-describe.md), [fetch overlays](specverb-fetch.md).
+- **specgen / codegen** - The no-code driver: discovery, locks, generation. See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
+- **opcore** - The frozen inline grammar: typed query, nested-string body projection, JMESPath postconditions, MCP proxy grants. See [opcore-inline.md](opcore-inline.md).
+- **Named client** - every request carries a default User-Agent as etiquette, and `auth none` states a credential-free upstream rather than faking one. See [policy](specverb-policy.md).
+- **respfmt** - JSON renderer with optional JMESPath projection and five output formats (yaml, yaml-stream, json, text, table), mirroring the aws CLI `--query` / `--output` surface.
 
-### Shared core (`pkg/`)
+## Shared core (`pkg/`)
 
-- **audit** - Rotated JSONL invocation log with optional typed CI attribution.
-- **policy** - Argv validation rejecting shell metachars.
-- **scope** - Resolve cwd to git root for audit.
-- **exitcode** - Public exit-code taxonomy.
-- **valuesource** - Shared `value <provider>` resolution: env/file/literal built in, store-backed resolvers declared by the consumer. See [value-providers.md](value-providers.md).
-- **config** - Layered-config primitives + `OverlayFile[T]`.
+- **audit** - Append-only JSONL invocation log with lumberjack rotation and optional typed CI attribution. The package preserves that context but does not establish its trust.
+- **policy** - Argv validation rejecting shell metacharacters before they reach `execve`.
+- **scope** - Resolve cwd to its git toplevel, best-effort, stamping each audit row's RepoRoot (empty outside any repo).
+- **exitcode** - Public exit-code taxonomy (success / generic / policy-denied / upstream-failed / internal / user-error) for orchestrators.
+- **valuesource** - Shared `value <provider>` resolution with ordered fallback chains. See [value providers](value-providers.md).
+- **config** - Layered-config primitives plus a generic `OverlayFile[T]`.
 - **stepflow** - Transport-agnostic ordered sequence engine with explicit data threading.
-- **ttlcache** - Generic TTL-keyed cache.
-- **skillgen** - Render deterministic native agent skills from CLI command trees.
-- **broker** / **credseed** - Credential broker and env seeder. See [broker.md](broker.md).
-- **provenance** - Transport-neutral origin envelope: actor, source, source object, content hash, observation time, and verification state. Policy-free input to a consumer's trust decision. See [provenance.md](provenance.md).
-- **scan** / **attribution** / **flock** / **version** / **issueref** /
-  **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
+- **ttlcache** - Generic TTL-keyed cache. **skillgen** - Render deterministic agent skills from CLI command trees.
+- **broker** / **credseed** / **provenance** - Credential broker, env seeder, and origin envelope. See [broker.md](broker.md).
+- **scan** / **attribution** / **flock** / **version** / **issueref** / **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
 
 ## Repo development
 
-- `Makefile` is the source of truth for dev verbs (umbra is unguarded).
-- `.golangci.yaml` / `staticcheck.conf` mirror urfave/cli. CI validates code, secrets, and docs. GitHub publishes and deploys nothing.
-- Release is automated and Forgejo-canonical, with commit-scoped draft tags on `main`, public release tags on `release`, packaged `specgen` binaries, and automatic Homebrew tap plus Scoop bucket updates. Consumers self-bump. See [release-pipeline.md](release-pipeline.md).
+`Makefile` is the source of truth for dev verbs, since umbra is deliberately unguarded. `.golangci.yaml` and `staticcheck.conf` mirror urfave/cli, and CI validates code, secrets, and docs. Release is automated and Forgejo-canonical; see [release-pipeline.md](release-pipeline.md).
 
 ## See also
 
 - [README.md](../README.md) - human-facing intro.
 - [AGENTS.md](../AGENTS.md) - agent-facing operating rules.
-- [features-detail.md](features-detail.md) - per-primitive details.
 
 Cross-reference convention from the shared repo-pointer rule in the agentic-os docs.

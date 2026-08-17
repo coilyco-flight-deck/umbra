@@ -1,18 +1,16 @@
 # spec-driven verbs (guardfile + specverb)
 
-The spec-driven verb subsystem replaces hand-rolled per-verb CLI wrappers with one generic engine that builds the guarded command tree at runtime from an embedded API spec plus a policy.
+The spec-driven verb subsystem replaces hand-rolled per-verb CLI wrappers with one generic engine that builds the guarded command tree at runtime from an embedded API spec plus a policy. Three layers:
 
-Three layers:
-
-- **L0 - upstream spec.** The vendor's API truth, embedded. A Swagger 2.0 or OpenAPI 3.0 / 3.1 document (JSON or YAML).
-- **L1 - policy IR.** The compiled operation set. A grant's verb+resource resolve to an operation by convention; an explicit `op` overrides. No API-specific table in the engine.
-- **L2 - KDL Guardfile.** The human authoring layer. Pure data, parsed never evaluated, compiling to L1.
+- **L0 - upstream spec.** The vendor's API truth, embedded: Swagger 2.0 or OpenAPI 3.0 / 3.1, JSON or YAML.
+- **L1 - policy IR.** The compiled operation set. A grant's verb+resource resolve to an operation by convention, with `op` as the override. No API-specific table in the engine.
+- **L2 - KDL Guardfile.** The authoring layer. Pure data, parsed never evaluated, compiling to L1.
 
 The engine carries no upstream knowledge, so one engine drives every spec.
 
 ## guardfile (L2)
 
-`guardfile.Parse` turns a KDL Guardfile into a typed model (group, auth, grants, restrictions, actions). KDL is parsed, never evaluated. The grant's verb+resource ARE the CLI leaf+group, and they resolve to an operation by convention - an explicit `op` is the override seam, not a required binding:
+`guardfile.Parse` turns a KDL Guardfile into a typed model of group, auth, grants, restrictions, and actions. The grant's verb+resource **are** the CLI leaf and group:
 
 ```kdl
 wrap ward ops forgejo {
@@ -26,28 +24,21 @@ wrap ward ops forgejo {
 }
 ```
 
-Grant-body nodes: `op "<operationId>"` (optional override; resolution rules in [specverb-resolution.md](specverb-resolution.md)), `body k=v` fixed-body toggles, `message "..."`, and `describe "..."`. The parser fails closed on unknown nodes, missing required fields, and unsupported auth schemes. Built on `calico32/kdl-go`.
-
-`fetch "<name>"` is the overlay sibling for non-Swagger endpoints. It mounts a
-fixed HTTP request leaf with raw stdout output.
-
-The auth schemes (header-token, bearer, query-param dual-secret), the deny semantics (a deny beats an allow), and the restrict scope gate live in [specverb-policy.md](specverb-policy.md).
+Grant-body nodes are `op` (the override seam, rules in [resolution](specverb-resolution.md)), `body k=v` fixed-body toggles, `message`, and `describe`. The parser fails closed on unknown nodes, missing required fields, and unsupported auth schemes. `fetch "<name>"` is the overlay sibling for non-Swagger endpoints. Auth schemes, deny semantics, and the restrict gate live in [policy](specverb-policy.md).
 
 ## specverb (engine)
 
 `specverb.Build(Config)` assembles the guarded `*cli.Command` tree:
 
-1. Parse the embedded spec into one `kin-openapi` `openapi3.T` IR (Swagger 2.0 upgraded via `openapi2conv`) that resolves `$ref`s, reads `requestBody.content`, promotes `in:query`/`in:path` params, and collapses 3.1 type-lists.
-2. For each `can` grant, resolve its operation (by convention or `op`) to a `{method, path, params, body}` descriptor; resource is the CLI group, verb the leaf. **Deny-by-default: an unresolvable or ambiguous grant, or an op the spec lacks, fails closed.**
-3. Mount each op as a guarded leaf under `verb.Wrap` (audit + argv gate). A reserved-flag collision is fail-closed; the restrict gate runs at invocation.
-4. Mount each `fetch` overlay under the `fetch` group. `when first input` aliases `arg0`.
+1. Parse the embedded spec into one `kin-openapi` IR (Swagger 2.0 upgraded via `openapi2conv`), resolving `$ref`s, reading `requestBody.content`, promoting `in:query`/`in:path` params, and collapsing 3.1 type-lists.
+2. Resolve each `can` grant to a `{method, path, params, body}` descriptor, resource as group and verb as leaf. **Deny-by-default: an unresolvable or ambiguous grant, or an op the spec lacks, fails closed.**
+3. Mount each op as a guarded leaf under `verb.Wrap` (audit + argv gate). A reserved-flag collision fails closed, and the restrict gate runs at invocation.
+4. Mount each `fetch` overlay under the `fetch` group.
 
-One generic action backs every verb: path params positional, query/body fields as typed flags, `--body-file`, fixed-body toggles, injected-resolver auth, `--dry-run`, the `respfmt` render rail - see [specverb-request.md](specverb-request.md).
+One generic action backs every verb: positional path params, typed query and body flags, `--body-file`, fixed-body toggles, injected-resolver auth, `--dry-run`, and the render rail. See [requests](specverb-request.md).
 
-`specverb.Mount(root, Config)` grafts the built group onto root, generating the intermediate path groups the `wrap` line names. `codegen.Render` generates a consumer's whole `main.go` from the Guardfile (AWS SDK kept out of umbra); the no-code `specgen` driver wraps it in a `gen` / `lock` / `skew` / `run` surface, see [specgen.md](specgen.md).
+`specverb.Mount` grafts the built group onto a root, generating the intermediate groups the `wrap` line names. `codegen.Render` generates a consumer's whole `main.go` from the Guardfile, and the no-code [specgen](specgen.md) driver wraps that in a `gen` / `lock` / `skew` / `run` surface.
 
 ## Spec durability
 
 Proven across three specs: Forgejo (Swagger 2.0 JSON), Trello (OpenAPI 3.0 JSON, `in:query` mutation fields), and Tailscale (OpenAPI 3.1 YAML, `$ref` path params). `Prune` has a path per version, reducing a document to the granted ops plus the transitive closure of the components they reach.
-
-Design: the Forgejo and Trello specverb implementations.

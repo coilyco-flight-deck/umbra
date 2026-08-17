@@ -1,47 +1,30 @@
 # specverb request semantics
 
-How the one generic action behind every mounted leaf assembles, previews, and fires its HTTP request. The engine and policy layers are in [specverb.md](specverb.md).
+How the generic action behind every mounted leaf assembles, previews, and fires its request. Engine and policy layers are in [specverb.md](specverb.md).
 
 ## Inputs
 
-- **Path params** become positional args (`repo delete <owner> <repo>`), count-validated before any wire call.
-- **Query params** become typed flags. Set scalars encode once, while typed
-  arrays encode as repeated keys in input order. Unset values are omitted.
-  Inline descriptors may give one query parameter a safe local flag/schema name
-  and an explicit upstream wire name.
-- **Body fields** (scalars and arrays of scalars) become typed flags; an unset optional is omitted from the JSON, never sent as a zero value. Arrays repeat the flag (`--assignees a --assignees b`).
-- **`--body-file <path>`** supplies the whole JSON body instead, mutually exclusive with body flags.
-- **Required body fields** are enforced at request assembly, not the CLI layer, so either source - flags or `--body-file` - satisfies them.
-- **State toggles** (`can close issues`) mount fixed-body leaves: the leaf sends exactly the table-declared body (`{"state":"closed"}`) and mounts no body flags.
+- **Path params** become positional args, count-validated before any wire call.
+- **Query params** become typed flags: scalars encode once, typed arrays as repeated keys in input order, unset values omitted.
+- **Body fields** become typed flags; an unset optional is omitted rather than sent as a zero value, and arrays repeat the flag. **`--body-file`** supplies the whole body instead. Required fields are enforced at assembly rather than in the CLI layer, so either source satisfies them.
+- **State toggles** mount fixed-body leaves sending exactly the declared body.
 
-A promoted local input that would shadow a reserved engine flag (`--dry-run`, `--query`, `--output`, `--body-file`), or a query/body name collision on one leaf, refuses to build - fail-closed, never silent shadowing. An explicit query alias changes only the outgoing parameter name. The local name still passes the reserved and duplicate checks, and two inputs cannot map to one outgoing parameter.
-
-Inline query blocks add bounds, required fields, and at-most-one groups through
-the shared schema and request runtime. The specverb CLI converts set flags to
-typed values and delegates the same pre-send validation to opcore. See
-[opcore-query-types.md](opcore-query-types.md).
+A local input shadowing a reserved engine flag (`--dry-run`, `--query`, `--output`, `--body-file`), or a query/body collision on one leaf, refuses to build rather than shadowing silently.
 
 ## The shell-metachar gate is location-aware
 
-The argv gate (`verb.Wrap` → `policy.ValidateArg`) refuses shell metacharacters, but only on the inputs that compose into the request **URL** - the injection surface. **Path params** (positionals) and **query flags** stay gated. Every element of a repeated query parameter is checked independently. **Body fields**, **form fields**, and the `--body-file` path are JSON/multipart-encoded into the HTTP body and never reach a shell or the URL, so they are exempt. Gating them was a false positive that mangled legitimate free text (descriptions, commit messages, issue bodies). Complex-action inputs are gated by the same rule: an input is gated when any leaf binds it to a path or query param, exempt when it flows only into a body.
+`verb.Wrap` → `policy.ValidateArg` refuses shell metacharacters, but only on inputs composing into the request **URL**, the injection surface. Path params and query flags stay gated, each element of a repeated parameter independently. Body and form fields and the `--body-file` path are encoded into the body and never reach a shell or the URL, so they are exempt: gating them mangled legitimate free text. A complex-action input is gated when any leaf binds it to a path or query param.
 
 ## Firing
 
-- **Auth** (header-token) resolves the secret through the value-provider registry (`value <provider> "addr"`), keeping the AWS SDK and other store clients out of umbra - the consumer registers the real `ssm`/`tailscale` resolvers, tests inject a fake or lean on the `env`/`file`/`literal` built-ins.
-- **`--dry-run`** prints the resolved request with the secret redacted and fires nothing.
-- Live responses render through the `respfmt` `--query`/`--output` rail; an empty 2xx prints an `ok:` confirmation line.
-- The default client refuses redirects for mutating methods, so a renamed or transferred target cannot silently swallow a write.
+Auth resolves the secret through the value-provider registry, keeping store clients out of umbra. `--dry-run` prints the resolved request with the secret redacted and fires nothing. Live responses render through the `respfmt` `--query`/`--output` rail, and an empty 2xx prints an `ok:` line. The client refuses redirects for mutating methods, so a renamed target cannot silently swallow a write.
 
-A spec-declared non-JSON media type skips the decode and the render rail, see
-[specverb-raw-responses.md](specverb-raw-responses.md).
+Every request carries `opcore.DefaultUserAgent` unless the header is already set. Naming your client is the stated etiquette for most of the volunteer and nonprofit APIs a Guardfile reads, and an unnamed one is bad manners whether or not they enforce it. It is etiquette rather than a fix: an earlier measurement blamed reddit's 403 on Go's default agent, but re-measured from `net/http` every agent reaches the served path, and the 403 came from the placeholder `Authorization` a credential-free Guardfile was forced to send. A Guardfile cannot yet choose the string, the open half of umbra#303.
 
-## Fetch overlays
+## Non-JSON responses
 
-Fetch overlays are the raw-stdout sibling of the spec-driven leaf path:
+An operation whose success response offers no JSON writes its body to stdout byte for byte. The spec-driven path infers this from the declared media type; a response listing JSON beside something else is negotiating content rather than declaring bytes, so it is parsed. An inline grant says it outright with a bare `raw-response` node, fail-closed against an argument, property, block, duplicate, or a `fail-when` pairing that would have nothing to evaluate.
 
-- The method and path are fixed in the Guardfile.
-- Path placeholders still become positional args in `{placeholder}` order.
-- Env-backed header templates resolve through the same value-provider registry.
-- The live response body prints raw, without the `respfmt` rail.
-- A non-2xx response fails closed with the status line and trimmed body.
-- The same client floor applies, so `GET` and `HEAD` may follow redirects while mutating methods refuse silent redirects.
+Both paths choose **before** firing rather than after reading, the whole of umbra#289: decoding first fails on a plaintext or ZIP body, leaving the raw branch unreachable. Only the decode is skipped, never a gate, and `--query` is refused rather than ignored.
+
+Fixed non-Swagger leaves live in [fetch overlays](specverb-fetch.md).

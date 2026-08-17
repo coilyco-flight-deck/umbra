@@ -1,38 +1,27 @@
-# op resolution (L1)
+# op resolution, wildcards, and unrecognised verbs
 
-A grant's verb+resource resolve to a spec operation by generic convention, so the author rarely hand-binds an operationId. A grant-body `op "<operationId>"` is the override seam. `specverb.resolveOp` is the single bridge, called from the engine (`resolveDescriptor`) and the pruner (`grantedPathMethods`). The conventions are pure path+method structure, no vendor strings, so one resolver drives Swagger 2.0 and OpenAPI 3.x alike.
+A grant's verb+resource resolve to a spec operation by generic convention, so the author rarely hand-binds an operationId; a grant-body `op "<operationId>"` is the override seam. The conventions are pure path+method structure, no vendor strings, so one resolver drives Swagger 2.0 and OpenAPI 3.x alike.
 
 ## Verbs
 
-- **CRUD** - `get`/`view` (GET item), `list` (GET collection), `create` (POST collection), `edit` (PATCH then PUT, item), `delete` (DELETE item).
-- **State toggles** - `close`/`reopen`/`archive`/`unarchive` resolve like `edit` (PATCH/PUT item) and carry a fixed `body`.
-- **Membership** - `add` (POST collection), `set` (PUT collection), `remove` (DELETE item) - attach/replace/detach an element of a sub-collection.
-- **`comment`** / **`pin`** - POST. Both used to reach POST through the fallthrough below, so they are stated rather than accidental.
-- **`search`** - GET a path ending in `<resource-collection>/search` (e.g. `search issue` -> `GET /repos/{o}/{r}/issues/search`).
-- **`list-<child>`** - GET the named sub-collection of the resource (`list-cards board` -> `GET /boards/{id}/cards`).
-- **`create-on-<parent>`** - POST the resource collection nested under `<parent>` (`create-on-board list` -> `POST /boards/{id}/lists`).
-- **Any other verb** - its trailing noun is read as a child sub-collection to create on the resource (`transfer repo` -> `POST .../repos/{o}/{r}/transfers`). This is the one place the grammar infers; see [unrecognised verbs](specverb-unrecognised-verbs.md).
+- **CRUD** - `get`/`view` (GET item), `list` (GET collection), `create` (POST collection), `edit` (PATCH then PUT), `delete` (DELETE item).
+- **State toggles** - `close`/`reopen`/`archive`/`unarchive` resolve like `edit` and carry a fixed `body`. **Membership** - `add` (POST), `set` (PUT), `remove` (DELETE).
+- **`search`**, **`list-<child>`**, **`create-on-<parent>`** - GET `<collection>/search`, GET that sub-collection, POST the collection under `<parent>`.
+- **`comment`** / **`pin`** - POST, stated rather than reaching it through the fallthrough.
+- **Any other verb** - its trailing noun is read as a child sub-collection to create on the resource (`transfer repo` -> `POST .../repos/{o}/{r}/transfers`).
 
-## Resources
+## Resources and matching
 
-A resource may be a `parent-child` compound: `issue-label` targets the `labels` sub-collection nested under an `issue`. Each ancestor must appear, in order, as a static segment before the leaf's resource segment.
+A resource may be a `parent-child` compound: `issue-label` targets the `labels` sub-collection under an `issue`. The resource segment is the trailing static segment (collection) or the last one before the trailing `{param}` run (item). Among matches, prefer a plural collection over a singular singleton, then the least-nested path.
 
-A resource may also be the wildcard sentinel `"*"`: `can <verb> "*"` / `never <verb> "*"` applies the verb across every resource the spec exposes for it, expanded into a concrete per-resource grant before resolution. See [specverb-wildcard.md](specverb-wildcard.md).
+With no path-structure candidate, the resolver matches verb and resource against the **words of each operationId**, reaching endpoints whose path does not name the resource: `get policy` -> `getPolicyFile`. **Exact word-set beats superset**, so `search skills` -> `searchSkills` beats `aiSearchSkills` with no `op` pin. Resolution is deny-by-default: zero candidates or a tie is a fail-closed error naming them. Pin `op` only then, or when neither path nor operationId names the verb+resource.
 
-## Path matching and disambiguation
+## Unrecognised verbs
 
-For the lowered (method, shape, leaf, ancestors), the resource segment is the static segment naming the collection: the trailing static segment (collection), or the last static segment before the trailing `{param}` run (item). Among matches, prefer a true **plural collection** over a singular singleton, then the **least-nested** path.
+That fallthrough is the **one place the grammar infers rather than refuses**, and a wrong POST against a real endpoint may not fail loudly the way a wrong GET does. So the guess is not silent: `MethodForVerb` reports `ok=false`, the inline parser records `Descriptor.MethodInferred`, and `ParseInlineWithWarnings` returns one note per inferred grant. Guardfiles keep working; for a novel verb state `method "PUT"` instead. A stated `DELETE` marks the leaf destructive whatever the verb is called: the gate keys off the effect, not the spelling.
 
-## operationId fallback
+## Wildcard resource `"*"`
 
-When no path-structure candidate matches, the resolver matches the grant's verb and resource against the **words of each operationId** (camelCase / kebab / snake split). This reaches endpoints whose path does not name the resource: `get policy` -> `getPolicyFile` (path `/tailnet/{tailnet}/acl`, words `[get, policy, file]`). The verb is split into words too, so `ai-search` matches `aiSearchSkills`, and `search` falls through here when the spec's search endpoint has no `<resource>/search` segment (skillsmp `GET /search` -> `searchSkills`).
+`can get "*"` applies a verb across every resource exposing it and `never delete "*"` denies it everywhere, expanding at build and prune time into one concrete grant per match. Only built-in convention verbs enumerate, because `"*"` carries no `op` to break a tie; any other verb fails closed.
 
-**Exact word-set beats superset.** When one operationId's words are set-equal to the grant (`search skills` -> `searchSkills`) and others only contain them as a superset (`aiSearchSkills`), the exact match wins - no `op` pin needed. A genuine tie still fails closed.
-
-## Fail-closed
-
-Resolution is deny-by-default. A unique winner resolves; **zero candidates or a remaining tie is a fail-closed error** naming the candidates and telling the author to pin one with `op`. Because disambiguation prefers shallow/plural paths, a re-vendor adding a shallower colliding path can change a resolved op - the `lock` diff and skew check surface that for review.
-
-## When to pin `op`
-
-With the structural conventions plus the operationId fallback, `op` is rarely needed. Pin it only when resolution is genuinely ambiguous, or when neither the path nor the operationId names the verb+resource.
+Precedence is the ordinary deny-wins rule rather than a special case: a wildcard deny shadows a specific allow, a specific deny carves an exception out of a wildcard allow, and an explicit same-class grant wins rather than double-mounting. A wildcard mounts only ops the spec has, a new resource exposing `delete` is auto-denied with no edit, an empty expansion fails the build rather than mounting nothing silently, and an ambiguous resource stays unmounted. Every expanded leaf names the verb-global grant in help and describe.

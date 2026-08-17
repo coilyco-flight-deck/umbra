@@ -1,3 +1,3 @@
 # Mark
 
-The umbra glare mark. See [docs/umbra-mark.md](../../docs/umbra-mark.md).
+The umbra glare mark. See [docs/release-pipeline.md](../../docs/release-pipeline.md).

@@ -1,47 +1,31 @@
-# specverb policy: auth, deny, restrict
+# specverb policy: auth, deny, restrict, tiering
 
-The policy surface a Guardfile authors on top of the `op`-bound grants. See [specverb.md](specverb.md) for the engine and layering.
+The policy surface a Guardfile authors on top of the `op`-bound grants. Engine and layering in [specverb.md](specverb.md).
 
-## Value sources
+## Value sources and auth
 
-A secret or opaque host is named, never committed: `value <provider> "<address>"`. The provider names a store; the address is whatever it interprets (an SSM path, a tailnet device, an env var). umbra never reads the store - a registered `specverb.Provider` does, so store clients stay in the consumer. It ships three no-SDK built-ins (`env`, `file`, `literal`); the rest come via `Config.Providers`. An unregistered provider fails closed at request time, never a silent empty secret. A `value` may also name a fallback list (a children block); see [specverb-value-chain.md](specverb-value-chain.md).
+A secret or opaque host is named, never committed: `value <provider> "<address>"`. umbra never reads the store; a registered provider does, so store clients stay in the consumer. An unregistered provider fails closed at request time rather than yielding a silent empty secret. See [value providers](value-providers.md).
 
-## Auth schemes
+Three auth schemes, each redacting its secrets in `--dry-run`: `header-token { header; prefix; value ... }` (the trailing space in `prefix "token "` is significant), `bearer { value ... }`, and `query-param { param key { value ... } ... }` for a dual-secret form injected as query parameters. Describe names the scheme and its value sources, never the value.
 
-Three schemes, named on the `auth` node, each redacting its secret(s) in `--dry-run`:
+`auth none` states that the upstream takes no credential: `authorize` returns without touching the request, so no provider runs and no secret is read. The block stays **required**, because a spec that simply omits `auth` is a spec that forgot, and failing closed on that is worth keeping. `auth none` carrying a block is an error, since a `value` under it is a contradiction rather than a no-op.
 
-- `header-token { header; prefix; value <provider> "addr" }` - Forgejo's `Authorization: token <key>`. The trailing space in `prefix "token "` is significant.
-- `bearer { value <provider> "addr" }` - Tailscale. Implies the `Authorization` header with a `Bearer ` prefix.
-- `query-param { param key { value <provider> "addr" }; param token { value <provider> "addr" } }` - Trello's dual-secret form: each named secret is injected as a query parameter (`?key=&token=`), read from its own value source.
+A placeholder credential is not a substitute. A credential-free upstream that named a scheme anyway and supplied `value literal "unused"` sent a **wrong** `Authorization` header rather than none, and measured against reddit's public feeds that placeholder is exactly what earned a 403 where a named `User-Agent` alone reached the ordinary rate limiter. An endpoint serving anonymous callers freely can still reject one presenting a credential it cannot verify, and that rejection looks just like a block on the client.
 
-The request builder resolves the scheme's secret(s) and applies them as a header or query parameters. The describe surface names the scheme and its value source(s) (`provider address`), never the value.
+`base-url` takes a committed string or a block resolving the host through a provider at request time, for a tailnet-only host that must not be committed. It resolves lazily on the first real request and caches, so mounting the tree never touches the store, and `--dry-run` stays offline. The forms are mutually exclusive and a spec member must carry one. With no committed host no spec fetch URL is derivable, so the spec is vendored beside the guardfile.
 
-## base-url from a value source
+## Deny beats allow
 
-`base-url` takes either a committed string (`base-url "host/api/v1"`) or a block that resolves the host through a value provider at request time:
-
-```kdl
-base-url { value ssm "/coilysiren/open-webui/url" }     // opaque host stashed in SSM
-base-url { value tailscale "open-webui" }               // tailnet host resolved live
-```
-
-The block form exists for a tailnet-only or otherwise opaque host that must not be committed (the `tailscale` provider resolves a device name to its IPv4 live, so no FQDN is stashed). It resolves lazily on the first real request, through the same provider registry as the auth token, and caches the result: mounting the tree (and so `--help`) never touches the store. A `--dry-run` preview stays offline, showing the host symbolically as `{base-url:<provider> <address>}`, and describe names the value source rather than resolving it. The two forms are mutually exclusive, and a spec member must carry one. Because the host is not committed, no spec fetch URL is derivable, so the spec is vendored beside the guardfile (read locally at `lock`).
-
-## Deny: a deny beats an allow
-
-A `cannot`/`never <verb> <resource>` blocks that class. The deny wins over any matching `can` (defense in depth): the allowed leaf is dropped from the mounted tree, the spec lock, and the action poll set, and replaced by a teaching leaf that fails closed with a `PolicyDenied` exit carrying the grant's `message`. A deny over a resource with no allow still mounts its teaching leaf, so an operator who reaches for a blocked verb learns why instead of hitting an "unknown command".
-
-```kdl
-never delete repos { message "repo deletion is irreversible; archive instead" }
-never create orgs { message "org creation is a human-only operation" }
-```
+`cannot`/`never <verb> <resource>` blocks that class and beats any matching `can`. The allowed leaf is dropped from the mounted tree, the spec lock, and the action poll set, replaced by a teaching leaf failing closed with a `PolicyDenied` exit carrying the grant's `message`. A deny with no matching allow still mounts that leaf, so an operator reaching for a blocked verb learns why rather than hitting "unknown command".
 
 ## Restrict: the scope gate
 
-`restrict <param> matches "<glob>"...` is a wrap-level allowlist. Every leaf whose path template carries `{param}` must supply an argument matching at least one glob (filepath.Match-style) at invocation, or it fails closed with a `PolicyDenied` exit before any wire call. A malformed glob matches nothing. Enforced on both the direct leaf path and the action poll/call request path.
+`restrict <param> matches "<glob>"...` is a wrap-level allowlist. Every leaf whose path template carries `{param}` must supply a matching argument at invocation or fail closed with `PolicyDenied` before any wire call. A malformed glob matches nothing. Enforced on the direct leaf path and the action poll/call path alike.
 
-```kdl
-restrict owner matches "coily*" "coilyco-*"
-```
+## inherit and override
 
-The describe surface documents both the denials ("Denied operations") and the scope restrictions ("Scope restrictions").
+A wrap may carry `inherit "<path>"` directives pulling in another guardfile's grants, so a tiered surface composes by layering rather than copy-paste. Resolution is **textual** and runs before the typed parse: each file is flattened recursively, its wrap body spliced in, and the directives dropped, after which the ordinary pipeline runs unchanged. Effective grants are the union, order-independent since precedence resolves by class rather than position. `restrict` inherits deduped by param with the child winning, singletons (`spec`, `base-url`, `auth`) inherit only when the child declares none, a restated grant collapses keeping the child's body, and `action` blocks stay child-local. A missing ref or a cycle fails closed with a teaching error.
+
+The load-bearing rule: **an inherited `never` beats a plain `can`, and the only construct that beats an inherited `never` is an `override` in a higher tier naming the exact verb+resource.** The posture is deny low, override high. A higher tier may write `can delete "*"` and an inherited `never delete issue` still carves `issue` out silently, by design; deny is sticky upward.
+
+`override can <verb> <resource>` is the sole escalation and re-grants exactly that pair, rejecting `"*"`, so every escalation a tier holds is enumerated and reviewable. Enforced when guardfiles flatten rather than silently at runtime: a plain explicit `can` shadowed by an inherited `never` is a build error pointing at `override`, and an `override` lifting no matching `never` is one too, since silently it would be a plain `can` - the fail-open the keyword exists to stop.
