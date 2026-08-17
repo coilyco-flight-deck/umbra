@@ -25,7 +25,7 @@ Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: 
 - `make tidy` - `go mod tidy`.
 - `make cover` - tests with a coverage profile.
 
-The repocfg primitive lets a consumer pick its own config filename. umbra declares no dev verbs: [`.ward/ward.yaml`](.ward/ward.yaml) states only the landing lane.
+The repocfg primitive lets a consumer pick its config filename. umbra declares no dev verbs: its Makefile is the dev surface, [`.ward/ward.yaml`](.ward/ward.yaml) the catalog.
 
 ## Validation
 
