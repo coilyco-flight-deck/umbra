@@ -3,6 +3,7 @@ package opcore_test
 import (
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
@@ -111,6 +112,115 @@ func TestParseInlineMethodFromVerb(t *testing.T) {
 		if got := descByLeaf(t, descs, leaf).Method; got != want {
 			t.Errorf("leaf %q method = %q, want %q", leaf, got, want)
 		}
+	}
+}
+
+// unknownVerbSrc grants a verb the convention table has never seen, which is
+// the shape that used to mint a POST with no signal at all.
+const unknownVerbSrc = `wrap ward mcp forgejo {
+    auth bearer { value env "T" }
+    can transfer repo {
+        path "/repos/{owner}/{repo}/transfer"
+    }
+}`
+
+const statedMethodSrc = `wrap ward mcp forgejo {
+    auth bearer { value env "T" }
+    can transfer repo {
+        path "/repos/{owner}/{repo}/transfer"
+        method "PUT"
+    }
+}`
+
+func TestParseInlineKnownVerbIsNotInferred(t *testing.T) {
+	descs, _ := parseInline(t, inlineSrc)
+	for _, leaf := range []string{"create", "close", "delete"} {
+		if descByLeaf(t, descs, leaf).MethodInferred {
+			t.Errorf("leaf %q is a known verb, so its method must not be marked inferred", leaf)
+		}
+	}
+}
+
+// The method still resolves to POST, so existing guardfiles keep working. What
+// changes is that the guess is now recorded and reported.
+func TestParseInlineUnknownVerbIsMarkedAndWarned(t *testing.T) {
+	descs, _, warnings, err := opcore.ParseInlineWithWarnings([]byte(unknownVerbSrc))
+	if err != nil {
+		t.Fatalf("ParseInlineWithWarnings: %v", err)
+	}
+	d := descByLeaf(t, descs, "transfer")
+	if d.Method != http.MethodPost {
+		t.Errorf("method = %q, want POST (the fallthrough must still resolve)", d.Method)
+	}
+	if !d.MethodInferred {
+		t.Error("an unrecognised verb must be marked MethodInferred")
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("want exactly one warning, got %d: %v", len(warnings), warnings)
+	}
+	if !strings.Contains(warnings[0], "transfer") {
+		t.Errorf("warning does not name the verb: %s", warnings[0])
+	}
+}
+
+func TestParseInlineStatedMethodSuppressesInference(t *testing.T) {
+	descs, _, warnings, err := opcore.ParseInlineWithWarnings([]byte(statedMethodSrc))
+	if err != nil {
+		t.Fatalf("ParseInlineWithWarnings: %v", err)
+	}
+	d := descByLeaf(t, descs, "transfer")
+	if d.Method != http.MethodPut {
+		t.Errorf("method = %q, want PUT", d.Method)
+	}
+	if d.MethodInferred {
+		t.Error("a stated method must not be marked inferred")
+	}
+	if len(warnings) != 0 {
+		t.Errorf("a stated method owes no warning, got %v", warnings)
+	}
+}
+
+// A stated DELETE is destructive even where the verb name is not "delete",
+// because the confirmation gate keys off the effect rather than the spelling.
+func TestParseInlineStatedDeleteIsDestructive(t *testing.T) {
+	src := `wrap ward mcp forgejo {
+    auth bearer { value env "T" }
+    can purge repo {
+        path "/repos/{owner}/{repo}"
+        method "DELETE"
+    }
+}`
+	descs, _ := parseInline(t, src)
+	if d := descByLeaf(t, descs, "purge"); !d.Destructive {
+		t.Error("a stated DELETE must mark the leaf destructive")
+	}
+}
+
+func TestParseInlineMethodFailsClosed(t *testing.T) {
+	cases := map[string]string{
+		"not an HTTP method": `method "FETCH"`,
+		"duplicate":          "method \"PUT\"\n        method \"PATCH\"",
+	}
+	for name, decl := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := `wrap ward mcp forgejo {
+    auth bearer { value env "T" }
+    can transfer repo {
+        path "/repos/{owner}/{repo}/transfer"
+        ` + decl + `
+    }
+}`
+			if _, _, err := opcore.ParseInline([]byte(src)); err == nil {
+				t.Fatal("want a parse error, got nil")
+			}
+		})
+	}
+}
+
+// ParseInline keeps its signature, so an existing caller compiles unchanged.
+func TestParseInlineStillParsesWithoutWarnings(t *testing.T) {
+	if _, _, err := opcore.ParseInline([]byte(unknownVerbSrc)); err != nil {
+		t.Fatalf("ParseInline: %v", err)
 	}
 }
 

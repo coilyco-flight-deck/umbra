@@ -13,32 +13,39 @@ import (
 // ParseInline states the ward-mcp inline grammar as the same []Descriptor the
 // OpenAPI source feeds, plus the request RuntimeConfig. See docs/opcore-inline.md.
 func ParseInline(src []byte) ([]Descriptor, RuntimeConfig, error) {
+	descs, cfg, _, err := ParseInlineWithWarnings(src)
+	return descs, cfg, err
+}
+
+// ParseInlineWithWarnings is [ParseInline] plus the non-fatal notes a caller
+// should surface, one per grant whose method was inferred rather than known.
+func ParseInlineWithWarnings(src []byte) ([]Descriptor, RuntimeConfig, []string, error) {
 	// Accept the inline body grammar's boolean shorthand (`required=true`,
 	// `raw=true`) even though KDL itself spells booleans as `#true`.
 	doc, err := kdl.ParseString(normalizeInlineBooleans(string(src)))
 	if err != nil {
-		return nil, RuntimeConfig{}, fmt.Errorf("opcore: parse KDL: %w", err)
+		return nil, RuntimeConfig{}, nil, fmt.Errorf("opcore: parse KDL: %w", err)
 	}
 	wrap := doc.GetNode("wrap")
 	if wrap == nil {
-		return nil, RuntimeConfig{}, fmt.Errorf("opcore: missing top-level `wrap` node")
+		return nil, RuntimeConfig{}, nil, fmt.Errorf("opcore: missing top-level `wrap` node")
 	}
 	p := &inlineParser{}
 	for _, a := range wrap.Arguments() {
 		p.group = append(p.group, a.String())
 	}
 	if len(p.group) == 0 {
-		return nil, RuntimeConfig{}, fmt.Errorf("opcore: `wrap` needs a command path, e.g. `wrap ward mcp forgejo`")
+		return nil, RuntimeConfig{}, nil, fmt.Errorf("opcore: `wrap` needs a command path, e.g. `wrap ward mcp forgejo`")
 	}
 	for _, n := range wrap.Children().Nodes {
 		if aerr := p.applyNode(n); aerr != nil {
-			return nil, RuntimeConfig{}, aerr
+			return nil, RuntimeConfig{}, nil, aerr
 		}
 	}
 	if verr := p.validate(); verr != nil {
-		return nil, RuntimeConfig{}, verr
+		return nil, RuntimeConfig{}, nil, verr
 	}
-	return p.descs, p.cfg, nil
+	return p.descs, p.cfg, p.warnings, nil
 }
 
 // normalizeInlineBooleans keeps the added body grammar readable in KDL source
@@ -56,9 +63,10 @@ func normalizeInlineBooleans(src string) string {
 // inlineParser accumulates the wrap header, the RuntimeConfig, and the stated
 // descriptors as it walks the wrap body.
 type inlineParser struct {
-	group []string
-	cfg   RuntimeConfig
-	descs []Descriptor
+	group    []string
+	cfg      RuntimeConfig
+	descs    []Descriptor
+	warnings []string
 }
 
 // applyNode dispatches one child of the wrap block, failing closed on anything
@@ -127,14 +135,20 @@ func (p *inlineParser) parseGrant(n *kdl.Node) error {
 	if verb == "" || resource == "" {
 		return fmt.Errorf("opcore: `can` needs a non-empty verb and resource")
 	}
-	method, _ := MethodForVerb(verb)
+	method, known := MethodForVerb(verb)
 	d := Descriptor{
-		VerbName:    strings.Join(p.group, ".") + "." + resource + "." + verb,
-		Group:       resource,
-		Leaf:        verb,
-		Method:      method,
-		Destructive: DestructiveVerb(verb),
-		Grant:       "can " + verb + " " + resource,
+		VerbName:       strings.Join(p.group, ".") + "." + resource + "." + verb,
+		Group:          resource,
+		Leaf:           verb,
+		Method:         method,
+		MethodInferred: !known,
+		Destructive:    DestructiveVerb(verb),
+		Grant:          "can " + verb + " " + resource,
+	}
+	// d.Method always carries the convention value, so a duplicate `method` is
+	// counted here rather than detected by an empty field downstream.
+	if countChildren(n, "method") > 1 {
+		return fmt.Errorf("opcore: can %s %s: duplicate `method` (fail-closed)", verb, resource)
 	}
 	for _, c := range n.Children().Nodes {
 		if err := applyInlineGrantChild(&d, c); err != nil {
@@ -152,14 +166,11 @@ func (p *inlineParser) parseGrant(n *kdl.Node) error {
 			return fmt.Errorf("opcore: can %s %s: `set` cannot be combined with body `map` (fail-closed)", verb, resource)
 		}
 	}
-	if err := validateBodyMappings(d.BodyMappings); err != nil {
-		return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
-	}
-	if err := validateQueryExclusive(d); err != nil {
+	if err := validateGrant(d, verb, resource); err != nil {
 		return err
 	}
-	if err := CheckFlagCollisions(d); err != nil {
-		return err
+	if d.MethodInferred {
+		p.warnings = append(p.warnings, inferredMethodWarning(d, verb, resource))
 	}
 	p.descs = append(p.descs, d)
 	return nil
@@ -216,6 +227,8 @@ func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 		d.QueryExclusive = append(d.QueryExclusive, exclusive...)
 	case "body":
 		return applyInlineBody(d, c)
+	case "method":
+		return applyInlineMethod(d, c)
 	default:
 		return applyInlineGrantControlChild(d, c)
 	}
@@ -272,8 +285,59 @@ func applyInlineGrantControlChild(d *Descriptor, c *kdl.Node) error {
 		d.FailWhen = expr
 		return nil
 	default:
-		return fmt.Errorf("unknown node %q (want path | query | body | set | fail-when | describe; fail-closed)", c.Name())
+		return fmt.Errorf("unknown node %q (want path | query | body | method | set | fail-when | describe; fail-closed)", c.Name())
 	}
+}
+
+// validateGrant runs the cross-field checks a finished grant must pass.
+func validateGrant(d Descriptor, verb, resource string) error {
+	if err := validateBodyMappings(d.BodyMappings); err != nil {
+		return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
+	}
+	if err := validateQueryExclusive(d); err != nil {
+		return err
+	}
+	return CheckFlagCollisions(d)
+}
+
+// inferredMethodWarning names a grant whose method was guessed from a verb the
+// convention table has never seen. See docs/specverb-unrecognised-verbs.md.
+func inferredMethodWarning(d Descriptor, verb, resource string) string {
+	return fmt.Sprintf(
+		"opcore: can %s %s: %q is not a known verb, so the method was inferred as %s; state it with `method \"...\"` if that is wrong",
+		verb, resource, verb, d.Method)
+}
+
+// countChildren reports how many direct children of n carry name.
+func countChildren(n *kdl.Node, name string) int {
+	count := 0
+	for _, c := range n.Children().Nodes {
+		if c.Name() == name {
+			count++
+		}
+	}
+	return count
+}
+
+// applyInlineMethod states the HTTP method outright, which is how a verb the
+// convention table has never seen avoids being guessed at.
+func applyInlineMethod(d *Descriptor, c *kdl.Node) error {
+	v, err := singleInlineArg(c, "method")
+	if err != nil {
+		return err
+	}
+	m := strings.ToUpper(v)
+	if !ValidMethod(m) {
+		return fmt.Errorf("`method` %q is not an HTTP method (want GET | POST | PUT | PATCH | DELETE | HEAD; fail-closed)", v)
+	}
+	d.Method = m
+	// Stated, so nothing was inferred and no warning is owed.
+	d.MethodInferred = false
+	// A stated DELETE is destructive even when the verb name is not "delete".
+	if m == "DELETE" {
+		d.Destructive = true
+	}
+	return nil
 }
 
 // applyProxyChild dispatches one child of a proxy grant body onto d, failing

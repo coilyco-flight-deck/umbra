@@ -22,22 +22,20 @@ import (
 	"time"
 )
 
-// Verification is how far an origin claim was actually checked. It describes
-// the claim, never the payload: [Verified] means the content came from the
-// actor it says it did, not that the content is harmless.
+// Verification is how far an origin claim was checked. It describes the claim,
+// never the payload. See docs/provenance.md.
 type Verification string
 
 const (
-	// Unknown is the zero value: no check was attempted or none was recorded.
-	// It is deliberately distinct from Unverified, so a caller that never ran
-	// a check is not confused with one that ran a check and came up short.
+	// Unknown is the zero value: no check attempted or recorded, deliberately
+	// distinct from Unverified.
 	Unknown Verification = ""
 	// Unverified records that a check ran and did not establish the claim.
 	Unverified Verification = "unverified"
 	// Verified records that a check ran and established the claim.
 	Verified Verification = "verified"
-	// Refuted records that a check ran and contradicted the claim, which is a
-	// stronger signal than Unverified and worth keeping separate.
+	// Refuted records that a check ran and contradicted the claim, a stronger
+	// signal than Unverified.
 	Refuted Verification = "refuted"
 )
 
@@ -53,12 +51,10 @@ type Envelope struct {
 	// id. Opaque here.
 	SourceID string `json:"source_id"`
 	// ContentHash pins the exact bytes the claim covers, as returned by
-	// [HashContent]. Without it the envelope describes an object rather than
-	// the content a caller is holding.
+	// [HashContent].
 	ContentHash string `json:"content_hash"`
-	// ObservedAt is when the content was read, not when it was authored. The
-	// distinction matters because only the reader's clock is the reader's to
-	// trust.
+	// ObservedAt is when the content was read, not when it was authored: only
+	// the reader's clock is the reader's to trust.
 	ObservedAt time.Time `json:"observed_at"`
 	// Verification is how far the claim was checked.
 	Verification Verification `json:"verification"`
@@ -70,10 +66,8 @@ func HashContent(b []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-// Complete reports whether every field carries a value, naming all of the
-// missing ones at once rather than the first. An incomplete envelope is not an
-// error by itself, and a caller may hold one deliberately; it is an error only
-// where a caller has decided completeness is required.
+// Complete reports whether every field carries a value, naming all the missing
+// ones at once rather than the first.
 func (e Envelope) Complete() error {
 	var missing []string
 	if e.Actor == "" {
@@ -100,9 +94,8 @@ func (e Envelope) Complete() error {
 	return fmt.Errorf("provenance: incomplete envelope, missing %s", strings.Join(missing, ", "))
 }
 
-// CoversContent reports whether e's hash matches b, which is what makes the
-// envelope a claim about the bytes in hand rather than about some earlier
-// revision of the same object.
+// CoversContent reports whether e's hash matches b, so the claim covers the
+// bytes in hand rather than an earlier revision of the same object.
 func (e Envelope) CoversContent(b []byte) error {
 	if e.ContentHash == "" {
 		return errors.New("provenance: envelope carries no content hash")
@@ -114,15 +107,13 @@ func (e Envelope) CoversContent(b []byte) error {
 }
 
 // Trusted reports whether the envelope is complete and affirmatively verified.
-// It is the narrow question this package can answer on its own, and it is an
-// input to a consumer's trust decision rather than the decision itself: a
-// consumer still applies its own actor policy on top.
+// It is input to a consumer's trust decision, not the decision.
 func (e Envelope) Trusted() bool {
 	return e.Complete() == nil && e.Verification == Verified
 }
 
-// String renders the envelope as one audit-log line, with the verification
-// state first so a scan down a column shows the weak rows.
+// String renders one audit-log line, verification first so a scan down the
+// column shows the weak rows.
 func (e Envelope) String() string {
 	v := e.Verification
 	if v == Unknown {

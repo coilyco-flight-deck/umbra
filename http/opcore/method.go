@@ -18,7 +18,20 @@ var verbMethod = map[string]string{
 	"add":       "POST",
 	"set":       "PUT",
 	"remove":    "DELETE",
+	// comment and pin were reaching POST through the unknown-verb fallthrough.
+	// Stated here so the mapping is a convention rather than an accident.
+	"comment": "POST",
+	"pin":     "POST",
 }
+
+// httpMethods is the set an explicit `method` declaration may name. Anything
+// else is refused rather than passed through to the transport.
+var httpMethods = map[string]bool{
+	"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "HEAD": true,
+}
+
+// ValidMethod reports whether m is an HTTP method the grammar accepts.
+func ValidMethod(m string) bool { return httpMethods[m] }
 
 // destructiveVerbs names the irreversibly-mutating verb classes. Generic, not
 // API-specific: `delete` is destructive whatever the resource.

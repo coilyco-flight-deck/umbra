@@ -630,7 +630,9 @@ func TestMethodForVerb(t *testing.T) {
 		{"search", "GET", true},
 		{"list-runs", "GET", true},
 		{"create-on-repo", "POST", true},
-		{"comment", "POST", false}, // unknown verb -> sub-collection create default
+		{"comment", "POST", true},   // was reaching POST through the fallthrough
+		{"pin", "POST", true},       // same, and the one guardfiles documented
+		{"transfer", "POST", false}, // unknown verb -> sub-collection create default
 	}
 	for _, c := range cases {
 		m, ok := opcore.MethodForVerb(c.verb)

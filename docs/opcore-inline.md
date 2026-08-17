@@ -49,29 +49,29 @@ wrap ward mcp forgejo {
 
 ## How each piece maps
 
-* **method** - inferred through `opcore.MethodForVerb`, without operationId
-  resolution.
-* **path params** - inferred from the `{template}` in author order via
+* **method** - from `opcore.MethodForVerb`, or stated as `method "PUT"` for a verb the
+  convention table has never seen. See [resolution](specverb-unrecognised-verbs.md).
+* **path params** - from the `{template}` in author order via
   `opcore.PathParamsInOrder`.
 * **query / body** - flat names become string fields. Blocks add typed, nested, bounded, repeatable,
-  aliased, or mutually exclusive fields. See [query types](opcore-query-types.md) and [aliases](opcore-query-aliases.md).
-* **body map** - exact nested string inputs become a fresh top-level JSON
-  object. See [body mapping](opcore-body-mapping.md).
-* **set** - `set k=v...` becomes the leaf's `FixedBody`, keeping each value's KDL-native type (a
-  boolean stays a boolean). A `set` toggle owns its body, so no body flags mount alongside it.
+  aliased, or exclusive fields. See [query types](opcore-query-types.md), [aliases](opcore-query-aliases.md).
+* **body map** - exact nested string inputs become a fresh top-level JSON object.
+  See [body mapping](opcore-body-mapping.md).
+* **set** - `set k=v...` becomes the leaf's `FixedBody`, keeping each value's KDL-native type. A
+  `set` toggle owns its body, so no body flags mount alongside it.
 * **fail-when** - a JMESPath predicate over a successful response. A truthy result
   fails the call. Request inputs are available as native `$name` variables.
-* **describe** - the grant's own note. Consumers that mint a tool per grant use it as that tool's
-  description, so it is the one place guardfile text reaches the calling model rather than only the
-  next editor. Omitted, the consumer falls back to a generated sentence.
-* **proxy** - guarded upstream MCP passthroughs live in [opcore-proxy.md](opcore-proxy.md).
+* **describe** - the grant's own note, and the one place guardfile text reaches the calling model
+  rather than only the next editor. Omitted, the consumer generates a sentence.
+* **proxy** - guarded upstream MCP passthroughs. See [opcore-proxy.md](opcore-proxy.md).
 * **auth / base-url / restrict** - parsed by the shared `guardfile` node parsers
   (`ParseAuthNode`, `ParseBaseURL`, `ParseRestrictNode`) into the `RuntimeConfig`.
 ## Fail-closed and the shared guard
 
 `ParseInline` rejects unknown nodes, missing requirements, malformed predicates, and input
-collisions through the same guard as resolved descriptors. `Providers` and `Client` are the
-consumer's to fill on the returned `RuntimeConfig` before `NewRuntime`. The KDL carries no opaque values.
+collisions through the same guard as resolved descriptors. An unrecognised verb is the one
+place the grammar infers rather than refuses, so it is reported instead. `Providers` and
+`Client` are the consumer's to fill on the returned `RuntimeConfig` before `NewRuntime`.
 ## See also
 
 - [specverb.md](specverb.md) - the resolved OpenAPI source and the CLI projection.

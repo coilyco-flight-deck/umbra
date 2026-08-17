@@ -28,6 +28,9 @@ type Descriptor struct {
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-raw-responses.md.
 	RawResponse bool
+	// MethodInferred marks a Method guessed from an unrecognised verb rather
+	// than looked up or stated. See docs/opcore-inline.md.
+	MethodInferred bool
 }
 
 // BodyMapping projects one required nested string input path onto one
