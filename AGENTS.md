@@ -16,7 +16,7 @@ Every package here must be importable from a different binary without consumer-s
 
 ## Commands
 
-Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: it is the framework, not a consumer of it, so it carries no per-repo config and routes dev verbs through the Makefile.
+Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: it is the framework, not a consumer of it, so it routes every dev verb through the Makefile.
 
 - `make build` - compile every package.
 - `make test` - run the unit test suite.
@@ -25,7 +25,7 @@ Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: 
 - `make tidy` - `go mod tidy`.
 - `make cover` - tests with a coverage profile.
 
-The repocfg primitive lets a consumer pick its own config filename. umbra itself uses none.
+The repocfg primitive lets a consumer pick its own config filename. umbra declares no dev verbs: [`.ward/ward.yaml`](.ward/ward.yaml) states only the landing lane.
 
 ## Validation
 
@@ -33,7 +33,7 @@ Pre-commit runs the Go checks (vet, golangci-lint, go-mod-tidy, godoc-current) p
 
 ## Safety
 
-umbra ships no embedded denylist. It is a policy-free engine: the policy lives in the consumer's own KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`). See [architecture.md](docs/architecture.md).
+umbra ships no embedded denylist. It is a policy-free engine: policy lives in the consumer's KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`). See [architecture.md](docs/architecture.md).
 
 ## Cross-repo contracts
 
@@ -44,11 +44,11 @@ v0.x. Minor API breaks ship in `main` with a note in the commit body, with no se
 Automated and Forgejo-canonical, in two stages. A push to `main` runs
 [`promote.yml`](.forgejo/workflows/promote.yml), which re-runs the full gate,
 publishes a commit-scoped draft tag, and fast-forwards `release`.
-[`release.yml`](.forgejo/workflows/release.yml) runs on that `release` push and
-cuts the minor bump, tag, and Forgejo release. Major is hand-driven only, never
-inferred from commit messages. Releases attach the `specgen` binary matrix,
-`SHA256SUMS`, a Homebrew formula, and a Scoop manifest, then update the shared
-tap and bucket. Full flow in [docs/release-pipeline.md](docs/release-pipeline.md).
+[`release.yml`](.forgejo/workflows/release.yml) runs on that push and cuts the
+minor bump, tag, and Forgejo release. Major is hand-driven only, never inferred
+from commit messages. Releases attach the `specgen` binary matrix, `SHA256SUMS`,
+a Homebrew formula, and a Scoop manifest, then update the shared tap and bucket.
+Full flow in [docs/release-pipeline.md](docs/release-pipeline.md).
 
 umbra is the base of the umbra / ward stack, so it never reaches up into
 consumers. Downstream bumps are the consumers' job. The Go module path is
@@ -57,7 +57,7 @@ consumers. Downstream bumps are the consumers' job. The Go module path is
 
 ## Agent rules
 
-One issue per discrete additive change, per [the workspace rule](https://github.com/coilysiren/agentic-os-kai/blob/main/AGENTS.md). `closes #N` or a Forgejo URL is encouraged, not enforced.
+One issue per discrete additive change, per [the workspace rule](https://github.com/coilysiren/agentic-os-kai/blob/main/AGENTS.md). `closes #N` is encouraged, not enforced.
 
 ## Checkout residency
 

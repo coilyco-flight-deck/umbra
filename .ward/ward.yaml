@@ -1,0 +1,13 @@
+# Per-repo command allowlist. No dev verbs on purpose: umbra is the framework
+# rather than a consumer of it, so the Makefile stays the dev surface and this
+# file exists only so ward's repocfg loader recognizes the repo and resolves a
+# declared landing lane instead of an implicit default. See agentic-os#994.
+
+commands: {}
+
+agent:
+  workflow: merge-remote-main
+
+catalog:
+  description: "Security framework for guarded command-line tools with scoped authority, validation, and audit logs. The generic engine Ward and ward-mcp build against."
+  dependsOn: []
