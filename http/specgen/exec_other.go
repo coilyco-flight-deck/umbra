@@ -1,7 +1,7 @@
 //go:build windows
 
-// Process spawn (Windows has no syscall.Exec) and a no-op cache lock. run
-// spawns the binary as a child, mirrors stdio, and propagates its exit code.
+// Process spawn, since Windows has no syscall.Exec: run spawns the binary as
+// a child, mirrors stdio, and propagates its exit code.
 package specgen
 
 import (
@@ -27,10 +27,3 @@ func execBinary(path string, args []string) error {
 	os.Exit(0)
 	return nil
 }
-
-// lockFile is a no-op on Windows; concurrent run of the same cache dir is rare
-// and the build is idempotent.
-func lockFile(*os.File) error { return nil }
-
-// unlockFile is the no-op pair of lockFile on Windows.
-func unlockFile(*os.File) error { return nil }

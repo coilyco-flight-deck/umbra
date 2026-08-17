@@ -10,6 +10,18 @@ The `.stamp.json` records input hashes for the root-relative Guardfile identitie
 
 `run` refuses without committed locks rather than silently locking. `lock` is the only online dependency-resolution step.
 
+## The cache lock, and where it does not exist
+
+Materialize+build runs under an advisory lock on `<cache>/.lock` via `pkg/flock`, so two concurrent runs against one cache dir serialise instead of racing.
+
+That lock is **unix-only**. On Windows and any other non-unix target, specgen prints to stderr that it is building unserialised and continues, rather than reporting a lock it never took:
+
+```
+specgen: no cache lock on windows, building <dir> unserialised (a concurrent run may race)
+```
+
+Continuing is deliberate: specgen ships Windows binaries, the build is idempotent, and a concurrent run against one cache dir is rare. Being quiet about it was not. A caller that must serialise on Windows does so above specgen, and now has the signal to know it must.
+
 The consumer's source-of-truth build artifacts are the analog of `pyproject.toml` plus `uv.lock`: each `<spec>.lock.json.gz` is a generated, encoded pruned API snapshot. Specgen decodes it before materializing the plain JSON that the binary embeds. `specverb.lock` freezes the resolved Go dependency graph without making the consumer repo look like a Go module. Legacy plain `<spec>.lock.json` files remain readable until the next `lock` refresh replaces them.
 
 The encoded API lock is machine-owned. Specgen decodes it before skew

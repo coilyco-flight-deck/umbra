@@ -1332,7 +1332,8 @@ The uv-style dependency lockfile (specverb.lock) and the `go` plumbing
 that resolves and replays it for a reproducible out-of-band build. See
 docs/specverb.md.
 
-Process replacement (syscall.Exec) and cache locking (flock) on Unix.
+Process replacement (syscall.Exec) on Unix. Cache locking lives in pkg/flock,
+which is honest about the platforms it does not cover.
 
 Package specgen is the no-code driver behind cmd/specgen: the uv-style verb
 surface (gen / lock / skew / run) over a Guardfile. See docs/specverb.md.

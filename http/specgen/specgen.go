@@ -19,6 +19,7 @@ import (
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/flock"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/skillgen"
 	kdl "github.com/calico32/kdl-go"
 	"github.com/urfave/cli/v3"
@@ -898,6 +899,20 @@ func copyExecutable(src, dest string) error {
 	return nil
 }
 
+// lockCache serialises materialize+build against cdir. Where the platform has
+// no advisory lock it says so and continues. See docs/specgen-materialization.md.
+func lockCache(lf *os.File, cdir string) error {
+	err := flock.Exclusive(lf)
+	if errors.Is(err, flock.ErrUnsupported) {
+		fmt.Fprintf(os.Stderr, "specgen: no cache lock on %s, building %s unserialised (a concurrent run may race)\n", runtime.GOOS, cdir)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("specgen: lock cache: %w", err)
+	}
+	return nil
+}
+
 // materializeIfStale rebuilds the binary under the cache lock when its inputs
 // changed, releasing the lock before return so Run can exec the fresh image.
 func materializeIfStale(cdir, binPath string, main []byte, mems []member, specByPath map[string][]byte, dl *DepLock, want stamp) error {
@@ -909,10 +924,10 @@ func materializeIfStale(cdir, binPath string, main []byte, mems []member, specBy
 		return fmt.Errorf("specgen: open cache lock: %w", err)
 	}
 	defer func() { _ = lf.Close() }()
-	if err := lockFile(lf); err != nil {
-		return fmt.Errorf("specgen: lock cache: %w", err)
+	if err := lockCache(lf, cdir); err != nil {
+		return err
 	}
-	defer func() { _ = unlockFile(lf) }()
+	defer func() { _ = flock.Unlock(lf) }()
 
 	if !stale(cdir, binPath, want) {
 		return nil
