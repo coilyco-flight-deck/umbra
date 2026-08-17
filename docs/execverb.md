@@ -1,43 +1,33 @@
 # exec-dialect verbs (execverb)
 
-`execverb` is the exec-transport sibling of [specverb](specverb.md): the same policy-as-KDL-sentences design, pointed at wrapped binaries instead of HTTP APIs (git, package managers, remote-exec, local-agent launchers).
-
-## Grammar
+The exec-transport sibling of [specverb](specverb.md): policy as KDL sentences, pointed at wrapped binaries rather than HTTP APIs.
 
 ```kdl
 wrap ward git {
     exec git
-    can run status
     can run commit { deny-flag "--no-verify" }
-    can run push { allow-flag "--force-with-lease" }
     never run "reflog expire"
 }
 ```
 
-- **`exec <bin>`** - the real binary, fixed at parse. Prefer bare names unless you intentionally pin one artifact.
-- **`argv-prefix`** (child of `exec`) - an unoverridable leading argv, the remote-exec transport: `exec ssh { argv-prefix "kai@kai-server" "kubectl" ... }` pins the invocation ahead of the subcommand.
-- **`env <NAME> { value <provider> "<addr>" }`** (child of `exec`) - an env var on the wrapped process, resolved at exec time via a provider (so a secret comes from SSM, not the guardfile); `env "NAME" "literal"` for a committed value. Providers via `pkg/valuesource`.
-- **`can run <subcommand>`** - deny-by-default: only named subcommands mount. A quoted multi-word sentence (`"admin user list"`) is a nested path.
-- **`argv <tokens...>`** (child of a grant) - fixed invocation fragments in place of the subcommand. Repeat to preserve ordering around an `embed`; bare `argv` runs the bin. Not allowed with `can run "*"`.
-- **`embed <source>`** (child of a grant) - compile a file and insert its absolute runtime path as fixed argv. See [embedded files](specgen-embedded-files.md).
-- **`sealed`** (child of a grant) - forbids trailing caller args so the pinned `argv` forwards **exactly** - a strict single-resource verb. Requires `argv`; a non-empty caller token is refused before exec.
-- **`can run "*"`** - open-passthrough grant: the group is one leaf, every operation reaches the binary. Must be the only grant.
-- **`passthrough <bin>`** - funnel sugar (`exec` + `can run "*"`) with wrap-level `never pass`/`only pass` guards. See [passthrough.md](passthrough.md).
-- **Flag policy per grant** - `deny-flag` (default-allow minus denials) or `allow-flag` (strict allowlist). `describe` adds a note.
-- **`when <selector> matches <glob...>`** / **`deny-when ...`** - argv guards. `when` passes only on a match, `deny-when` refuses on one. The selector names an argv slot: a **flag name** (`secret-id` reads `--secret-id`), **`any-arg`** (all positionals), or **`argN`** (Nth positional, 0-based). It takes no qualifiers. A `*` glob needs quoting.
-- **`gate <name> { ... }`** - a registered preflight gate for logic not sayable declaratively (`pattern`, `allow`). The registry ships empty - umbra registers no gates of its own - so every name fails closed until a consumer registers one.
-- **`never run`** - an explicit denial; parses for docs, mounts none.
-- **`allow <bin...>`** - inspect-list sugar: N read-only funnels per wrap. See [execverb-inspect.md](execverb-inspect.md).
-- **`action` / `bin`** - complex actions + the per-grant binary override. See [execverb-actions.md](execverb-actions.md).
+- **`exec <bin>`** - the binary, fixed at parse. `argv-prefix` pins an unoverridable leading argv, the remote-exec transport. `env <NAME> { value <provider> "<addr>" }` resolves at exec time, so a secret comes from SSM rather than the guardfile.
+- **`can run <sub>`** - deny-by-default; only named subcommands mount. A quoted multi-word sentence is a nested path. `can run "*"` is an open funnel and must be the only grant.
+- **`argv <tokens...>`** - fixed fragments replacing the subcommand. **`embed`** compiles a file in and inserts its runtime path. **`sealed`** forbids trailing caller args. **`bin`** overrides the wrap binary for one leaf and does **not** inherit `argv-prefix`.
+- **Flag policy** - `deny-flag` (default-allow minus denials) or `allow-flag` (strict allowlist).
+- **`when` / `deny-when <sel> matches <glob...>`** - argv guards. The selector is a flag name (`secret-id` reads `--secret-id`), `any-arg`, or `argN`.
+- **`gate <name>`** - a registered preflight gate. The registry ships empty, so every name fails closed until a consumer registers one.
+- **`passthrough <bin>`** - funnel sugar. See [passthrough.md](passthrough.md).
 
-Unknown nodes fail closed. Per-operation grants guard a kwarg (`deny-when secret-id matches "*prod*"`) or positional (`deny-when arg0 matches "*tfstate*"`); a `can run "*"` funnel uses `any-arg`.
+Unknown nodes fail closed. `execverb.Mount` mirrors `specverb.Mount`: one leaf per grant under `verb.Wrap`, `SkipFlagParsing` so caller args pass through after the check. The invocation is `bin + argv-prefix + (subcommand or argv) + caller args`.
 
-## Engine
+## `allow <bin...>` inspect lists
 
-`execverb.Mount(root, Config{Guardfile, Wrap, Run})` mirrors `specverb.Mount`: one leaf per grant under `verb.Wrap` (audit + argv metachar gate), `SkipFlagParsing` so every caller arg passes through after the policy check. The resolved invocation is `bin + argv-prefix + (subcommand or argv override) + caller args`; policy decides whether a call happens, not what it targets. A `sealed` grant also pins the target, refusing any caller arg so the invocation is just `bin + argv-prefix + argv`.
+Opens N read-only funnels from one wrap. `allow grep cat` desugars mechanically to two `exec` + `can run "*"` wraps, so it is exactly as safe as what it stands in for. Bare names only: a path separator or metacharacter fails closed. Mutually exclusive with `exec`/`can run`. A wrap-level guard composes onto every leaf, and a wrap guard with no list fails closed.
 
-## Driver integration
+## Complex actions
 
-`specgen` merges exec consumers into a spec binary. See [mixed transports](specverb-mixed-transports.md).
+A wrap may declare `action` nodes: ordered `call run <grant>` sequences over granted leaves, run by `pkg/stepflow`. Step `args` are positional tokens appended after the pinned `argv`; named `args` blocks are refused. Each step decodes to `{exit_code, ok, stdout, stderr, last_line, kv{...}}`, and later steps read `$as.field`. A non-zero exit stops the sequence. Guards hold throughout, each step audits its own row, and `--dry-run` renders the plan without firing.
 
-Design: the security-pure-engine refactor. `sealed` is the single-resource variant.
+## Value flags
+
+`valueFlags` in `cli/execverb/argv.go` names the long flags whose value arrives as a separate token. Without it `--region us-east-1` leaves `us-east-1` looking positional, slipping past an `argN` guard. The table is one vendor's shape and belongs in the guardfile. Dropping an entry weakens any `argN` guard on a binary taking that flag, and does it silently. umbra#282.
