@@ -1,2 +1,7 @@
 [tool.agentic-os.repo-pointer-skills]
 org = "coilyco-flight-deck"
+
+[tool.agentic-os.documentation-layout]
+# Declared rather than defaulted: an undeclared repo and a deliberately
+# small one were the same file, and only one had the decision made.
+band = "small"
