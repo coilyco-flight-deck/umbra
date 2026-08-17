@@ -37,7 +37,7 @@ type operation struct {
 }
 
 // rawResponseOp reports a success response offering no JSON at all.
-// See docs/specverb-raw-responses.md.
+// See docs/specverb-request.md.
 func rawResponseOp(op *openapi3.Operation) bool {
 	if op == nil || op.Responses == nil {
 		return false
@@ -49,7 +49,7 @@ func rawResponseOp(op *openapi3.Operation) bool {
 			continue
 		}
 		// Offering JSON among others is content negotiation, not a statement
-		// that the body is HTML. See docs/specverb-raw-responses.md.
+		// that the body is HTML. See docs/specverb-request.md.
 		if offersJSON(ref.Value.Content) {
 			return false
 		}

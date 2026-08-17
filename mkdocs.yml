@@ -1,18 +1,14 @@
 site_name: coilysiren/umbra
 site_description: Security-boundary framework for urfave/cli v3
-site_url: https://coilysiren.github.io/cli-guard/
-repo_url: https://github.com/coilysiren/cli-guard
+site_url: https://forgejo.coilysiren.me/coilyco-flight-deck/umbra
+repo_url: https://forgejo.coilysiren.me/coilyco-flight-deck/umbra
 edit_uri: edit/main/docs/
 nav:
   - Home: index.md
   - Architecture: architecture.md
   - Features: FEATURES.md
-  - Examples: examples.md
   - Value providers: value-providers.md
-  - CLI reference: https://coilysiren.github.io/cli-guard/cli/
   - Contributing: CONTRIBUTING.md
-  - Code of Conduct: CODE_OF_CONDUCT.md
-  - Security: SECURITY.md
 theme:
   name: material
   palette:

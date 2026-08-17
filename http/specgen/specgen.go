@@ -179,7 +179,7 @@ func readMember(path, identity string) (member, error) {
 		return member{Path: identity, SourcePath: path, ExecGF: egf, Params: p, Bytes: b, Embeds: embeds}, nil
 	}
 	// Resolve `inherit` into one self-contained document before the typed parse,
-	// so every downstream stage sees the merged grant set (docs/specverb-inherit.md).
+	// so every downstream stage sees the merged grant set (docs/specverb-policy.md).
 	flat, err := guardfile.Flatten(path)
 	if err != nil {
 		return member{}, fmt.Errorf("specgen: resolve guardfile %s: %w", path, err)

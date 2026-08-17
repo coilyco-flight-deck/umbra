@@ -18,7 +18,6 @@ wrap ward mcp forgejo {
 - **method** - from `MethodForVerb`, or `method "PUT"` for an unknown verb. See [unrecognised verbs](specverb-unrecognised-verbs.md).
 - **query / body** - flat names become string fields; blocks add typed, bounded, aliased, or exclusive ones. **set** becomes `FixedBody` and owns it.
 - **fail-when** - a JMESPath predicate over a success response; truthy fails the call. Inputs are `$name` variables.
-- **describe** - the one place guardfile text reaches the calling model, not just the next editor.
 - **raw-response** - bare node declaring the body non-JSON, written through undecoded. See [raw responses](specverb-raw-responses.md).
 
 Unknown nodes, missing requirements, malformed predicates, and input collisions fail closed. An unrecognised verb is the one place the grammar infers rather than refuses, so it is reported.
@@ -37,4 +36,4 @@ Unknown nodes, missing requirements, malformed predicates, and input collisions 
 
 ## Proxy grants
 
-`proxy <tool> { upstream <server> <tool>; allow|deny <field> matches <regex>; post-call <field> matches <regex> }` is the inline MCP passthrough: deny-by-absence on the served surface, pinning the exact upstream tool. `allow`/`deny` guard request strings; `post-call` inspects the returned `text`, `content`, `url`, or `state`.
+`proxy <tool> { upstream <server> <tool>; allow|deny <field> matches <regex>; post-call ... }` is the inline MCP passthrough: deny-by-absence on the served surface, pinning the exact upstream tool. `allow`/`deny` guard request strings; `post-call` inspects the returned `text`, `content`, `url`, or `state`.

@@ -306,7 +306,7 @@ func validateGrant(d Descriptor, verb, resource string) error {
 }
 
 // inferredMethodWarning names a grant whose method was guessed from a verb the
-// convention table has never seen. See docs/specverb-unrecognised-verbs.md.
+// convention table has never seen. See docs/specverb-resolution.md.
 func inferredMethodWarning(d Descriptor, verb, resource string) string {
 	return fmt.Sprintf(
 		"opcore: can %s %s: %q is not a known verb, so the method was inferred as %s; state it with `method \"...\"` if that is wrong",
@@ -314,7 +314,7 @@ func inferredMethodWarning(d Descriptor, verb, resource string) string {
 }
 
 // applyInlineRawResponse declares the success body non-JSON, written through
-// undecoded. Bare by design: see docs/specverb-raw-responses.md.
+// undecoded. Bare by design: see docs/specverb-request.md.
 func applyInlineRawResponse(d *Descriptor, c *kdl.Node) error {
 	if len(c.Arguments()) != 0 || len(c.Properties()) != 0 {
 		return fmt.Errorf("`raw-response` takes no arguments (write it bare; fail-closed)")

@@ -15,7 +15,7 @@ import (
 // Guardfile is the parsed form of one exec-dialect wrap block.
 type Guardfile struct {
 	// Description is the optional top-level `description "..."` prose (sibling of
-	// `wrap`): standing context in describe + the ref doc. See docs/kdl-description.md.
+	// `wrap`): standing context in describe + the ref doc. See docs/value-providers.md.
 	Description string
 
 	Group      []string     // command path, e.g. ["<cli>", "git"]
@@ -34,7 +34,7 @@ type Guardfile struct {
 	WrapWhens []WhenClause
 
 	// Actions are declared ordered call sequences over granted exec leaves. See
-	// docs/execverb-actions.md.
+	// docs/execverb.md.
 	Actions []guardfile.Action
 
 	// ProviderDecls are consumer-declared value resolvers shared with the spec

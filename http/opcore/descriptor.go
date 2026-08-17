@@ -26,7 +26,7 @@ type Descriptor struct {
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
 	// RawResponse marks a success response offering no JSON, written through
-	// untouched. See docs/specverb-raw-responses.md.
+	// untouched. See docs/specverb-request.md.
 	RawResponse bool
 	// MethodInferred marks a Method guessed from an unrecognised verb rather
 	// than looked up or stated. See docs/opcore-inline.md.

@@ -3,7 +3,7 @@
 // referenced guardfile's grants (and its `spec`/`base-url`/`auth` singletons when
 // the child declares none of its own). Resolution is textual and happens before
 // the typed Parse runs, so the engine's resolve/prune/deny pipeline operates on
-// the already-merged set unchanged. See docs/specverb-inherit.md.
+// the already-merged set unchanged. See docs/specverb-policy.md.
 
 package guardfile
 
@@ -20,7 +20,7 @@ import (
 const inheritNode = "inherit"
 
 // restrictNode is the scope-gate node name. Child-local `restrict` now
-// inherits (deduped by param, child wins). See docs/specverb-inherit.md.
+// inherits (deduped by param, child wins). See docs/specverb-policy.md.
 const restrictNode = "restrict"
 
 // singletonNodes are the wrap-body fields a child inherits only when it declares
@@ -32,7 +32,7 @@ var singletonNodes = map[string]bool{"spec": true, "base-url": true, "auth": tru
 func isGrantNode(name string) bool { return modals[name] || name == overrideNode }
 
 // Flatten resolves every `inherit` in the guardfile at path into one self-contained
-// KDL document's bytes (no `inherit` => source verbatim). docs/specverb-inherit.md.
+// KDL document's bytes (no `inherit` => source verbatim). docs/specverb-policy.md.
 func Flatten(path string) ([]byte, error) {
 	return flattenFile(path, nil)
 }
@@ -242,7 +242,7 @@ func grantVerbResource(n *kdl.Node) (verb, resource string) {
 }
 
 // validateInheritedPrecedence enforces the load-bearing rule at the inherit seam:
-// only an `override` crosses an inherited `never`. See docs/specverb-override.md.
+// only an `override` crosses an inherited `never`. See docs/specverb-policy.md.
 func validateInheritedPrecedence(local, inherited []*kdl.Node) error {
 	exact := map[string]bool{}    // verb\x00resource
 	verbStar := map[string]bool{} // verb (a `never <verb> "*"`)

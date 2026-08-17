@@ -17,7 +17,7 @@ const authNoneSpec = `wrap ward mcp public {
 }`
 
 // A placeholder credential is a wrong Authorization header, which some
-// upstreams 403. See docs/specverb-auth-none.md.
+// upstreams 403. See docs/specverb-policy.md.
 func TestAuthNoneSendsNoAuthorizationHeader(t *testing.T) {
 	var got string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

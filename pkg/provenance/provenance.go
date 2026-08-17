@@ -10,7 +10,7 @@
 // The design rule is that ignorance is never mistaken for trust: the zero
 // [Verification] is [Unknown] rather than a pass, an envelope missing fields is
 // incomplete rather than assumed, and [Envelope.Trusted] requires both a
-// complete envelope and an affirmative check. See docs/provenance.md.
+// complete envelope and an affirmative check. See docs/broker.md.
 package provenance
 
 import (
@@ -23,7 +23,7 @@ import (
 )
 
 // Verification is how far an origin claim was checked. It describes the claim,
-// never the payload. See docs/provenance.md.
+// never the payload. See docs/broker.md.
 type Verification string
 
 const (

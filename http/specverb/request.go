@@ -485,7 +485,7 @@ func (rt *runtime) fire(ctx context.Context, desc opDescriptor, method, url stri
 }
 
 // writeRawResponse emits a non-JSON success body byte for byte, refusing a
-// projection rather than ignoring it. See docs/specverb-raw-responses.md.
+// projection rather than ignoring it. See docs/specverb-request.md.
 func writeRawResponse(body []byte, query, method, url, status string) error {
 	if strings.TrimSpace(query) != "" {
 		return exitcode.New(exitcode.UserError, "user_error",

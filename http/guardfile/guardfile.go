@@ -37,7 +37,7 @@ func (c ValueChain) String() string {
 }
 
 // AuthSchemeNone marks a deliberately credential-free upstream. Distinct from
-// an unset scheme, which is a spec that forgot. See docs/specverb-auth-none.md.
+// an unset scheme, which is a spec that forgot. See docs/specverb-policy.md.
 const AuthSchemeNone = "none"
 
 // Auth describes how the engine authenticates to the target API. Four schemes:
@@ -215,7 +215,7 @@ type FetchWhen struct {
 // Guardfile is the parsed form of one wrap block.
 type Guardfile struct {
 	// Description is the optional top-level `description "..."` prose (sibling of
-	// `wrap`): standing context in describe + the ref doc. See docs/kdl-description.md.
+	// `wrap`): standing context in describe + the ref doc. See docs/value-providers.md.
 	Description string
 
 	Group   []string // command path, e.g. ["ward", "ops", "forgejo"]
@@ -534,7 +534,7 @@ func (gf *Guardfile) validate() error {
 }
 
 // validateOverrides fails closed on a no-op `override` (one crossing no deny):
-// silently it is a plain `can`. See docs/specverb-override.md.
+// silently it is a plain `can`. See docs/specverb-policy.md.
 func (gf *Guardfile) validateOverrides() error {
 	for _, g := range gf.Grants {
 		if !g.Override {
@@ -592,7 +592,7 @@ func parseAuth(n *kdl.Node) (Auth, error) {
 }
 
 // parseNoneAuth reads `auth none`, for a genuinely credential-free upstream.
-// See docs/specverb-auth-none.md.
+// See docs/specverb-policy.md.
 func parseNoneAuth(n *kdl.Node) (Auth, error) {
 	if len(n.Children().Nodes) > 0 {
 		return Auth{}, fmt.Errorf("guardfile: auth none takes no block (a credential-free upstream resolves nothing)")

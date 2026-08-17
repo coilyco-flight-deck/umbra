@@ -1,8 +1,8 @@
 # value providers, chains, and the `description` node
 
-A `value <provider> <address>` source names *where* a value is read at request time. umbra ships three store-agnostic resolvers and nothing else: **`env`**, **`file`** (trimmed), and **`literal`**.
+A `value <provider> <address>` names *where* a value is read at request time. umbra ships three store-agnostic resolvers: **`env`**, **`file`** (trimmed), and **`literal`**.
 
-Anything store-backed is the consumer's, declared in the guardfile as a subprocess contract:
+Anything store-backed is the consumer's, declared as a subprocess contract:
 
 ```kdl
 provider ssm {
@@ -14,9 +14,9 @@ The address is appended as the final argument. Only stdout is read, trimmed; the
 
 ## Why exec rather than an SDK
 
-umbra is a policy-free engine, and [architecture.md](architecture.md) keeps consumer-specific knowledge out of it. Linking a vendor SDK would put one cloud's credential-resolution rules inside the framework and hand every generated binary that dependency whether or not it resolves anything.
+umbra is a policy-free engine, and [architecture.md](architecture.md) keeps consumer-specific knowledge out of it. Linking a vendor SDK would put one cloud's credential rules inside the framework and hand every generated binary that dependency whether or not it resolves anything.
 
-The trade is real and worth naming: credential resolution becomes whatever the declared binary does. A provider relying on SDK-specific behaviour, such as profile precedence or SSO fallbacks, inherits the CLI's behaviour instead, and that CLI must exist wherever the generated binary runs. The SDK path had its own version of this: aws-sdk-go-v2's default chain prefers static keys in `~/.aws/credentials` over an SSO profile of the same name, so a stale `[default]` silently shadowed SSO while the aws CLI resolved it, and only the SDK path broke.
+The trade is worth naming: resolution becomes whatever the declared binary does, so a provider relying on SDK profile precedence or SSO fallbacks inherits the CLI's behaviour, and that CLI must exist wherever the binary runs.
 
 ## Fallback chains
 
@@ -29,14 +29,12 @@ value {
 }
 ```
 
-Every field taking a `value` takes a chain: the three auth schemes and `base-url`. The inline form is a one-element chain, so existing Guardfiles are unchanged, and the two forms are mutually exclusive on one node. Parse-time refusals, never request-time: an empty block, a source missing its address, a mixed inline-and-block form, or a source carrying its own children.
+Every field taking a `value` takes a chain. The inline form is a one-element chain, so existing Guardfiles are unchanged, and the two forms are mutually exclusive on one node. Refusals happen at parse time: an empty block, a source missing its address, a mixed form, or a source carrying children.
 
-`valuesource.ResolveFirst` skips a source when its provider errors **or** resolves empty, since success needs both. When every source fails it returns a combined error naming each provider and address tried but never a resolved value, so a provider handing back a value alongside an error still leaks nothing. A `--dry-run` stays offline, showing the chain symbolically as sources joined by ` | `, and describe names them the same way.
+`valuesource.ResolveFirst` skips a source when its provider errors **or** resolves empty, since success needs both. When every source fails it returns a combined error naming each provider and address tried but never a resolved value, so a provider handing back a value alongside an error leaks nothing. A `--dry-run` stays offline.
 
-A `value` naming a provider that is neither built-in nor declared is an error at resolve time (`no provider registered for "ssm"`), never an empty string. Declaring a provider with no `exec`, or with an unknown child, is a parse error. Both dialects share the grammar, and a declaration in one member of a merged binary serves the others.
+A `value` naming a provider that is neither built-in nor declared is an error at resolve time, never an empty string. Declaring a provider with no `exec`, or with an unknown child, is a parse error. Both dialects share the grammar, and a declaration in one member of a merged binary serves the others.
 
-## The top-level `description` node
+## The `description` node
 
-Every `.kdl` spec may carry a first-class top-level `description "..."` node, sibling of the root block and present on both dialects. It is **queryable contract data rather than a comment header**, the sanctioned home for the standing context a comment header used to carry.
-
-A single string argument, with KDL's escaped and multi-line literals available for multi-paragraph prose. An empty `description ""` fails closed, so the node is never a silent no-op. It holds the durable what and why a reader needs to understand the surface; changelog and provenance archaeology belong in maintained documentation instead.
+Every `.kdl` spec may carry a top-level `description "..."` node, sibling of the root block and present on both dialects. It is **queryable contract data rather than a comment header**, the sanctioned home for standing context. A single string argument, with KDL's multi-line literals available for longer prose; an empty `description ""` fails closed, so the node is never a silent no-op.

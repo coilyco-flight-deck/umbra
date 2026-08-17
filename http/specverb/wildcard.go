@@ -1,5 +1,5 @@
 // Wildcard resource expansion: a `"*"` grant applies its verb across every spec
-// resource exposing it, expanded per resource. See docs/specverb-wildcard.md.
+// resource exposing it, expanded per resource. See docs/specverb-resolution.md.
 
 package specverb
 
@@ -31,7 +31,7 @@ func isDenyModal(modal string) bool {
 }
 
 // expandWildcards returns gf with every `"*"` grant replaced by a concrete grant
-// per spec resource exposing the verb. See docs/specverb-wildcard.md.
+// per spec resource exposing the verb. See docs/specverb-resolution.md.
 func expandWildcards(spec *spec, gf *guardfile.Guardfile) (*guardfile.Guardfile, error) {
 	if !hasWildcard(gf) {
 		return gf, nil

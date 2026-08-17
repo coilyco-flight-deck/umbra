@@ -3,7 +3,7 @@ package execverb
 import "strings"
 
 // valueFlags are the long flags whose value is a separate argv token.
-// See docs/execverb-value-flags.md.
+// See docs/execverb.md.
 var valueFlags = map[string]bool{
 	"--region": true, "--profile": true, "--output": true,
 	"--endpoint-url": true, "--cli-read-timeout": true,

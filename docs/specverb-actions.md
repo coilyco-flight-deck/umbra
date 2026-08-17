@@ -10,24 +10,9 @@ A **complex action** is a named composite verb authored inside a `wrap` block, o
 4. **Dry-run is a plan.** `--dry-run` prints the call with bound params and the compiled `until`, firing nothing.
 5. **One expression engine.** Conditions are JMESPath, the same engine `--query` uses, extended with native `$input` variables.
 
-```kdl
-action ci-watch {
-    describe "Watch a CI run to completion, then surface failing-job status."
-    input repo { positional; required; help "owner/name" }
-    input run  { flag; default "max([].run_number)"; help "latest run if --run absent" }
-    poll list tasks {
-        args { owner-repo $repo }
-        until "length([?run_number==$run && status!='success']) == `0`"
-        every   "10s"                // durations are quoted: KDL rejects a bare 10s
-        timeout "30m"
-        as run_tasks
-    }
-}
-```
-
 ## Input defaulting
 
-An `input` may carry `default <jmespath>`. When the operator omits it, the action fires the poll leaf **once as a pre-flight**, evaluates the expression against that response, and binds the result before the loop starts. That makes `ci-watch owner/repo` with no `--run` resolve to the latest run in the listing without a hand-rolled pre-flight in the consumer. The pre-flight hits only the poll leaf, so it introduces no new target and no new grant, and it writes its own audit row like any tick.
+An `input` may carry `default <jmespath>`. When the operator omits it, the action fires the poll leaf **once as a pre-flight**, evaluates the expression against that response, and binds the result before the loop starts, so `ci-watch owner/repo` with no `--run` resolves to the latest run in the listing. The pre-flight hits only the poll leaf, introducing no new target and no new grant, and writes its own audit row like any tick.
 
 ## `collect`: auto-pagination
 

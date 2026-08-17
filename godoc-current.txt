@@ -130,7 +130,7 @@ type GrantInfo struct {
 
 type Guardfile struct {
 	// Description is the optional top-level `description "..."` prose (sibling of
-	// `wrap`): standing context in describe + the ref doc. See docs/kdl-description.md.
+	// `wrap`): standing context in describe + the ref doc. See docs/value-providers.md.
 	Description string
 
 	Group      []string     // command path, e.g. ["<cli>", "git"]
@@ -149,7 +149,7 @@ type Guardfile struct {
 	WrapWhens []WhenClause
 
 	// Actions are declared ordered call sequences over granted exec leaves. See
-	// docs/execverb-actions.md.
+	// docs/execverb.md.
 	Actions []guardfile.Action
 
 	// ProviderDecls are consumer-declared value resolvers shared with the spec
@@ -664,9 +664,8 @@ specverb engine, into a typed model. KDL is parsed, never evaluated.
 CONSTANTS
 
 const AuthSchemeNone = "none"
-    AuthSchemeNone marks a deliberately credential-free upstream.
-    Distinct from an unset scheme, which is a spec that forgot. See
-    docs/specverb-auth-none.md.
+    AuthSchemeNone marks a deliberately credential-free upstream. Distinct from
+    an unset scheme, which is a spec that forgot. See docs/specverb-policy.md.
 
 
 FUNCTIONS
@@ -674,7 +673,7 @@ FUNCTIONS
 func Flatten(path string) ([]byte, error)
     Flatten resolves every `inherit` in the guardfile at path into one
     self-contained KDL document's bytes (no `inherit` => source verbatim).
-    docs/specverb-inherit.md.
+    docs/specverb-policy.md.
 
 
 TYPES
@@ -826,7 +825,7 @@ type Grant struct {
 
 type Guardfile struct {
 	// Description is the optional top-level `description "..."` prose (sibling of
-	// `wrap`): standing context in describe + the ref doc. See docs/kdl-description.md.
+	// `wrap`): standing context in describe + the ref doc. See docs/value-providers.md.
 	Description string
 
 	Group   []string // command path, e.g. ["ward", "ops", "forgejo"]
@@ -1085,7 +1084,7 @@ type Descriptor struct {
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
 	// RawResponse marks a success response offering no JSON, written through
-	// untouched. See docs/specverb-raw-responses.md.
+	// untouched. See docs/specverb-request.md.
 	RawResponse bool
 	// MethodInferred marks a Method guessed from an unrecognised verb rather
 	// than looked up or stated. See docs/opcore-inline.md.
@@ -1531,7 +1530,7 @@ FUNCTIONS
 
 func Materialize(prefix string, sources map[int]map[string]Source) (map[int]map[string]string, func() error, error)
     Materialize writes sources beneath one private temporary directory.
-    Key shape and resolution: docs/specgen-embedded-files.md.
+    Key shape and resolution: docs/specgen-materialization.md.
 
 
 TYPES
@@ -2730,7 +2729,7 @@ a forge, a bot account, or an email domain.
 The design rule is that ignorance is never mistaken for trust: the zero
 Verification is Unknown rather than a pass, an envelope missing fields is
 incomplete rather than assumed, and Envelope.Trusted requires both a complete
-envelope and an affirmative check. See docs/provenance.md.
+envelope and an affirmative check. See docs/broker.md.
 
 FUNCTIONS
 
@@ -2779,7 +2778,7 @@ func (e Envelope) Trusted() bool
 
 type Verification string
     Verification is how far an origin claim was checked. It describes the claim,
-    never the payload. See docs/provenance.md.
+    never the payload. See docs/broker.md.
 
 const (
 	// Unknown is the zero value: no check attempted or recorded, deliberately

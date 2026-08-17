@@ -9,7 +9,7 @@ import (
 )
 
 // Some APIs refuse an unnamed client outright rather than rate-limit it.
-// Measurements in docs/specverb-user-agent.md (umbra#303).
+// Measurements in docs/specverb-request.md (umbra#303).
 func TestSendNamesItself(t *testing.T) {
 	var got string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
