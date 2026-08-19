@@ -172,6 +172,12 @@ func (rt *runtime) actionFor(desc opDescriptor) cli.ActionFunc {
 			if err != nil {
 				return exitcode.New(exitcode.UserError, "user_error", err, "check the form flag values")
 			}
+		case len(desc.BodyMappings) > 0:
+			// A mapped source mounts no CLI flag, so this surface cannot fill
+			// one. Refusing beats sending a body missing its mapped keys.
+			return exitcode.New(exitcode.UserError, "user_error",
+				fmt.Errorf("%s takes a mapped body, which this command line cannot supply", desc.Leaf),
+				"call this grant through the MCP surface, which carries mapped inputs")
 		case len(desc.FixedBody) > 0:
 			body, err = json.Marshal(desc.FixedBody)
 			if err != nil {

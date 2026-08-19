@@ -19,7 +19,7 @@ type Descriptor struct {
 	QueryFlags     []Field        // query params, including typed scalar-array shapes
 	QueryExclusive [][]string     // local query-name groups where at most one may be supplied
 	FormFlags      []Field        // formData params, where "file" types take a path
-	FixedBody      map[string]any // exact body for state-toggle leaves, with no body flags
+	FixedBody      map[string]any // pinned body keys, alone for a state toggle or seeding a mapped body
 	Destructive    bool           // leaf mutates irreversibly (delete)
 	Grant          string         // the authorizing grant sentence, e.g. "can delete repos"
 	Describe       string         // optional Guardfile describe "..." note, "" if none

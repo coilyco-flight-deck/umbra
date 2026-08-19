@@ -107,13 +107,26 @@ func validateBodyMappingMode(d Descriptor) error {
 	if len(d.BodyMappings) == 0 {
 		return nil
 	}
+	// Body fields stay refused: a caller-named key and a mapped one both come
+	// from the model, so which wins at a shared name is genuinely ambiguous.
 	if len(d.BodyFlags) > 0 {
 		return fmt.Errorf("body fields and body mappings cannot be combined (fail-closed)")
 	}
-	if len(d.FixedBody) > 0 {
-		return fmt.Errorf("fixed body and body mappings cannot be combined (fail-closed)")
+	if err := validateFixedBodyMappings(d.FixedBody, d.BodyMappings); err != nil {
+		return err
 	}
 	return validateBodyMappings(d.BodyMappings)
+}
+
+// validateFixedBodyMappings refuses a fixed key a mapping also targets. The two
+// carry different authority, so a silent winner is the one outcome to refuse.
+func validateFixedBodyMappings(fixed map[string]any, mappings []BodyMapping) error {
+	for _, mapping := range mappings {
+		if _, clash := fixed[mapping.Target]; clash {
+			return fmt.Errorf("`set` key %q is also a body `map` target: one key cannot be both pinned and mapped (fail-closed)", mapping.Target)
+		}
+	}
+	return nil
 }
 
 func validMappingName(name string) bool {
@@ -161,8 +174,13 @@ func insertMappingField(fields []Field, path []string) []Field {
 	return append(fields, f)
 }
 
-func projectMappedBody(body map[string]any, mappings []BodyMapping) ([]byte, error) {
-	out := make(map[string]any, len(mappings))
+// projectMappedBody builds the body from the mappings, seeded with the pins. A
+// target colliding with a pin is refused at validation, so neither overwrites.
+func projectMappedBody(body map[string]any, mappings []BodyMapping, fixed map[string]any) ([]byte, error) {
+	out := make(map[string]any, len(mappings)+len(fixed))
+	for name, value := range fixed {
+		out[name] = value
+	}
 	for _, mapping := range mappings {
 		value, err := mappedString(body, mapping.SourcePath)
 		if err != nil {
