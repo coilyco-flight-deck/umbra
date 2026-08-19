@@ -60,6 +60,11 @@ func (d Descriptor) InputSchema() Schema {
 	}
 	add(d.QueryFlags, LocationQuery)
 	add(d.BodyFlags, LocationBody)
+	// Variables ride the body location so a consumer splitting by Location
+	// needs no change; assembleBody is what nests them under `variables`.
+	if d.GraphQL != nil {
+		add(d.GraphQL.Variables, LocationBody)
+	}
 	add(bodyMappingFields(d.BodyMappings), LocationBody)
 	add(d.FormFlags, LocationForm)
 	return s

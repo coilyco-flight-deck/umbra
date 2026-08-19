@@ -632,6 +632,9 @@ func (o Operation) assembleBody(body map[string]any) ([]byte, error) {
 		return nil, exitcode.New(exitcode.Internal, "internal", err,
 			"fix the operation's body mapping declaration")
 	}
+	if o.Desc.GraphQL != nil {
+		return assembleGraphQLBody(body, o.Desc.GraphQL)
+	}
 	if len(o.Desc.FixedBody) > 0 {
 		return json.Marshal(o.Desc.FixedBody)
 	}

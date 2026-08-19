@@ -1083,6 +1083,7 @@ type Descriptor struct {
 	Describe       string         // optional Guardfile describe "..." note, "" if none
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
+	GraphQL        *GraphQL       // non-nil for a `graphql` grant; owns the whole body
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-request.md.
 	RawResponse bool
@@ -1127,6 +1128,14 @@ func (f Field) QueryName() string
 
 func (f Field) TypeLabel() string
     TypeLabel renders the flag's type for help and describe output.
+
+type GraphQL struct {
+	Document  string  // the operation document, sent verbatim as `query`
+	Operation string  // operation name, sent as `operationName`; "" when anonymous
+	Variables []Field // derived from the document signature, decorated by `variable`
+}
+    GraphQL is one grant's operation: an authored document that never reaches
+    the input schema, plus caller variables derived from its signature.
 
 type Operation struct {
 	Desc Descriptor

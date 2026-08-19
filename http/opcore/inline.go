@@ -266,9 +266,22 @@ func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 		return applyInlineMethod(d, c)
 	case "raw-response":
 		return applyInlineRawResponse(d, c)
+	case "graphql":
+		return applyInlineGraphQL(d, c)
 	default:
 		return applyInlineGrantControlChild(d, c)
 	}
+	return nil
+}
+
+// applyInlineGraphQL mounts the `graphql` block. It owns the whole request
+// body, so validateGrant refuses any other body construct beside it.
+func applyInlineGraphQL(d *Descriptor, c *kdl.Node) error {
+	gql, err := parseGraphQL(c)
+	if err != nil {
+		return err
+	}
+	d.GraphQL = gql
 	return nil
 }
 
@@ -333,6 +346,9 @@ func validateGrant(d Descriptor, verb, resource string) error {
 	if d.RawResponse && d.FailWhen != "" {
 		return fmt.Errorf("opcore: can %s %s: `raw-response` cannot be combined with `fail-when`, which needs a decoded response (fail-closed)", verb, resource)
 	}
+	if err := validateGraphQLGrant(d, verb, resource); err != nil {
+		return err
+	}
 	if err := validateBodyMappings(d.BodyMappings); err != nil {
 		return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
 	}
@@ -366,7 +382,7 @@ func applyInlineRawResponse(d *Descriptor, c *kdl.Node) error {
 // checkOnceOnlyChildren refuses a repeated `method` or `raw-response`. Both
 // carry a meaningful zero, so neither is caught by an already-set field.
 func checkOnceOnlyChildren(n *kdl.Node, verb, resource string) error {
-	for _, once := range []string{"method", "raw-response"} {
+	for _, once := range []string{"method", "raw-response", "graphql"} {
 		if countChildren(n, once) > 1 {
 			return fmt.Errorf("opcore: can %s %s: duplicate `%s` (fail-closed)", verb, resource, once)
 		}
