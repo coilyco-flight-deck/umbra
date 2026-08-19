@@ -3019,6 +3019,57 @@ type Step struct {
     available to later arguments as `$as.field`.
 
 
+## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/tokenmint
+
+package tokenmint // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/tokenmint"
+
+Package tokenmint resolves a value that has to be MINTED rather than read.
+Every valuesource provider reads a secret that already exists; an OAuth
+client_credentials upstream has none until one is fetched (umbra#310).
+
+CONSTANTS
+
+const (
+	AuthStyleBasic = "basic"
+	AuthStylePost  = "post"
+)
+    AuthStyle names how the client authenticates to the token endpoint. Basic is
+    the default because RFC 6749 requires a server to support it.
+
+
+TYPES
+
+type Client struct {
+	Name         string
+	TokenURL     string
+	ClientID     string
+	ClientSecret valuesource.Source
+	Scopes       []string
+	AuthStyle    string
+}
+    Client is one named machine-to-machine OAuth client. The secret is a value
+    SOURCE rather than a string, so policy never carries the credential itself.
+
+type Registry struct {
+	// Has unexported fields.
+}
+    Registry mints and caches access tokens for the clients it was built with.
+    It is the thing a consumer registers as the "oauth2" value provider.
+
+func New(clients []Client, secrets map[string]valuesource.Provider, httpClient *http.Client) (*Registry, error)
+    New builds a Registry over the consumer's base value providers. A client
+    with no name, token URL, or client id is refused here rather than at first
+    call.
+
+func (r *Registry) Names() []string
+    Names lists the registered clients, for a consumer's describe surface.
+    It reports names only, never an endpoint or a credential.
+
+func (r *Registry) Provider() valuesource.Provider
+    Provider is the valuesource.Provider to register as "oauth2". Its address is
+    a CLIENT NAME, so a guardfile carries no endpoint and no credential.
+
+
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/ttlcache
 
 package ttlcache // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/ttlcache"

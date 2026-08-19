@@ -8,6 +8,7 @@ require (
 	github.com/jmespath-community/go-jmespath v1.1.1
 	github.com/olekukonko/tablewriter v1.1.4
 	github.com/urfave/cli/v3 v3.9.0
+	golang.org/x/oauth2 v0.36.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )

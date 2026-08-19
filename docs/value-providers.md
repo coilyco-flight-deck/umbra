@@ -1,6 +1,6 @@
 # value providers, chains, and the `description` node
 
-A `value <provider> <address>` names *where* a value is read at request time. umbra ships three store-agnostic resolvers: **`env`**, **`file`** (trimmed), and **`literal`**.
+A `value <provider> <address>` names *where* a value is read at request time. umbra ships three store-agnostic resolvers: **`env`**, **`file`** (trimmed), and **`literal`**. A value may also be **minted** rather than read: `pkg/tokenmint` resolves `value oauth2 "<client>"` to a live OAuth `client_credentials` access token, cached to the token's own `expires_in` and re-minted when the client secret rotates. The consumer constructs it over its base registry and merges the result in, so no grammar changes and spec mode and upstream mode share one implementation.
 
 Anything store-backed is the consumer's, declared as a subprocess contract:
 

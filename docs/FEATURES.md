@@ -22,7 +22,9 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 - **audit** - Append-only JSONL invocation log with rotation and optional typed CI attribution, which it preserves but does not establish trust in.
 - **policy** - Argv validation rejecting shell metacharacters before `execve`.
 - **scope** / **exitcode** - Resolve cwd to its git toplevel for each audit row's RepoRoot, and a public exit-code taxonomy for orchestrators.
-- **valuesource** - Shared `value <provider>` resolution with fallback chains. See [value providers](value-providers.md).
+- **valuesource** / **tokenmint** - Shared `value <provider>` resolution with
+  fallback chains, plus OAuth `client_credentials` tokens minted rather than
+  read. See [value providers](value-providers.md).
 - **config** / **stepflow** - Layered-config primitives with a generic `OverlayFile[T]`, and a transport-agnostic ordered sequence engine.
 - **broker** / **credseed** / **provenance** - Credential broker, env seeder, and origin envelope. See [broker.md](broker.md).
 - **scan** / **attribution** / **flock** / **version** / **issueref** / **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
