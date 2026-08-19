@@ -3,6 +3,7 @@ package opcore
 import (
 	"bytes"
 	"context"
+	sqldb "database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -46,6 +47,13 @@ type Runtime struct {
 	baseURLOnce  sync.Once
 	baseURLVal   string
 	baseURLErr   error
+
+	// Database backs `sql` grants. The pool opens once on first use, so a
+	// consumer that serves no SQL grant never opens a connection.
+	Database Database
+	dbOnce   sync.Once
+	db       *sqldb.DB
+	dbErr    error
 }
 
 // RuntimeConfig is the input to NewRuntime: BaseURL is raw (scheme + trim
@@ -58,6 +66,7 @@ type RuntimeConfig struct {
 	Restrict     []guardfile.Restriction
 	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
+	Database     Database
 }
 
 // NewRuntime assembles a Runtime, defaulting the base-url scheme and the HTTP
@@ -75,6 +84,7 @@ func NewRuntime(c RuntimeConfig) *Runtime {
 		Restrict:     c.Restrict,
 		Headers:      c.Headers,
 		BaseURLValue: c.BaseURLValue,
+		Database:     c.Database,
 	}
 }
 

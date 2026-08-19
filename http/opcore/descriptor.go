@@ -26,6 +26,7 @@ type Descriptor struct {
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
 	GraphQL        *GraphQL       // non-nil for a `graphql` grant; owns the whole body
+	SQL            *SQL           // non-nil for a `sql` grant; reaches a database, not a URL
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-request.md.
 	RawResponse bool

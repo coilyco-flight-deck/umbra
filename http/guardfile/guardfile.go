@@ -418,6 +418,26 @@ func ParseBaseURL(n *kdl.Node) (raw string, chain ValueChain, err error) {
 	return "", chain, nil
 }
 
+// ParseValueBlock reads a `{ value ... }` block off a node that carries one,
+// so a new wrap node can take a credential chain without restating the shape.
+func ParseValueBlock(n *kdl.Node, node string) (ValueChain, error) {
+	var chain ValueChain
+	for _, c := range n.Children().Nodes {
+		if c.Name() != "value" {
+			return nil, fmt.Errorf("guardfile: %s: unknown field %q (want value; fail-closed)", node, c.Name())
+		}
+		vc, err := parseValueChain(c)
+		if err != nil {
+			return nil, fmt.Errorf("guardfile: %s: %w", node, err)
+		}
+		chain = vc
+	}
+	if chain.IsZero() {
+		return nil, fmt.Errorf("guardfile: %s requires `value <provider> \"...\"`", node)
+	}
+	return chain, nil
+}
+
 // parseValueChain reads a `value` node in either form (inline `value <p> "<a>"`
 // or a `{ ... }` fallback block) into a ValueChain. See specverb-value-chain.md.
 func parseValueChain(n *kdl.Node) (ValueChain, error) {

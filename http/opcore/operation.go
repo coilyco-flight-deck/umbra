@@ -56,6 +56,17 @@ func (o Operation) Resolve(ctx context.Context, a Args, dry bool) (Request, erro
 // Execute runs the leaf under the full security floor (gate, restrict, assemble,
 // base-url, auth, fire) and returns the decoded response, rendering nothing.
 func (o Operation) Execute(ctx context.Context, a Args) (Response, error) {
+	// A sql grant never assembles a URL, so it leaves before the HTTP floor.
+	if o.Desc.SQL != nil {
+		resp, err := o.executeSQL(ctx, a)
+		if err != nil {
+			return Response{}, err
+		}
+		if err := o.checkResponse(resp.Decoded, a); err != nil {
+			return Response{}, err
+		}
+		return resp, nil
+	}
 	req, err := o.Resolve(ctx, a, false)
 	if err != nil {
 		return Response{}, err

@@ -8,6 +8,19 @@ var ReservedFlagNames = map[string]bool{
 	"dry-run": true, "query": true, "output": true, "body-file": true,
 }
 
+// descriptorBodyInputs gathers every body-side caller input. A graphql variable
+// and a sql parameter are caller inputs too, held to the same rules.
+func descriptorBodyInputs(desc Descriptor) []Field {
+	out := append(append([]Field{}, desc.BodyFlags...), bodyMappingFields(desc.BodyMappings)...)
+	if desc.GraphQL != nil {
+		out = append(out, desc.GraphQL.Variables...)
+	}
+	if desc.SQL != nil {
+		out = append(out, desc.SQL.Params...)
+	}
+	return out
+}
+
 // CheckFlagCollisions rejects reserved or duplicate local inputs and duplicate
 // outgoing query names. Both descriptor sources share this fail-closed check.
 func CheckFlagCollisions(desc Descriptor) error {
@@ -15,7 +28,7 @@ func CheckFlagCollisions(desc Descriptor) error {
 		return fmt.Errorf("opcore: %s: %w", desc.VerbName, err)
 	}
 	seen := map[string]bool{}
-	bodyInputs := append(append([]Field{}, desc.BodyFlags...), bodyMappingFields(desc.BodyMappings)...)
+	bodyInputs := descriptorBodyInputs(desc)
 	all := append(append([]Field{}, desc.QueryFlags...), bodyInputs...)
 	for _, f := range append(all, desc.FormFlags...) {
 		if ReservedFlagNames[f.Name] {

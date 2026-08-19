@@ -85,6 +85,8 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 		return nil
 	case "header":
 		return p.parseHeader(n)
+	case "database":
+		return p.parseDatabase(n)
 	case "restrict":
 		r, err := guardfile.ParseRestrictNode(n)
 		if err != nil {
@@ -97,7 +99,7 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 	case "proxy":
 		return p.parseProxy(n)
 	default:
-		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | header | restrict | can | proxy; fail-closed)", n.Name())
+		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | header | database | restrict | can | proxy; fail-closed)", n.Name())
 	}
 }
 
@@ -149,8 +151,13 @@ func (p *inlineParser) parseBaseURL(n *kdl.Node) error {
 
 // validate enforces the cross-node invariants after every wrap child is applied.
 func (p *inlineParser) validate() error {
-	if p.cfg.Auth.Scheme == "" {
+	// `auth` authenticates an HTTP upstream, so a wrap serving only `sql`
+	// grants has nothing to authenticate: the DSN carries the credential.
+	if p.cfg.Auth.Scheme == "" && !p.everyGrantIsSQL() {
 		return fmt.Errorf("opcore: `auth` block is required")
+	}
+	if p.needsDatabase() && p.cfg.Database.IsZero() {
+		return fmt.Errorf("opcore: a `sql` grant needs a wrap-level `database <driver> { value ... }` (fail-closed)")
 	}
 	if p.cfg.BaseURL != "" && !p.cfg.BaseURLValue.IsZero() {
 		return fmt.Errorf("opcore: base-url set both as a string and a `{ value }` block; pick one")
@@ -159,6 +166,26 @@ func (p *inlineParser) validate() error {
 		return fmt.Errorf("opcore: no `can` or `proxy` operations (nothing to mount)")
 	}
 	return nil
+}
+
+// everyGrantIsSQL reports whether nothing in this wrap reaches an HTTP upstream.
+func (p *inlineParser) everyGrantIsSQL() bool {
+	for _, d := range p.descs {
+		if d.SQL == nil {
+			return false
+		}
+	}
+	return len(p.descs) > 0
+}
+
+// needsDatabase reports whether any grant reaches a database.
+func (p *inlineParser) needsDatabase() bool {
+	for _, d := range p.descs {
+		if d.SQL != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // parseGrant states one `can <verb> <resource> { ... }` operation as a Descriptor:
@@ -190,16 +217,8 @@ func (p *inlineParser) parseGrant(n *kdl.Node) error {
 			return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
 		}
 	}
-	if d.Path == "" {
-		return fmt.Errorf("opcore: can %s %s: `path \"...\"` is required (the request path template)", verb, resource)
-	}
-	d.PathParams = PathParamsInOrder(d.Path)
-	if len(d.FixedBody) > 0 {
-		// a state toggle owns its body: no body flags mount alongside a `set`.
-		d.BodyFlags = nil
-		if len(d.BodyMappings) > 0 {
-			return fmt.Errorf("opcore: can %s %s: `set` cannot be combined with body `map` (fail-closed)", verb, resource)
-		}
+	if err := shapeGrant(&d, verb, resource); err != nil {
+		return err
 	}
 	if err := validateGrant(d, verb, resource); err != nil {
 		return err
@@ -208,6 +227,24 @@ func (p *inlineParser) parseGrant(n *kdl.Node) error {
 		p.warnings = append(p.warnings, inferredMethodWarning(d, verb, resource))
 	}
 	p.descs = append(p.descs, d)
+	return nil
+}
+
+// shapeGrant settles the request shape once every child is applied: a sql
+// grant has no URL to template, and a `set` body owns itself.
+func shapeGrant(d *Descriptor, verb, resource string) error {
+	if d.SQL != nil {
+		d.Method, d.MethodInferred = "", false
+	} else if d.Path == "" {
+		return fmt.Errorf("opcore: can %s %s: `path \"...\"` is required (the request path template)", verb, resource)
+	}
+	d.PathParams = PathParamsInOrder(d.Path)
+	if len(d.FixedBody) > 0 {
+		d.BodyFlags = nil
+		if len(d.BodyMappings) > 0 {
+			return fmt.Errorf("opcore: can %s %s: `set` cannot be combined with body `map` (fail-closed)", verb, resource)
+		}
+	}
 	return nil
 }
 
@@ -268,9 +305,40 @@ func applyInlineGrantChild(d *Descriptor, c *kdl.Node) error {
 		return applyInlineRawResponse(d, c)
 	case "graphql":
 		return applyInlineGraphQL(d, c)
+	case "sql":
+		return applyInlineSQL(d, c)
 	default:
 		return applyInlineGrantControlChild(d, c)
 	}
+	return nil
+}
+
+// parseDatabase states the wrap's database: a registered database/sql driver
+// name plus the chain its DSN resolves through. umbra imports no driver.
+func (p *inlineParser) parseDatabase(n *kdl.Node) error {
+	if !p.cfg.Database.IsZero() {
+		return fmt.Errorf("opcore: duplicate `database` (fail-closed)")
+	}
+	driver, err := singleInlineArg(n, "database")
+	if err != nil {
+		return fmt.Errorf("opcore: `database` needs a driver name, e.g. `database pgx { value env \"DATABASE_URL\" }`: %w", err)
+	}
+	chain, err := guardfile.ParseValueBlock(n, "database")
+	if err != nil {
+		return err
+	}
+	p.cfg.Database = Database{Driver: driver, DSN: chain}
+	return nil
+}
+
+// applyInlineSQL mounts the `sql` block, which reaches a database rather than
+// a URL, so validateGrant refuses every HTTP construct beside it.
+func applyInlineSQL(d *Descriptor, c *kdl.Node) error {
+	spec, err := parseSQL(c)
+	if err != nil {
+		return err
+	}
+	d.SQL = spec
 	return nil
 }
 
@@ -346,6 +414,9 @@ func validateGrant(d Descriptor, verb, resource string) error {
 	if d.RawResponse && d.FailWhen != "" {
 		return fmt.Errorf("opcore: can %s %s: `raw-response` cannot be combined with `fail-when`, which needs a decoded response (fail-closed)", verb, resource)
 	}
+	if err := validateSQLGrant(d, verb, resource); err != nil {
+		return err
+	}
 	if err := validateGraphQLGrant(d, verb, resource); err != nil {
 		return err
 	}
@@ -382,7 +453,7 @@ func applyInlineRawResponse(d *Descriptor, c *kdl.Node) error {
 // checkOnceOnlyChildren refuses a repeated `method` or `raw-response`. Both
 // carry a meaningful zero, so neither is caught by an already-set field.
 func checkOnceOnlyChildren(n *kdl.Node, verb, resource string) error {
-	for _, once := range []string{"method", "raw-response", "graphql"} {
+	for _, once := range []string{"method", "raw-response", "graphql", "sql"} {
 		if countChildren(n, once) > 1 {
 			return fmt.Errorf("opcore: can %s %s: duplicate `%s` (fail-closed)", verb, resource, once)
 		}

@@ -65,6 +65,9 @@ func (d Descriptor) InputSchema() Schema {
 	if d.GraphQL != nil {
 		add(d.GraphQL.Variables, LocationBody)
 	}
+	if d.SQL != nil {
+		add(d.SQL.Params, LocationBody)
+	}
 	add(bodyMappingFields(d.BodyMappings), LocationBody)
 	add(d.FormFlags, LocationForm)
 	return s

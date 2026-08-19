@@ -922,6 +922,10 @@ func ParseBaseURL(n *kdl.Node) (raw string, chain ValueChain, err error)
     }` block (chain). Exactly one is non-zero. Shared with the opcore inline
     source.
 
+func ParseValueBlock(n *kdl.Node, node string) (ValueChain, error)
+    ParseValueBlock reads a `{ value ... }` block off a node that carries one,
+    so a new wrap node can take a credential chain without restating the shape.
+
 func (c ValueChain) IsZero() bool
     IsZero reports whether the chain names no source.
 
@@ -1021,6 +1025,10 @@ func PathParamsInOrder(path string) []string
     the order the leaf takes them positionally. Shared with the CLI projection's
     binder.
 
+func SQLParamNames(spec *SQL) []string
+    SQLParamNames lists a SQL grant's parameters in binding order, for a
+    consumer rendering the operation.
+
 func ValidMethod(m string) bool
     ValidMethod reports whether m is an HTTP method the grammar accepts.
 
@@ -1065,6 +1073,16 @@ type BodyMapping struct {
     BodyMapping projects one required nested string input path onto one
     top-level outgoing JSON key. Unmapped input is never forwarded.
 
+type Database struct {
+	Driver string
+	DSN    guardfile.ValueChain
+}
+    Database is the wrap-level `database <driver> { value ... }` declaration: a
+    registered database/sql driver name and the chain its DSN resolves through.
+
+func (d Database) IsZero() bool
+    IsZero reports whether no database was declared.
+
 type Descriptor struct {
 	VerbName       string         // dotted audit name, e.g. ward.ops.forgejo.repo.create
 	Group          string         // CLI group noun, e.g. repo
@@ -1084,6 +1102,7 @@ type Descriptor struct {
 	FailWhen       string         // optional JMESPath response postcondition; truthy rejects a successful call
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
 	GraphQL        *GraphQL       // non-nil for a `graphql` grant; owns the whole body
+	SQL            *SQL           // non-nil for a `sql` grant; reaches a database, not a URL
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-request.md.
 	RawResponse bool
@@ -1236,6 +1255,10 @@ type Runtime struct {
 	// available source in its chain once, caching it. See specverb-policy.md.
 	BaseURLValue guardfile.ValueChain
 
+	// Database backs `sql` grants. The pool opens once on first use, so a
+	// consumer that serves no SQL grant never opens a connection.
+	Database Database
+
 	// Has unexported fields.
 }
     Runtime carries the per-tree request dependencies shared by every leaf,
@@ -1278,9 +1301,20 @@ type RuntimeConfig struct {
 	Restrict     []guardfile.Restriction
 	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
+	Database     Database
 }
     RuntimeConfig is the input to NewRuntime: BaseURL is raw (scheme + trim
     applied), a nil Client defaults to the redirect-guarding client.
+
+type SQL struct {
+	Statement   string  // sent verbatim; parameters bind, nothing interpolates
+	Params      []Field // ordered, binding to $1..$N or ?..? in that order
+	MaxRows     int     // result bound for a reading statement
+	Reads       bool    // true when the statement returns rows rather than a count
+	Placeholder byte    // '$' or '?', the style the statement uses
+}
+    SQL is one grant's declared statement: authored text that never reaches the
+    input schema, plus the parameters a caller binds into its placeholders.
 
 type Schema struct {
 	Properties        map[string]Property // keyed by field name
