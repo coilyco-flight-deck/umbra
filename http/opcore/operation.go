@@ -121,11 +121,17 @@ func responseVars(d Descriptor, a Args) map[string]any {
 		out[name] = value
 	}
 	body := a.Body
-	if len(d.FixedBody) > 0 {
+	// A mapped body keeps its caller values, the pins riding beside them below.
+	if len(d.FixedBody) > 0 && len(d.BodyMappings) == 0 {
 		body = d.FixedBody
 	}
 	for name, value := range body {
 		out[name] = value
+	}
+	if len(d.BodyMappings) > 0 {
+		for name, value := range d.FixedBody {
+			out[name] = value
+		}
 	}
 	return out
 }
@@ -636,8 +642,14 @@ func assembleQuery(q neturl.Values) string {
 	return "?" + q.Encode()
 }
 
-// assembleBody builds the body JSON: a state-toggle's FixedBody wins, else the
-// supplied object with required-field enforcement; an empty body marshals to nil.
+// AssembleBody builds one descriptor's outgoing JSON body. Exported so a caller
+// assembling a request by hand cannot order the body modes differently.
+func AssembleBody(d Descriptor, body map[string]any) ([]byte, error) {
+	return Operation{Desc: d}.assembleBody(body)
+}
+
+// assembleBody builds the body JSON: a mapped body projects its sources and
+// carries any pins, else pins alone, else the supplied object; empty is nil.
 func (o Operation) assembleBody(body map[string]any) ([]byte, error) {
 	if err := validateBodyMappingMode(o.Desc); err != nil {
 		return nil, exitcode.New(exitcode.Internal, "internal", err,
@@ -646,11 +658,12 @@ func (o Operation) assembleBody(body map[string]any) ([]byte, error) {
 	if o.Desc.GraphQL != nil {
 		return assembleGraphQLBody(body, o.Desc.GraphQL)
 	}
+	// Mappings first: a mapped body carries the pins rather than losing to them.
+	if len(o.Desc.BodyMappings) > 0 {
+		return projectMappedBody(body, o.Desc.BodyMappings, o.Desc.FixedBody)
+	}
 	if len(o.Desc.FixedBody) > 0 {
 		return json.Marshal(o.Desc.FixedBody)
-	}
-	if len(o.Desc.BodyMappings) > 0 {
-		return projectMappedBody(body, o.Desc.BodyMappings)
 	}
 	if err := validateBodyFields(body, o.Desc.BodyFlags, ""); err != nil {
 		return nil, err

@@ -1,0 +1,240 @@
+package opcore_test
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"strings"
+	"testing"
+
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
+)
+
+// bodyEcho captures the one outgoing body a grant sends.
+func bodyEcho(t *testing.T, desc opcore.Descriptor) (*opcore.Operation, *map[string]any) {
+	t.Helper()
+	got := map[string]any{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &got)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	rt := opcore.NewRuntime(opcore.RuntimeConfig{
+		BaseURL:   srv.URL,
+		Auth:      tokenAuth("s3cret"),
+		Providers: valuesource.Merge(nil),
+		Client:    srv.Client(),
+	})
+	return &opcore.Operation{RT: rt, Desc: desc}, &got
+}
+
+// The Exa shape from #311: a required upstream parameter whose name collides
+// with a reserved engine flag, so it has to be mapped, beside an operator
+// constant the model must not be able to name or vary.
+func TestExecuteMappedBodyCarriesPinnedConstants(t *testing.T) {
+	op, got := bodyEcho(t, opcore.Descriptor{
+		Method:       http.MethodPost,
+		Path:         "/search",
+		Leaf:         "search",
+		BodyMappings: []opcore.BodyMapping{{SourcePath: []string{"search_text"}, Target: "query"}},
+		FixedBody: map[string]any{
+			"contents": map[string]any{"text": true},
+			"numimic":  10,
+		},
+	})
+	if _, err := op.Execute(context.Background(), opcore.Args{Body: map[string]any{
+		// A caller naming the pinned keys must not reach them, which is the
+		// property the whole construct exists for.
+		"search_text": "recent umbra releases",
+		"contents":    map[string]any{"text": false},
+		"numimic":     9999,
+	}}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	want := map[string]any{
+		"query":    "recent umbra releases",
+		"contents": map[string]any{"text": true},
+		"numimic":  float64(10),
+	}
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("outgoing body = %#v, want %#v", *got, want)
+	}
+}
+
+// A pin is an object where a mapped value can only be a string, which is the
+// half of #311 that `map` alone could not express at all.
+func TestExecutePinnedBodyKeepsNonStringShapes(t *testing.T) {
+	op, got := bodyEcho(t, opcore.Descriptor{
+		Method:       http.MethodPost,
+		Path:         "/search",
+		Leaf:         "search",
+		BodyMappings: []opcore.BodyMapping{{SourcePath: []string{"search_text"}, Target: "query"}},
+		FixedBody: map[string]any{
+			"livecrawl": "always",
+			"enabled":   true,
+			"depth":     3,
+		},
+	})
+	if _, err := op.Execute(context.Background(), opcore.Args{
+		Body: map[string]any{"search_text": "q"},
+	}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	for name, want := range map[string]any{
+		"livecrawl": "always",
+		"enabled":   true,
+		"depth":     float64(3),
+	} {
+		if (*got)[name] != want {
+			t.Errorf("%s = %#v, want %#v", name, (*got)[name], want)
+		}
+	}
+}
+
+// The pins must not become model-facing inputs, or the construct has bought
+// nothing over declaring the parameter as a caller field.
+func TestPinnedBodyKeysStayOutOfTheInputSchema(t *testing.T) {
+	desc := opcore.Descriptor{
+		Method:       http.MethodPost,
+		Path:         "/search",
+		Leaf:         "search",
+		BodyMappings: []opcore.BodyMapping{{SourcePath: []string{"search_text"}, Target: "query"}},
+		FixedBody:    map[string]any{"contents": map[string]any{"text": true}},
+	}
+	schema := desc.InputSchema()
+	if _, named := schema.Properties["contents"]; named {
+		t.Errorf("the pinned key reached the input schema, so the model can name it")
+	}
+	if _, named := schema.Properties["search_text"]; !named {
+		t.Errorf("the mapped source is absent from the input schema: %#v", schema.Properties)
+	}
+}
+
+// One key cannot be both pinned and mapped: a silent winner is the outcome
+// neither an operator nor a reader could predict.
+func TestPinnedKeyCollidingWithAMapTargetFailsClosedWithoutFiring(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		calls++
+	}))
+	defer srv.Close()
+	rt := opcore.NewRuntime(opcore.RuntimeConfig{
+		BaseURL:   srv.URL,
+		Auth:      tokenAuth("s3cret"),
+		Providers: valuesource.Merge(nil),
+		Client:    srv.Client(),
+	})
+	op := opcore.Operation{RT: rt, Desc: opcore.Descriptor{
+		Method:       http.MethodPost,
+		Path:         "/search",
+		Leaf:         "search",
+		BodyMappings: []opcore.BodyMapping{{SourcePath: []string{"search_text"}, Target: "query"}},
+		FixedBody:    map[string]any{"query": "pinned"},
+	}}
+	_, err := op.Execute(context.Background(), opcore.Args{
+		Body: map[string]any{"search_text": "q"},
+	})
+	if err == nil {
+		t.Fatal("a pinned key that a mapping also targets should fail closed")
+	}
+	if calls != 0 {
+		t.Errorf("the request fired %d times before failing closed", calls)
+	}
+}
+
+// A grant with pins and no mappings is the state toggle, unchanged by #311.
+func TestPinnedBodyWithoutMappingsStillSendsPinsAlone(t *testing.T) {
+	op, got := bodyEcho(t, opcore.Descriptor{
+		Method:    http.MethodPost,
+		Path:      "/toggle",
+		Leaf:      "close",
+		FixedBody: map[string]any{"state": "closed"},
+	})
+	if _, err := op.Execute(context.Background(), opcore.Args{
+		Body: map[string]any{"state": "open"},
+	}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if want := (map[string]any{"state": "closed"}); !reflect.DeepEqual(*got, want) {
+		t.Fatalf("outgoing body = %#v, want %#v", *got, want)
+	}
+}
+
+// The whole #311 shape end to end, in the guardfile spelling a consumer writes:
+// a reserved-word-colliding required parameter renamed through `map`, beside an
+// object constant `set` pins because a KDL property cannot hold one.
+func TestInlineMappedBodyWithPinnedObjectReachesTheWire(t *testing.T) {
+	src := `wrap ward mcp exa {
+        base-url "https://api.exa.ai"
+        auth header-token { header "x-api-key"; value env "EXA_API_KEY" }
+        can search result {
+            path "/search"
+            body { map "search_text" to="query" }
+            set numResults=5 {
+                contents {
+                    text #true
+                    highlights { numSentences 2 }
+                }
+                categories "news" "papers"
+            }
+        }
+    }`
+	descs, _, err := opcore.ParseInline([]byte(src))
+	if err != nil {
+		t.Fatalf("ParseInline: %v", err)
+	}
+	op, got := bodyEcho(t, descs[0])
+	if _, err := op.Execute(context.Background(), opcore.Args{Body: map[string]any{
+		"search_text": "umbra guardfiles",
+		"contents":    "model tries to override",
+		"numResults":  999,
+	}}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	want := map[string]any{
+		"query":      "umbra guardfiles",
+		"numResults": float64(5),
+		"contents": map[string]any{
+			"text":       true,
+			"highlights": map[string]any{"numSentences": float64(2)},
+		},
+		"categories": []any{"news", "papers"},
+	}
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("outgoing body = %#v,\n want %#v", *got, want)
+	}
+}
+
+// A pin block fails closed on the shapes that have no single reading.
+func TestInlinePinnedObjectFailsClosed(t *testing.T) {
+	cases := map[string]string{
+		"value and block":   `set { contents "x" { text #true } }`,
+		"key with no value": `set { contents }`,
+		"nested key=value":  `set { contents text=#true }`,
+		"empty set":         `set`,
+		"duplicate key":     `set numResults=1 { numResults 2 }`,
+	}
+	for name, set := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := `wrap x {
+                auth bearer { value env "T" }
+                can search message { path "/search"; ` + set + ` }
+            }`
+			_, _, err := opcore.ParseInline([]byte(src))
+			if err == nil {
+				t.Fatal("an ambiguous or empty pin should fail closed")
+			}
+			// A KDL syntax error would pass this test while proving nothing
+			// about the rule, which is how the case this replaced went vacuous.
+			if strings.Contains(err.Error(), "parse KDL") {
+				t.Fatalf("failed on KDL syntax rather than the pin rule: %v", err)
+			}
+			t.Logf("refused with: %v", err)
+		})
+	}
+}

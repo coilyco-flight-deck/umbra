@@ -241,8 +241,8 @@ func shapeGrant(d *Descriptor, verb, resource string) error {
 	d.PathParams = PathParamsInOrder(d.Path)
 	if len(d.FixedBody) > 0 {
 		d.BodyFlags = nil
-		if len(d.BodyMappings) > 0 {
-			return fmt.Errorf("opcore: can %s %s: `set` cannot be combined with body `map` (fail-closed)", verb, resource)
+		if err := validateFixedBodyMappings(d.FixedBody, d.BodyMappings); err != nil {
+			return fmt.Errorf("opcore: can %s %s: %w", verb, resource, err)
 		}
 	}
 	return nil
@@ -617,12 +617,14 @@ func proxySelectorAllowed(selector string, mode proxyRuleMode) bool {
 	return false
 }
 
-// applyInlineSet reads `set k=v...` into FixedBody, keeping each value's
-// KDL-native type (a boolean stays a boolean) via RawValue.
+// applyInlineSet reads `set k=v...` and `set { key value }` into FixedBody,
+// keeping each value's KDL-native type (a boolean stays a boolean) via RawValue.
 func applyInlineSet(d *Descriptor, c *kdl.Node) error {
 	props := c.Properties()
-	if len(props) == 0 {
-		return fmt.Errorf("`set` needs at least one key=value (e.g. `set state=\"closed\"`)")
+	children := c.Children()
+	nested := children != nil && len(children.Nodes) > 0
+	if len(props) == 0 && !nested {
+		return fmt.Errorf("`set` needs at least one key=value (e.g. `set state=\"closed\"`) or a block of keys")
 	}
 	if d.FixedBody == nil {
 		d.FixedBody = map[string]any{}
@@ -630,7 +632,63 @@ func applyInlineSet(d *Descriptor, c *kdl.Node) error {
 	for k, val := range props {
 		d.FixedBody[k] = val.RawValue()
 	}
+	if !nested {
+		return nil
+	}
+	block, err := pinnedObject(children.Nodes)
+	if err != nil {
+		return err
+	}
+	for k, value := range block {
+		if _, clash := props[k]; clash {
+			return fmt.Errorf("`set` key %q is given twice (fail-closed)", k)
+		}
+		d.FixedBody[k] = value
+	}
 	return nil
+}
+
+// pinnedObject reads a `set` block. A KDL property is scalar-only, so a block
+// is how a pin carries a shape. See docs/opcore-body.md.
+func pinnedObject(nodes []*kdl.Node) (map[string]any, error) {
+	out := make(map[string]any, len(nodes))
+	for _, n := range nodes {
+		if _, dup := out[n.Name()]; dup {
+			return nil, fmt.Errorf("duplicate `set` key %q (fail-closed)", n.Name())
+		}
+		value, err := pinnedValue(n)
+		if err != nil {
+			return nil, err
+		}
+		out[n.Name()] = value
+	}
+	return out, nil
+}
+
+func pinnedValue(n *kdl.Node) (any, error) {
+	args := n.Arguments()
+	children := n.Children()
+	if children != nil && len(children.Nodes) > 0 {
+		if len(args) > 0 || len(n.Properties()) > 0 {
+			return nil, fmt.Errorf("`set` key %q takes a value or a block, not both (fail-closed)", n.Name())
+		}
+		return pinnedObject(children.Nodes)
+	}
+	// One spelling per shape: a nested key states its value positionally.
+	if len(n.Properties()) > 0 {
+		return nil, fmt.Errorf("`set` key %q takes a value or a block, not key=value (fail-closed)", n.Name())
+	}
+	switch len(args) {
+	case 0:
+		return nil, fmt.Errorf("`set` key %q needs a value (fail-closed)", n.Name())
+	case 1:
+		return args[0].RawValue(), nil
+	}
+	values := make([]any, 0, len(args))
+	for _, arg := range args {
+		values = append(values, arg.RawValue())
+	}
+	return values, nil
 }
 
 // inlineFields reads query or flat body strings into Fields. Query upstream=

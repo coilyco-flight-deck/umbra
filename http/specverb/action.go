@@ -548,12 +548,9 @@ func (rt *runtime) buildCallRequestDry(ctx context.Context, leaf opDescriptor, b
 	}
 	url = base + opcore.FillPath(leaf.Path, b.PathVals) + qs
 	contentType = contentTypeJSON
-	switch {
-	case len(leaf.FixedBody) > 0:
-		body, err = json.Marshal(leaf.FixedBody)
-	case len(b.BodyObj) > 0:
-		body, err = json.Marshal(b.BodyObj)
-	}
+	// Through opcore so a preview cannot order the body modes differently from
+	// the request it is previewing.
+	body, err = opcore.AssembleBody(leaf, b.BodyObj)
 	if err != nil {
 		return "", "", nil, "", exitcode.New(exitcode.Internal, "internal", err, "")
 	}

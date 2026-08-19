@@ -289,7 +289,9 @@ func TestParseInlineBodyMappingsFailClosed(t *testing.T) {
 func TestParseInlineBodyMappingsRejectOtherBodyModes(t *testing.T) {
 	cases := map[string]string{
 		"flat fields": `body "title"; body { map "a" to="text" }`,
-		"fixed body":  `set enabled=true; body { map "a" to="text" }`,
+		// A pin and a mapping may coexist, but not on one key. `#true` is the
+		// KDL spelling; a bare `true` made this case pass on a syntax error.
+		"pinned key is also a map target": `set text=#true; body { map "a" to="text" }`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {

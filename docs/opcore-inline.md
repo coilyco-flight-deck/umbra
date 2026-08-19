@@ -15,7 +15,7 @@ wrap ward mcp forgejo {
 ```
 
 - **method** - from `MethodForVerb`, or `method "PUT"` for an unknown verb. See [unrecognised verbs](specverb-unrecognised-verbs.md).
-- **query / body** - flat names become string fields; blocks add typed, bounded, aliased, or exclusive ones. **set** becomes `FixedBody` and owns it.
+- **query / body** - flat names become string fields; blocks add typed, bounded, aliased, or exclusive ones. **set** becomes `FixedBody`. See [body projection and pins](opcore-body.md).
 - **fail-when** - a JMESPath predicate over a success response; truthy fails the call. Inputs are `$name` variables.
 - **raw-response** - bare node declaring the body non-JSON, written through undecoded. See [raw responses](specverb-raw-responses.md).
 - **graphql / sql** - an authored document or statement plus caller-supplied holes, the two request shapes no other node builds.
@@ -24,7 +24,7 @@ Unknown nodes, missing requirements, malformed predicates, and input collisions 
 
 ## Typed inputs
 
-`field` takes `string`, `boolean`, `integer`, `number`; `array` takes one via `items`. Bounds are inclusive `minimum`/`maximum` and `min-items`/`max-items`. `mutually-exclusive` declares an at-most-one group over local names. Objects, duplicates, impossible bounds, and unresolved names fail closed. `Args.Query` stays strings; `Args.QueryValues` carries typed scalars and arrays, and one name through both fails closed. `query "search_query" upstream="query"` aliases a local whose upstream name would collide with `dry-run`, `query`, `output`, or `body-file`. `map "commonAnnotations.summary" to="text"` projects required nested string inputs onto fresh top-level keys, forwards nothing else, resolves to strings only, and cannot combine with body fields or `set`.
+`field` takes `string`, `boolean`, `integer`, `number`; `array` takes one via `items`. Bounds are inclusive `minimum`/`maximum` and `min-items`/`max-items`. `mutually-exclusive` declares an at-most-one group over local names. Objects, duplicates, impossible bounds, and unresolved names fail closed. `Args.Query` stays strings; `Args.QueryValues` carries typed scalars and arrays, and one name through both fails closed. `query "search_query" upstream="query"` aliases a local whose upstream name would collide with `dry-run`, `query`, `output`, or `body-file`. Body projection and pinned values are [their own page](opcore-body.md).
 
 ## GraphQL grants
 
