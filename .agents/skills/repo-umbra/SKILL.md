@@ -1,6 +1,6 @@
 ---
 name: repo-umbra
-description: Security framework for guarded command-line tools with scoped authority, validation, and audit logs. Triggers - umbra, automation, command-line, devops, security
+description: a config driven occlusion framework for your CLIs and APIs. Triggers - umbra, automation, command-line, devops, security
 ---
 
 # repo-umbra
