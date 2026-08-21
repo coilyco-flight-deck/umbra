@@ -2,6 +2,8 @@
 
 a config driven occlusion framework for your CLIs and APIs
 
+![umbra - a config driven occlusion framework](assets/banner/umbra.jpg)
+
 ## About
 
 Designed to sit between AI agents (or any semi-trusted automation) and the host system, featuring:
