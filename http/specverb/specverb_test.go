@@ -682,6 +682,66 @@ func TestUntypedArrayTakesNames(t *testing.T) {
 	}
 }
 
+// runIssueLabels returns the request body issueAddLabel sends, so the union
+// cases below differ only by their arguments.
+func runIssueLabels(t *testing.T, values ...string) string {
+	t.Helper()
+	_, spec := loadFixtures(t)
+	gf, err := guardfile.Parse([]byte(`wrap ward ops forgejo {
+		spec forgejo.swagger.v1.json
+		auth header-token { header Authorization; value ssm "/forgejo/api-token" }
+		can add issue-label { op "issueAddLabel" }
+	}`))
+	if err != nil {
+		t.Fatalf("parse guardfile: %v", err)
+	}
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer srv.Close()
+	cfg := Config{Guardfile: gf, Spec: spec, BaseURL: srv.URL,
+		Providers: map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }}}
+	args := []string{"forgejo", "issue-label", "add", "kai", "demo", "7"}
+	for _, value := range values {
+		args = append(args, "--labels", value)
+	}
+	if _, err := runTree(t, cfg, args...); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	return gotBody
+}
+
+// The other half of the union: 332 went as "332", matched no label name,
+// applied nothing, and returned success. agentic-os#1047
+func TestUntypedArrayTakesNumericIDs(t *testing.T) {
+	if got := runIssueLabels(t, "332", "333"); !strings.Contains(got, `"labels":[332,333]`) {
+		t.Errorf("body = %q, want the IDs as a number array", got)
+	}
+}
+
+// The spec's own sentence: "integers representing label IDs or strings
+// representing label names".
+func TestUntypedArrayMixesNamesAndIDs(t *testing.T) {
+	if got := runIssueLabels(t, "332", "bug"); !strings.Contains(got, `"labels":[332,"bug"]`) {
+		t.Errorf("body = %q, want the ID as a number and the name as a string", got)
+	}
+}
+
+// Nothing that merely looks numeric is coerced, since a label may be named
+// with digits and a sign.
+func TestUntypedArrayKeepsNonNumericTokensQuoted(t *testing.T) {
+	for _, token := range []string{"-1", "1.5", "1a", "007x", " 12"} {
+		got := runIssueLabels(t, token)
+		if !strings.Contains(got, `"labels":["`+token+`"]`) {
+			t.Errorf("token %q: body = %q, want it left as a string", token, got)
+		}
+	}
+}
+
 // TestMultipartUpload proves a formData op streams the file flag as a real
 // multipart part and keeps the scalar form field beside it.
 func TestMultipartUpload(t *testing.T) {
