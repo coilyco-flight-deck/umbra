@@ -377,6 +377,36 @@ func bodyObject(c *cli.Command, flags []fieldFlag) (map[string]any, error) {
 	return obj, nil
 }
 
+// itemsAny marks an array whose swagger `items` schema is empty: the spec says
+// the list carries more than one type. Forgejo labels. agentic-os#1047
+const itemsAny = "any"
+
+// anyValue lowers one token: all digits becomes a JSON number, anything else
+// stays a string, which is the only encoding a both-types spec allows.
+func anyValue(token string) any {
+	if token == "" {
+		return token
+	}
+	for _, r := range token {
+		if r < '0' || r > '9' {
+			return token
+		}
+	}
+	parsed, err := strconv.ParseInt(token, 10, 64)
+	if err != nil {
+		return token
+	}
+	return parsed
+}
+
+func anyValues(tokens []string) []any {
+	out := make([]any, 0, len(tokens))
+	for _, token := range tokens {
+		out = append(out, anyValue(token))
+	}
+	return out
+}
+
 // flagValue reads one set flag as the JSON value its swagger type implies.
 func flagValue(c *cli.Command, f fieldFlag) any {
 	switch f.Type {
@@ -392,6 +422,8 @@ func flagValue(c *cli.Command, f fieldFlag) any {
 			return c.IntSlice(f.Name)
 		case "number":
 			return c.FloatSlice(f.Name)
+		case itemsAny:
+			return anyValues(c.StringSlice(f.Name))
 		default:
 			return c.StringSlice(f.Name)
 		}
@@ -542,6 +574,8 @@ func anySlice(c *cli.Command, f fieldFlag) []any {
 		for _, v := range c.FloatSlice(f.Name) {
 			out = append(out, v)
 		}
+	case itemsAny:
+		out = append(out, anyValues(c.StringSlice(f.Name))...)
 	default:
 		for _, v := range c.StringSlice(f.Name) {
 			out = append(out, v)

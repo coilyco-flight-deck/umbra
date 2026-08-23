@@ -444,9 +444,10 @@ func fieldFlagFor(name string, prop *openapi3.Schema, required bool) (fieldFlag,
 			f.Type = "array"
 			f.Items = it
 		case it == "":
-			// untyped union items (forgejo's "label ids or names") lower to strings
+			// An untyped item is a genuine union, so neither string nor integer
+			// is right. See itemsAny in request.go for how it is encoded.
 			f.Type = "array"
-			f.Items = "string"
+			f.Items = itemsAny
 		default:
 			return fieldFlag{}, false
 		}
