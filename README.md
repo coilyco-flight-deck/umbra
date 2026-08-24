@@ -4,73 +4,76 @@ a config driven occlusion framework for your CLIs and APIs
 
 ![umbra - a config driven occlusion framework](assets/banner/umbra.jpg)
 
-## About
+Occlusion is the idea. umbra sits between semi-trusted automation and the host
+system, and what you did not declare does not get through. The boundary lives in
+a KDL guardfile rather than in code, so it is one artifact a reviewer reads in a
+sitting. umbra ships no denylist and knows nothing about your tools: policy is
+yours, and umbra enforces it across two surfaces, `cli/` around subprocess exec
+and `http/` around outbound requests.
 
-Designed to sit between AI agents (or any semi-trusted automation) and the host system, featuring:
+It validates argv before `execve`, checks a scope token per verb, refuses
+repo-shaped verbs on a dirty tree, gates egress through a per-invocation CONNECT
+proxy, and appends every call to a rotating JSONL audit log. A public exit-code
+taxonomy lets an orchestrator tell a policy refusal from a tool failure.
+Inventory in [docs/FEATURES.md](docs/FEATURES.md), surfaces in
+[docs/architecture.md](docs/architecture.md).
 
-- argv validation rejecting shell metacharacters before they reach `execve`
-- append-only JSONL audit log with lumberjack rotation
-- read / write / delete scope tokens, validated per verb
-- best-effort RepoRoot stamping that records each audit row's git toplevel (empty outside any repo)
-- clean+synced gate refusing repo-shaped verbs on a dirty tree
-- per-repo config loaded from a consumer-chosen YAML filename (e.g. `.<app>/<app>.yaml`)
-- thin pass-through wrapper for embedding existing CLIs as audited subcommands
-- per-invocation CONNECT proxy with consumer-supplied egress allowlist
-- public exit-code taxonomy for orchestrators
+## Two ways in
 
-The repository also ships **`specgen`**, an installable no-code driver that turns
-KDL policy plus committed locks into standalone guarded CLIs without hand-written
-Go. It discovers `.specgen/` and can generate, lock, check skew, build, and run.
-An explicit `--skills-out` path also renders a concise native agent skill plus
-a lazy command index from the merged command tree.
+**Generate the CLI.** `specgen` reads KDL policy plus committed locks out of a
+`.specgen/` directory and builds a standalone guarded CLI with no hand-written
+Go. `--skills-out` also renders a native agent skill and a lazy command index.
+
+**Import the primitives.** Every package stands alone if you are adding a
+boundary to an existing [urfave/cli](https://github.com/urfave/cli) v3 app.
+Nothing consumer-shaped leaks into the API.
+
+```sh
+GOPRIVATE=forgejo.coilysiren.me go get forgejo.coilysiren.me/coilyco-flight-deck/umbra
+```
 
 ## Install specgen
 
-Homebrew users on macOS or Linux can install from the coilyco tap:
-
 ```sh
-brew tap coilyco-flight-deck/tap https://forgejo.coilysiren.me/coilyco-flight-deck/homebrew-tap.git
+brew tap coilyco-flight-deck/tap https://forgejo.coilysiren.me/coilyco-flight-deck/homebrew-tap
 brew install coilyco-flight-deck/tap/specgen
 ```
 
-Scoop users on Windows can install from the coilyco bucket:
-
-```sh
-scoop bucket add coilyco https://forgejo.coilysiren.me/coilyco-flight-deck/scoop-bucket.git
-scoop install coilyco/specgen
+```powershell
+scoop bucket add coilyco-flight-deck https://forgejo.coilysiren.me/coilyco-flight-deck/scoop-bucket
+scoop install coilyco-flight-deck/specgen
 ```
 
-Tagged Forgejo releases also publish raw `specgen` binaries for Linux, macOS,
-and Windows on amd64 and arm64, plus `SHA256SUMS`. Go users can install directly:
+Tagged releases also publish raw binaries and `SHA256SUMS` for Linux, macOS, and
+Windows on amd64 and arm64. `specgen --version` reports both the driver and the
+umbra ref `lock` freezes by default. It shells out to the Go toolchain to resolve
+locks and build, so Go has to be present.
+
+## Try it
+
+[`examples/`](examples/) holds one runnable app per primitive. The shortest:
 
 ```sh
-GOPRIVATE=forgejo.coilysiren.me go install forgejo.coilysiren.me/coilyco-flight-deck/umbra/cmd/specgen@vX.Y.Z
+go run ./examples/policy unsafe 'foo; rm -rf /'
 ```
 
-`specgen --version` reports both the installed driver version and the
-umbra module ref that `lock` will freeze by default. The driver invokes the
-Go toolchain when it resolves locks and builds generated CLIs.
+[`examples/README.md`](examples/README.md) gives a reading order from the
+minimum useful program to the network gate.
 
-## Documentation
+## Status and development
 
-See the [`specgen` guide](docs/specgen.md), [`docs/FEATURES.md`](docs/FEATURES.md) for a feature inventory, and [`examples/`](examples/) for runnable demos one per primitive. `make docs-serve` renders the documentation and CLI reference locally. Other development verbs also run through the [`Makefile`](Makefile).
-
-## Support
-
-If you found a bug or have a feature request, [create a new issue]. Participation in this community is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). Security disclosures go through [SECURITY.md](SECURITY.md).
-
-Sibling repo: [mcp-beaver].
-
-### License
-
-See [`LICENSE`](./LICENSE).
-
-[create a new issue]: https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/new
-[mcp-beaver]: https://forgejo.coilysiren.me/coilyco-flight-deck/mcp-beaver
+v0.x. Minor API breaks land on `main` with a note in the commit body and no
+deprecation cycle, so pin a commit in your `go.mod` until v1.0.0. The API locks
+once a second consumer lands. Forgejo is canonical and the GitHub mirror is
+verified. umbra is deliberately unguarded, being the framework rather than a
+consumer of one, so its dev verbs run through the [`Makefile`](Makefile):
+`make build test lint vet`, and `make docs-serve` for the rendered docs.
 
 ## See also
 
 - [AGENTS.md](AGENTS.md) - agent-facing operating rules.
-- [docs/FEATURES.md](docs/FEATURES.md) - inventory of what ships today.
+- [docs/specgen.md](docs/specgen.md) - the no-code driver in depth.
+- [a new issue](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/new) - bugs and requests, under the [Code of Conduct](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md).
+- [mcp-beaver](https://forgejo.coilysiren.me/coilyco-flight-deck/mcp-beaver) - the sibling that renders a guardfile into a guarded MCP server.
 
-Cross-reference convention from the shared repo-pointer rule in the agentic-os docs.
+MIT. See [LICENSE](LICENSE).

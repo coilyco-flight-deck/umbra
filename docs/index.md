@@ -17,7 +17,7 @@ It provides:
 ## Where to go next
 
 - **[Features](FEATURES.md)** - feature inventory.
-- **[Examples](examples.md)** - one runnable demo per primitive.
+- **[Examples](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/src/branch/main/examples)** - one runnable demo per primitive, with a reading order.
 - **CLI reference** - run `make docs-serve` to render the command tree for every example locally.
 - **[Source on Forgejo](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra)** - issues, releases, code.
 
