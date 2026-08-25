@@ -379,25 +379,11 @@ func bodyObject(c *cli.Command, flags []fieldFlag) (map[string]any, error) {
 
 // itemsAny marks an array whose swagger `items` schema is empty: the spec says
 // the list carries more than one type. Forgejo labels. agentic-os#1047
-const itemsAny = "any"
+const itemsAny = opcore.ItemsAny
 
 // anyValue lowers one token: all digits becomes a JSON number, anything else
 // stays a string, which is the only encoding a both-types spec allows.
-func anyValue(token string) any {
-	if token == "" {
-		return token
-	}
-	for _, r := range token {
-		if r < '0' || r > '9' {
-			return token
-		}
-	}
-	parsed, err := strconv.ParseInt(token, 10, 64)
-	if err != nil {
-		return token
-	}
-	return parsed
-}
+func anyValue(token string) any { return opcore.AnyItem(token) }
 
 func anyValues(tokens []string) []any {
 	out := make([]any, 0, len(tokens))

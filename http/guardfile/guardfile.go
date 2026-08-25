@@ -114,6 +114,9 @@ type Input struct {
 	// Default is a JMESPath pre-flight binding for an absent input (poll actions
 	// only); mutually exclusive with Required. See specverb-action-defaults.md.
 	Default string
+	// Array makes the input repeatable, projected as a JSON array coerced to the
+	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
+	Array bool
 }
 
 // ArgBind is one `args { <name> <value> }` binding for the polled leaf. A
@@ -1240,6 +1243,12 @@ func parseInput(n *kdl.Node) (Input, error) {
 	if in.Required && in.Default != "" {
 		return Input{}, fmt.Errorf("input %q: `required` and `default` are mutually exclusive (a default only resolves when the input is absent)", name)
 	}
+	if in.Array && in.Positional {
+		return Input{}, fmt.Errorf("input %q: `array` needs `flag` (a positional list cannot be told from the arguments after it)", name)
+	}
+	if in.Array && in.Default != "" {
+		return Input{}, fmt.Errorf("input %q: `array` and `default` are mutually exclusive (a default resolves one scalar)", name)
+	}
 	return in, nil
 }
 
@@ -1270,8 +1279,11 @@ func applyInputField(in *Input, c *kdl.Node) (kindSet bool, err error) {
 		}
 		in.Default = v
 		return false, nil
+	case "array":
+		in.Array = true
+		return false, nil
 	default:
-		return false, fmt.Errorf("input %q: unknown field %q (want positional | flag | required | help | default; fail-closed)", in.Name, c.Name())
+		return false, fmt.Errorf("input %q: unknown field %q (want positional | flag | required | help | default | array; fail-closed)", in.Name, c.Name())
 	}
 }
 

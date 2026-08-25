@@ -34,21 +34,40 @@ type Step struct {
 // current bound string.
 type Resolve func(string) (string, error)
 
+// SliceOf reports whether an argument value references a list-valued input, and
+// with what elements. It is consulted before Resolve, so a list never reaches
+// the scalar path and flattens there unnoticed.
+type SliceOf func(string) ([]string, bool)
+
 // Runner fires or plans one already-resolved step.
 type Runner interface {
 	Fire(ctx context.Context, c *cli.Command, leaf Leaf, args []guardfile.ArgBind,
-		resolve Resolve) (decoded any, raw []byte, err error)
+		resolve Resolve, sliceOf SliceOf) (decoded any, raw []byte, err error)
 	Plan(ctx context.Context, leaf Leaf, args []guardfile.ArgBind,
-		resolve Resolve) (map[string]any, error)
+		resolve Resolve, sliceOf SliceOf) (map[string]any, error)
+}
+
+// SliceRefs builds a SliceOf over the list-valued inputs bound for this run. A
+// step-output reference (`$step.field`) is never a list: only a declared
+// `array` input is.
+func SliceRefs(sliceVars map[string][]string) SliceOf {
+	return func(value string) ([]string, bool) {
+		if len(sliceVars) == 0 || !strings.HasPrefix(value, "$") {
+			return nil, false
+		}
+		v, ok := sliceVars[strings.TrimPrefix(value, "$")]
+		return v, ok
+	}
 }
 
 // Run executes steps in order and returns the successfully completed prefix.
 // A failure stops the sequence; it does not infer a recovery action.
-func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]string, r Runner) (bindings map[string]any, lastRaw []byte, err error) {
+func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]string, sliceVars map[string][]string, r Runner) (bindings map[string]any, lastRaw []byte, err error) {
 	bindings = map[string]any{}
+	sliceOf := SliceRefs(sliceVars)
 	for i, step := range steps {
 		resolve := func(v string) (string, error) { return ResolveArg(v, strVars, bindings) }
-		decoded, raw, ferr := r.Fire(ctx, c, step.Leaf, step.Args, resolve)
+		decoded, raw, ferr := r.Fire(ctx, c, step.Leaf, step.Args, resolve, sliceOf)
 		if ferr != nil {
 			return bindings, lastRaw, exitcode.New(exitcode.UpstreamFailed, "action_failed",
 				fmt.Errorf("call %d (%s): %w", i+1, step.Leaf.Label(), ferr),
@@ -64,10 +83,10 @@ func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]s
 
 // PlanCalls renders each step for a dry run. Data-flow references are resolved
 // by the supplied resolver, which normally preserves future bindings as hints.
-func PlanCalls(ctx context.Context, steps []Step, resolve Resolve, r Runner) ([]any, error) {
+func PlanCalls(ctx context.Context, steps []Step, resolve Resolve, sliceOf SliceOf, r Runner) ([]any, error) {
 	plan := make([]any, 0, len(steps))
 	for _, step := range steps {
-		stepPlan, err := r.Plan(ctx, step.Leaf, step.Args, resolve)
+		stepPlan, err := r.Plan(ctx, step.Leaf, step.Args, resolve, sliceOf)
 		if err != nil {
 			return nil, err
 		}

@@ -815,3 +815,40 @@ func TestParseProviderFailsClosed(t *testing.T) {
 		}
 	}
 }
+
+// TestParseInputArray asserts `array` round-trips onto Input.Array, and that the
+// two shapes it cannot mean are refused at parse time rather than at call time.
+func TestParseInputArray(t *testing.T) {
+	action := func(inputBlock string) []byte {
+		return []byte(`wrap ward ops forgejo {
+    spec s
+    auth header-token { header H; value ssm S }
+    can create issue { op "issueCreateIssue" }
+
+    action create issue {
+        input repo { positional; required; help "owner/name" }
+        ` + inputBlock + `
+        call create issue { args { owner-repo $repo } }
+    }
+}`)
+	}
+
+	gf, err := Parse(action(`input labels { flag; required; array; help "label id, repeatable" }`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := Input{Name: "labels", Required: true, Array: true, Help: "label id, repeatable"}
+	if got := gf.Actions[0].Inputs[1]; !reflect.DeepEqual(got, want) {
+		t.Errorf("Input = %+v, want %+v", got, want)
+	}
+
+	for name, block := range map[string]string{
+		"positional list":   `input labels { positional; array }`,
+		"defaulted list":    `input labels { flag; array; default "x" }`,
+		"unknown item type": `input labels { flag; arrays }`,
+	} {
+		if _, err := Parse(action(block)); err == nil {
+			t.Errorf("%s: expected a fail-closed parse error", name)
+		}
+	}
+}

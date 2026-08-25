@@ -14,6 +14,16 @@ A **complex action** is a named composite verb authored inside a `wrap` block, o
 
 An `input` may carry `default <jmespath>`. When the operator omits it, the action fires the poll leaf **once as a pre-flight**, evaluates the expression against that response, and binds the result before the loop starts, so `ci-watch owner/repo` with no `--run` resolves to the latest run in the listing. The pre-flight hits only the poll leaf, introducing no new target and no new grant, and writes its own audit row like any tick.
 
+## List inputs, and refusing before the write
+
+An `input` may carry `array`, which makes its flag repeatable and projects the values as a JSON array rather than one string. Flags only: a positional list cannot be told from the arguments after it.
+
+The element type is not declared here. It is read from the schema of the leaf field the arg binds, so `--labels 199 --labels 333` against a leaf declaring `items: {type: integer}` sends `[199, 333]` as numbers, and `--labels headless` against that same leaf is refused rather than sent. An array whose spec declares an empty `items` schema resolves each token on its own, the union encoding described in [specverb-request.md](specverb-request.md).
+
+This is what lets a shadow refuse **before** a write. `required` on an action input is enforced while the inputs bind, which is before the request is assembled, so an action shadowing `create issue` can demand a label set and end the run with the hazard still absent. `fail-when` cannot do that job: it evaluates over the final response, so it reports a bad write rather than preventing one.
+
+Two forms still carry scalars only, and both fail closed rather than flattening. A `collect` step pages a request built from string bindings, so binding an `array` input there is a build-time error. An exec step takes argv tokens, so a list reaching one is refused at the step.
+
 ## `collect`: auto-pagination
 
 A `collect` action walks a granted list leaf page by page, appending every array response until a page returns fewer than the page size, then emits one accumulated array bound to `as`. It takes `page-param`, `limit-param`, and `default-limit`, and an optional `cache "<ttl>"` serving from the on-disk TTL cache. Granted-only, audited per page plus an envelope row, and dry-runnable like the rest.

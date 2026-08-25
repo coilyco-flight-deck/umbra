@@ -108,6 +108,9 @@ func resolveActions(spec *spec, gf *guardfile.Guardfile, granted map[grantKey]gu
 }
 
 func resolveAction(spec *spec, gf *guardfile.Guardfile, granted map[grantKey]guardfile.Grant, a guardfile.Action) (actionDescriptor, error) {
+	if err := validateArrayInputs(a); err != nil {
+		return actionDescriptor{}, err
+	}
 	// Parser guarantees exactly one of Poll/Calls/Collect is set.
 	if len(a.Calls) > 0 {
 		return resolveCallAction(spec, gf, granted, a)
@@ -116,6 +119,32 @@ func resolveAction(spec *spec, gf *guardfile.Guardfile, granted map[grantKey]gua
 		return resolveCollectAction(spec, gf, granted, a)
 	}
 	return resolvePollAction(spec, gf, granted, a)
+}
+
+// validateArrayInputs fails an action at Build time when a list input reaches a
+// form that cannot carry one. A collect step assembles its own paged request
+// from string bindings, so a list arriving there would flatten silently, and the
+// whole point of a typed input is that it refuses instead. Poll and call steps
+// both bind lists properly and are unaffected.
+func validateArrayInputs(a guardfile.Action) error {
+	if a.Collect == nil {
+		return nil
+	}
+	arrays := map[string]bool{}
+	for _, in := range a.Inputs {
+		if in.Array {
+			arrays[in.Name] = true
+		}
+	}
+	if len(arrays) == 0 {
+		return nil
+	}
+	for _, arg := range a.Collect.Args {
+		if ref := strings.TrimPrefix(arg.Value, "$"); strings.HasPrefix(arg.Value, "$") && arrays[ref] {
+			return fmt.Errorf("specverb: action %q: arg %q references the `array` input $%s from a `collect` step, which pages a request built from scalar bindings only (fail-closed)", a.Name, arg.Name, ref)
+		}
+	}
+	return nil
 }
 
 // resolvePollAction resolves a poll action: it binds the granted leaf, parses the
@@ -280,6 +309,10 @@ func (rt *runtime) buildActionLeaf(ad actionDescriptor) *cli.Command {
 			positional = append(positional, in)
 			continue
 		}
+		if in.Array {
+			flags = append(flags, &cli.StringSliceFlag{Name: in.Name, Usage: in.Help})
+			continue
+		}
 		flags = append(flags, &cli.StringFlag{Name: in.Name, Usage: in.Help})
 	}
 	outcome := &cacheOutcome{}
@@ -378,18 +411,18 @@ func urlBoundInputs(ad actionDescriptor) map[string]bool {
 // poll path (build the request, then print the plan or run the bounded loop).
 func (rt *runtime) runAction(ad actionDescriptor, outcome *cacheOutcome) cli.ActionFunc {
 	return func(ctx context.Context, c *cli.Command) error {
-		strVars, jmesVars, err := bindInputs(ad, c)
+		strVars, jmesVars, sliceVars, err := bindInputs(ad, c)
 		if err != nil {
 			return err
 		}
 		if ad.isCall() {
-			return rt.runCallAction(ctx, c, ad, strVars, jmesVars)
+			return rt.runCallAction(ctx, c, ad, strVars, sliceVars, jmesVars)
 		}
 		if ad.isCollect() {
 			return rt.runCollectAction(ctx, c, ad, strVars, jmesVars, outcome)
 		}
 		dry := c.Bool(flagDryRun)
-		method, url, body, contentType, err := rt.buildLeafRequest(ctx, dry, ad, strVars)
+		method, url, body, contentType, err := rt.buildLeafRequest(ctx, dry, ad, strVars, sliceVars)
 		if err != nil {
 			return err
 		}
@@ -454,39 +487,102 @@ func (rt *runtime) resolveDefaults(ctx context.Context, c *cli.Command, ad actio
 	return nil
 }
 
+// bindScope is the three parallel scopes one action run binds its inputs into:
+// raw strings for the request, coerced values for conditions, and lists for the
+// arguments a scalar cannot carry.
+type bindScope struct {
+	str    map[string]string
+	jmes   map[string]any
+	slices map[string][]string
+}
+
 // bindInputs reads inputs into strVars (raw, for the request) and jmesVars
-// (coerced, for conditions). Unset optional flags bind in neither scope.
-func bindInputs(ad actionDescriptor, c *cli.Command) (strVars map[string]string, jmesVars map[string]any, err error) {
-	strVars = map[string]string{}
-	jmesVars = map[string]any{}
+// (coerced, for conditions). Unset optional flags bind in neither scope, and a
+// missing required one ends the run before any request is built.
+func bindInputs(ad actionDescriptor, c *cli.Command) (strVars map[string]string, jmesVars map[string]any, sliceVars map[string][]string, err error) {
+	sc := bindScope{str: map[string]string{}, jmes: map[string]any{}, slices: map[string][]string{}}
 	positional := c.Args().Slice()
 	pi := 0
 	for _, in := range ad.Inputs {
-		if in.Positional {
-			if pi >= len(positional) {
-				if in.Required {
-					return nil, nil, exitcode.New(exitcode.UserError, "user_error",
-						fmt.Errorf("missing required argument <%s>", in.Name), "supply the positional arguments this action names")
-				}
-				continue
-			}
-			val := positional[pi]
-			pi++
-			strVars[in.Name] = val
-			jmesVars[in.Name] = coerceScalar(val)
-			continue
+		var berr error
+		switch {
+		case in.Array:
+			berr = sc.bindArray(in, c)
+		case in.Positional:
+			berr = sc.bindPositional(in, positional, &pi)
+		default:
+			berr = sc.bindFlag(in, c)
 		}
-		if c.IsSet(in.Name) {
-			val := c.String(in.Name)
-			strVars[in.Name] = val
-			jmesVars[in.Name] = coerceScalar(val)
+		if berr != nil {
+			return nil, nil, nil, berr
 		}
 	}
 	if pi < len(positional) {
-		return nil, nil, exitcode.New(exitcode.UserError, "user_error",
+		return nil, nil, nil, exitcode.New(exitcode.UserError, "user_error",
 			fmt.Errorf("got %d positional args, this action takes %d", len(positional), pi), "remove the extra arguments")
 	}
-	return strVars, jmesVars, nil
+	strVars, jmesVars, sliceVars = sc.str, sc.jmes, sc.slices
+	return strVars, jmesVars, sliceVars, nil
+}
+
+// bindArray binds one repeated flag into the list scope.
+func (sc bindScope) bindArray(in guardfile.Input, c *cli.Command) error {
+	if !c.IsSet(in.Name) {
+		return missingRequiredFlag(in, "supply at least one value")
+	}
+	vals := c.StringSlice(in.Name)
+	sc.slices[in.Name] = vals
+	sc.jmes[in.Name] = coerceScalars(vals)
+	return nil
+}
+
+// bindPositional consumes the next positional argument, advancing pi.
+func (sc bindScope) bindPositional(in guardfile.Input, positional []string, pi *int) error {
+	if *pi >= len(positional) {
+		if in.Required {
+			return exitcode.New(exitcode.UserError, "user_error",
+				fmt.Errorf("missing required argument <%s>", in.Name), "supply the positional arguments this action names")
+		}
+		return nil
+	}
+	val := positional[*pi]
+	*pi++
+	sc.str[in.Name] = val
+	sc.jmes[in.Name] = coerceScalar(val)
+	return nil
+}
+
+// bindFlag binds one scalar flag.
+func (sc bindScope) bindFlag(in guardfile.Input, c *cli.Command) error {
+	if !c.IsSet(in.Name) {
+		return missingRequiredFlag(in, "supply it on the command line")
+	}
+	val := c.String(in.Name)
+	sc.str[in.Name] = val
+	sc.jmes[in.Name] = coerceScalar(val)
+	return nil
+}
+
+// missingRequiredFlag is the pre-write refusal for an absent required flag, and
+// nil for an absent optional one. A control that returned an error after the
+// write would leave the hazard in place, so this fires before the request exists.
+func missingRequiredFlag(in guardfile.Input, hint string) error {
+	if !in.Required {
+		return nil
+	}
+	return exitcode.New(exitcode.UserError, "user_error",
+		fmt.Errorf("missing required flag --%s", in.Name), hint)
+}
+
+// coerceScalars lowers a list input for the condition scope, element by element,
+// matching the single-value coercion so `contains($labels, ...)` sees numbers as
+// numbers.
+func coerceScalars(vals []string) []any {
+	out := make([]any, 0, len(vals))
+	for _, v := range vals {
+		out = append(out, coerceScalar(v))
+	}
+	return out
 }
 
 // coerceScalar lowers an input string to a number where it parses as one (so
@@ -503,17 +599,25 @@ func coerceScalar(s string) any {
 
 // buildLeafRequest assembles the polled leaf's HTTP request from the arg
 // bindings, using the same path/query machinery a directly-invoked leaf uses.
-func (rt *runtime) buildLeafRequest(ctx context.Context, dry bool, ad actionDescriptor, strVars map[string]string) (method, url string, body []byte, contentType string, err error) {
+func (rt *runtime) buildLeafRequest(ctx context.Context, dry bool, ad actionDescriptor, strVars map[string]string, sliceVars map[string][]string) (method, url string, body []byte, contentType string, err error) {
 	return rt.buildCallRequest(ctx, dry, ad.Leaf, ad.Args, func(v string) (string, error) {
 		return resolveArgValue(v, strVars)
-	})
+	}, stepflow.SliceRefs(sliceVars))
 }
 
 // buildCallRequest assembles one leaf's HTTP request from arg bindings, resolving
 // each arg through resolve. ctx and dry feed base-url resolution (dry stays offline).
-func (rt *runtime) buildCallRequest(ctx context.Context, dry bool, leaf opDescriptor, args []guardfile.ArgBind, resolve func(string) (string, error)) (method, url string, body []byte, contentType string, err error) {
+func (rt *runtime) buildCallRequest(ctx context.Context, dry bool, leaf opDescriptor, args []guardfile.ArgBind, resolve stepflow.Resolve, sliceOf stepflow.SliceOf) (method, url string, body []byte, contentType string, err error) {
 	b := opcore.NewArgBinder(leaf)
 	for _, arg := range args {
+		if sliceOf != nil {
+			if vals, ok := sliceOf(arg.Value); ok {
+				if berr := b.BindSlice(arg.Name, vals); berr != nil {
+					return "", "", nil, "", berr
+				}
+				continue
+			}
+		}
 		val, rerr := resolve(arg.Value)
 		if rerr != nil {
 			return "", "", nil, "", exitcode.New(exitcode.UserError, "user_error",

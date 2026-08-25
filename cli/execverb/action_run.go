@@ -36,8 +36,26 @@ type execStepRunner struct {
 }
 
 // Fire runs an authorized step. A non-zero exit fails the sequence.
-func (r *execStepRunner) Fire(ctx context.Context, c *cli.Command, leaf stepflow.Leaf, args []guardfile.ArgBind, resolve stepflow.Resolve) (any, []byte, error) {
+func (r *execStepRunner) Fire(ctx context.Context, c *cli.Command, leaf stepflow.Leaf, args []guardfile.ArgBind, resolve stepflow.Resolve, sliceOf stepflow.SliceOf) (any, []byte, error) {
+	if err := refuseSliceArgs(args, sliceOf); err != nil {
+		return nil, nil, err
+	}
 	return r.fire(ctx, c, leaf, args, resolve)
+}
+
+// refuseSliceArgs fails closed when a list-valued input reaches an exec step.
+// argv is a flat token list, so a list here could only be joined or spread, and
+// both are a guess about what the pinned command meant.
+func refuseSliceArgs(args []guardfile.ArgBind, sliceOf stepflow.SliceOf) error {
+	if sliceOf == nil {
+		return nil
+	}
+	for _, arg := range args {
+		if _, ok := sliceOf(arg.Value); ok {
+			return fmt.Errorf("execverb: arg %q binds a list-valued input to an exec step, which takes argv tokens only (fail-closed)", arg.Name)
+		}
+	}
+	return nil
 }
 
 // fire resolves the step argv, applies the leaf's guards, and runs the pinned
@@ -109,7 +127,10 @@ func (r *execStepRunner) prepare(ctx context.Context, leaf stepflow.Leaf, args [
 
 // Plan renders one resolved step for a --dry-run: the pinned invocation with
 // placeholders for data-flow refs. Fires nothing.
-func (r *execStepRunner) Plan(_ context.Context, leaf stepflow.Leaf, args []guardfile.ArgBind, resolve stepflow.Resolve) (map[string]any, error) {
+func (r *execStepRunner) Plan(_ context.Context, leaf stepflow.Leaf, args []guardfile.ArgBind, resolve stepflow.Resolve, sliceOf stepflow.SliceOf) (map[string]any, error) {
+	if err := refuseSliceArgs(args, sliceOf); err != nil {
+		return nil, err
+	}
 	l, ok := leaf.(execLeaf)
 	if !ok {
 		return nil, fmt.Errorf("execverb: step leaf is not an exec leaf (engine misuse)")
@@ -270,7 +291,7 @@ func runExecAction(ea execAction, runner *execStepRunner) cli.ActionFunc {
 		if c.Bool(flagDryRun) {
 			return renderExecActionPlan(ctx, c, ea, strVars, runner)
 		}
-		bindings, lastRaw, err := stepflow.Run(ctx, c, ea.Calls, strVars, runner)
+		bindings, lastRaw, err := stepflow.Run(ctx, c, ea.Calls, strVars, nil, runner)
 		if err != nil {
 			return err
 		}
@@ -316,7 +337,7 @@ func bindExecInputs(ea execAction, c *cli.Command) (map[string]string, map[strin
 // renderExecActionPlan prints the planned ordered step sequence without firing it.
 func renderExecActionPlan(ctx context.Context, c *cli.Command, ea execAction, strVars map[string]string, runner *execStepRunner) error {
 	resolve := func(v string) (string, error) { return stepflow.ResolveArgDry(v, strVars), nil }
-	calls, err := stepflow.PlanCalls(ctx, ea.Calls, resolve, runner)
+	calls, err := stepflow.PlanCalls(ctx, ea.Calls, resolve, nil, runner)
 	if err != nil {
 		return err
 	}

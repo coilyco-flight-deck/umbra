@@ -866,6 +866,9 @@ type Input struct {
 	// Default is a JMESPath pre-flight binding for an absent input (poll actions
 	// only); mutually exclusive with Required. See specverb-action-defaults.md.
 	Default string
+	// Array makes the input repeatable, projected as a JSON array coerced to the
+	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
+	Array bool
 }
     Input is one parameter an Action declares (a positional arg or a flag).
     Its name doubles as the JMESPath `$name` variable in `until`/`fail-when`.
@@ -970,6 +973,10 @@ const DefaultUserAgent = "umbra/1.0 (+https://github.com/coilyco-flight-deck/umb
     DefaultUserAgent names this client when nothing else does. Go's default is
     refused outright by some APIs; see docs/specverb-request.md (umbra#303).
 
+const ItemsAny = "any"
+    ItemsAny marks an array whose swagger `items` schema is empty: the spec says
+    the list carries more than one type. Forgejo labels. agentic-os#1047
+
 const OwnerRepoArg = "owner-repo"
     OwnerRepoArg is the documented `args` sugar: a single `owner/name` value
     split across the leaf's `owner` and `repo` path params.
@@ -986,6 +993,10 @@ var ReservedFlagNames = map[string]bool{
 
 FUNCTIONS
 
+func AnyItem(token string) any
+    AnyItem lowers one token of an empty-`items` array: all digits becomes a
+    JSON number, anything else stays a string.
+
 func AssembleBody(d Descriptor, body map[string]any) ([]byte, error)
     AssembleBody builds one descriptor's outgoing JSON body. Exported so a
     caller assembling a request by hand cannot order the body modes differently.
@@ -997,6 +1008,11 @@ func ChainSources(chain guardfile.ValueChain) []valuesource.Source
 func CheckFlagCollisions(desc Descriptor) error
     CheckFlagCollisions rejects reserved or duplicate local inputs and duplicate
     outgoing query names. Both descriptor sources share this fail-closed check.
+
+func CoerceItems(items string, tokens []string) ([]any, error)
+    CoerceItems lowers CLI tokens to the JSON element type an array field
+    declares. An empty `items` schema (ItemsAny) resolves each token
+    independently, because that is the only encoding a both-types spec allows.
 
 func DefaultScheme(baseURL string) string
     DefaultScheme prepends https:// to a base-url that carries no scheme, so a
@@ -1055,6 +1071,15 @@ func NewArgBinder(leaf Descriptor) *ArgBinder
 func (b *ArgBinder) Bind(name, val string) error
     Bind routes one resolved arg value; the caller has already proved every arg
     targets something, so an unmatched name here is a no-op, not an error.
+
+func (b *ArgBinder) BindSlice(name string, vals []string) error
+    BindSlice routes one resolved arg whose value is a list. A query target
+    repeats the parameter; a body or form target lands as a JSON array coerced
+    to the element type the leaf's own schema declares, so an action shadow
+    encodes exactly what the leaf it shadows would.
+
+func (b *ArgBinder) FieldFor(name string) (Field, bool)
+    FieldFor returns the leaf's declared query/body/form field of that name.
 
 func (b *ArgBinder) RequireAllPaths() error
     RequireAllPaths fails closed if any path param went unbound, so a poll tick
@@ -2974,7 +2999,7 @@ func CondScope(jmesVars, bindings map[string]any) map[string]any
     CondScope merges coerced inputs with completed step bindings. A binding wins
     over an equally named input.
 
-func PlanCalls(ctx context.Context, steps []Step, resolve Resolve, r Runner) ([]any, error)
+func PlanCalls(ctx context.Context, steps []Step, resolve Resolve, sliceOf SliceOf, r Runner) ([]any, error)
     PlanCalls renders each step for a dry run. Data-flow references are resolved
     by the supplied resolver, which normally preserves future bindings as hints.
 
@@ -2986,7 +3011,7 @@ func ResolveArgDry(value string, inputs map[string]string) string
     ResolveArgDry resolves an argument for a dry-run plan. Unavailable step
     output is left as a `${ref}` placeholder.
 
-func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]string, r Runner) (bindings map[string]any, lastRaw []byte, err error)
+func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]string, sliceVars map[string][]string, r Runner) (bindings map[string]any, lastRaw []byte, err error)
     Run executes steps in order and returns the successfully completed prefix.
     A failure stops the sequence; it does not infer a recovery action.
 
@@ -3008,11 +3033,21 @@ type Resolve func(string) (string, error)
 
 type Runner interface {
 	Fire(ctx context.Context, c *cli.Command, leaf Leaf, args []guardfile.ArgBind,
-		resolve Resolve) (decoded any, raw []byte, err error)
+		resolve Resolve, sliceOf SliceOf) (decoded any, raw []byte, err error)
 	Plan(ctx context.Context, leaf Leaf, args []guardfile.ArgBind,
-		resolve Resolve) (map[string]any, error)
+		resolve Resolve, sliceOf SliceOf) (map[string]any, error)
 }
     Runner fires or plans one already-resolved step.
+
+type SliceOf func(string) ([]string, bool)
+    SliceOf reports whether an argument value references a list-valued input,
+    and with what elements. It is consulted before Resolve, so a list never
+    reaches the scalar path and flattens there unnoticed.
+
+func SliceRefs(sliceVars map[string][]string) SliceOf
+    SliceRefs builds a SliceOf over the list-valued inputs bound for this run.
+    A step-output reference (`$step.field`) is never a list: only a declared
+    `array` input is.
 
 type Step struct {
 	Leaf Leaf

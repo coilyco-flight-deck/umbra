@@ -2,6 +2,7 @@ package specverb
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -343,5 +344,139 @@ func TestActionWritesPerCallAndEnvelopeAudit(t *testing.T) {
 	}
 	if !strings.Contains(rows, "ward.ops.forgejo.tasks.list") {
 		t.Errorf("missing the per-call leaf audit row:\n%s", rows)
+	}
+}
+
+// labelArrayGuardfile is #317's blocked shape: a mount shadow over `create issue`
+// whose required `--labels` carries a list through to the create call, so the
+// refusal happens before the write instead of being reported after it.
+func labelArrayGuardfile(t *testing.T) *guardfile.Guardfile {
+	t.Helper()
+	gf, err := guardfile.Parse([]byte(`wrap ward ops forgejo {
+		spec forgejo.swagger.v1.json
+		base-url "https://forgejo.coilysiren.me/api/v1"
+		auth header-token { header Authorization; prefix "token "; value ssm "/forgejo/api-token" }
+		can create issue { op "issueCreateIssue" }
+		action create issue {
+			describe "File an issue, refusing one that carries no labels."
+			input repo   { positional; required; help "owner/name" }
+			input title  { flag; required; help "issue title" }
+			input labels { flag; required; array; help "label id, repeatable" }
+			call create issue {
+				args { owner-repo $repo; title $title; labels $labels }
+			}
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("parse label-array guardfile: %v", err)
+	}
+	return gf
+}
+
+// TestActionArrayInputReachesBodyAsJSONArray proves a repeated action flag lands
+// as a JSON array typed by the leaf's own schema, not as a flattened string.
+func TestActionArrayInputReachesBodyAsJSONArray(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"number":1}`))
+	}))
+	defer srv.Close()
+
+	cfg := Config{
+		Guardfile: labelArrayGuardfile(t),
+		Spec:      actionSpec(t),
+		BaseURL:   srv.URL,
+		Providers: map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }},
+	}
+	if _, err := runTree(t, cfg, "forgejo", "issue", "create", "kai/demo",
+		"--title", "t", "--labels", "199", "--labels", "333", "--output", "json"); err != nil {
+		t.Fatalf("array input: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal([]byte(gotBody), &body); err != nil {
+		t.Fatalf("body is not JSON: %q", gotBody)
+	}
+	labels, ok := body["labels"].([]any)
+	if !ok {
+		t.Fatalf("labels did not reach the body as an array: %q", gotBody)
+	}
+	if len(labels) != 2 || labels[0] != float64(199) || labels[1] != float64(333) {
+		t.Errorf("want [199 333] as JSON numbers, got %#v (body %q)", labels, gotBody)
+	}
+}
+
+// TestActionArrayInputRefusesWrongElementType proves the array refuses rather
+// than degrading: the leaf declares integer items, so a name cannot pass.
+func TestActionArrayInputRefusesWrongElementType(t *testing.T) {
+	cfg := Config{
+		Guardfile:  labelArrayGuardfile(t),
+		Spec:       actionSpec(t),
+		HTTPClient: &http.Client{Transport: failingTransport{t}}, // any wire call fails the test
+		Providers:  map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }},
+	}
+	_, err := runTree(t, cfg, "forgejo", "issue", "create", "kai/demo", "--title", "t", "--labels", "headless")
+	if err == nil {
+		t.Fatal("a non-integer element must be refused before the write, not sent")
+	}
+	if !strings.Contains(err.Error(), "is not an integer") {
+		t.Errorf("want an element-type refusal, got: %v", err)
+	}
+}
+
+// TestActionRequiredFlagRefusesBeforeTheWrite is the control this issue exists
+// for: a missing required flag ends the run before any request is built, so the
+// hazard is removed rather than reported afterwards.
+func TestActionRequiredFlagRefusesBeforeTheWrite(t *testing.T) {
+	cfg := Config{
+		Guardfile:  labelArrayGuardfile(t),
+		Spec:       actionSpec(t),
+		HTTPClient: &http.Client{Transport: failingTransport{t}},
+		Providers:  map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }},
+	}
+	_, err := runTree(t, cfg, "forgejo", "issue", "create", "kai/demo", "--title", "t")
+	if err == nil {
+		t.Fatal("a missing required flag must refuse before the write")
+	}
+	if !strings.Contains(err.Error(), "missing required flag --labels") {
+		t.Errorf("want a pre-write refusal naming the flag, got: %v", err)
+	}
+}
+
+// TestActionArrayInputRejectedOnCollect pins the one form that still cannot
+// carry a list, so it fails at Build rather than flattening at call time.
+func TestActionArrayInputRejectedOnCollect(t *testing.T) {
+	gf, err := guardfile.Parse([]byte(`wrap ward ops forgejo {
+		spec forgejo.swagger.v1.json
+		base-url "https://forgejo.coilysiren.me/api/v1"
+		auth header-token { header Authorization; prefix "token "; value ssm "/forgejo/api-token" }
+		can list issues { op "issueListIssues" }
+		action sweep {
+			input repo   { positional; required; help "owner/name" }
+			input labels { flag; array; help "labels" }
+			collect list issues {
+				args { owner-repo $repo; labels $labels }
+				page-param page
+				limit-param limit
+				default-limit "50"
+				as issues
+			}
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("parse collect guardfile: %v", err)
+	}
+	_, berr := Build(Config{
+		Guardfile: gf,
+		Spec:      actionSpec(t),
+		Providers: map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }},
+	})
+	if berr == nil {
+		t.Fatal("an array input bound from a collect step must fail at Build")
+	}
+	if !strings.Contains(berr.Error(), "collect") {
+		t.Errorf("want a message naming the collect limit, got: %v", berr)
 	}
 }

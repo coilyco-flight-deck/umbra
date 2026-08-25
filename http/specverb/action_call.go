@@ -134,11 +134,11 @@ func validateCallArgRef(action, where string, arg guardfile.ArgBind, inputNames,
 }
 
 // runCallAction runs the ordered call sequence through the generic stepflow engine.
-func (rt *runtime) runCallAction(ctx context.Context, c *cli.Command, ad actionDescriptor, strVars map[string]string, jmesVars map[string]any) error {
+func (rt *runtime) runCallAction(ctx context.Context, c *cli.Command, ad actionDescriptor, strVars map[string]string, sliceVars map[string][]string, jmesVars map[string]any) error {
 	if c.Bool(flagDryRun) {
-		return rt.renderCallActionPlan(ctx, c, ad, strVars)
+		return rt.renderCallActionPlan(ctx, c, ad, strVars, sliceVars)
 	}
-	bindings, lastRaw, err := stepflow.Run(ctx, c, ad.Calls, strVars, rt.stepRun)
+	bindings, lastRaw, err := stepflow.Run(ctx, c, ad.Calls, strVars, sliceVars, rt.stepRun)
 	if err != nil {
 		return err
 	}
@@ -184,9 +184,9 @@ func (rt *runtime) fireCallAudited(ctx context.Context, leaf opDescriptor, metho
 }
 
 // renderCallActionPlan prints the planned call sequence without firing it.
-func (rt *runtime) renderCallActionPlan(ctx context.Context, c *cli.Command, ad actionDescriptor, strVars map[string]string) error {
+func (rt *runtime) renderCallActionPlan(ctx context.Context, c *cli.Command, ad actionDescriptor, strVars map[string]string, sliceVars map[string][]string) error {
 	resolve := func(v string) (string, error) { return stepflow.ResolveArgDry(v, strVars), nil }
-	plan, err := stepflow.PlanCalls(ctx, ad.Calls, resolve, rt.stepRun)
+	plan, err := stepflow.PlanCalls(ctx, ad.Calls, resolve, stepflow.SliceRefs(sliceVars), rt.stepRun)
 	if err != nil {
 		return err
 	}

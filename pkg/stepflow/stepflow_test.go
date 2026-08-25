@@ -24,7 +24,7 @@ type fakeRunner struct {
 	fail  map[string]error
 }
 
-func (r *fakeRunner) Fire(_ context.Context, _ *cli.Command, leaf Leaf, args []guardfile.ArgBind, resolve Resolve) (any, []byte, error) {
+func (r *fakeRunner) Fire(_ context.Context, _ *cli.Command, leaf Leaf, args []guardfile.ArgBind, resolve Resolve, _ SliceOf) (any, []byte, error) {
 	values := make([]string, 0, len(args))
 	for _, arg := range args {
 		v, err := resolve(arg.Value)
@@ -40,7 +40,7 @@ func (r *fakeRunner) Fire(_ context.Context, _ *cli.Command, leaf Leaf, args []g
 	return map[string]any{"id": float64(len(r.fired)), "value": leaf.Label()}, []byte(leaf.Label()), nil
 }
 
-func (r *fakeRunner) Plan(_ context.Context, leaf Leaf, args []guardfile.ArgBind, resolve Resolve) (map[string]any, error) {
+func (r *fakeRunner) Plan(_ context.Context, leaf Leaf, args []guardfile.ArgBind, resolve Resolve, _ SliceOf) (map[string]any, error) {
 	values := make([]string, 0, len(args))
 	for _, arg := range args {
 		v, err := resolve(arg.Value)
@@ -58,7 +58,7 @@ func TestRunPreservesOrderAndThreadsBindings(t *testing.T) {
 		{Leaf: fakeLeaf("create"), As: "created"},
 		{Leaf: fakeLeaf("use"), Args: []guardfile.ArgBind{{Name: "id", Value: "$created.id"}}, As: "used"},
 	}
-	bindings, raw, err := Run(context.Background(), nil, steps, map[string]string{}, r)
+	bindings, raw, err := Run(context.Background(), nil, steps, map[string]string{}, nil, r)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestRunPreservesOrderAndThreadsBindings(t *testing.T) {
 func TestRunStopsAtFailureWithoutRunningLaterSteps(t *testing.T) {
 	r := &fakeRunner{fail: map[string]error{"second": errors.New("nope")}}
 	steps := []Step{{Leaf: fakeLeaf("first")}, {Leaf: fakeLeaf("second")}, {Leaf: fakeLeaf("third")}}
-	_, _, err := Run(context.Background(), nil, steps, map[string]string{}, r)
+	_, _, err := Run(context.Background(), nil, steps, map[string]string{}, nil, r)
 	if err == nil {
 		t.Fatal("Run returned nil error")
 	}
@@ -84,7 +84,7 @@ func TestRunStopsAtFailureWithoutRunningLaterSteps(t *testing.T) {
 
 func TestPlanCallsThreadsAsWithoutDeploymentFields(t *testing.T) {
 	r := &fakeRunner{}
-	plan, err := PlanCalls(context.Background(), []Step{{Leaf: fakeLeaf("first"), As: "first"}}, func(v string) (string, error) { return v, nil }, r)
+	plan, err := PlanCalls(context.Background(), []Step{{Leaf: fakeLeaf("first"), As: "first"}}, func(v string) (string, error) { return v, nil }, nil, r)
 	if err != nil {
 		t.Fatalf("PlanCalls: %v", err)
 	}
