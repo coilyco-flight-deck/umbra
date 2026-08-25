@@ -1,6 +1,6 @@
 # umbra
 
-a config driven occlusion framework for your CLIs and APIs
+config driven occlusion framework
 
 ![umbra - a config driven occlusion framework](assets/banner/umbra.jpg)
 
@@ -17,6 +17,11 @@ proxy, and appends every call to a rotating JSONL audit log. A public exit-code
 taxonomy lets an orchestrator tell a policy refusal from a tool failure.
 Inventory in [docs/FEATURES.md](docs/FEATURES.md), surfaces in
 [docs/architecture.md](docs/architecture.md).
+
+**umbra is not a sandbox.** It performs no execution isolation, and that is
+deliberate rather than unfinished. Validating argv, gating egress, and auditing
+every call does nothing to contain a process that is already running. Isolation
+is a container's job, and umbra is the gate in front of it.
 
 ## Two ways in
 
