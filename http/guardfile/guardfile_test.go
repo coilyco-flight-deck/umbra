@@ -852,3 +852,50 @@ func TestParseInputArray(t *testing.T) {
 		}
 	}
 }
+
+// TestParseInputMatches asserts a constraint round-trips with its message, that
+// several stack, and that malformed spellings fail closed at parse.
+func TestParseInputMatches(t *testing.T) {
+	action := func(inputBlock string) []byte {
+		return []byte(`wrap ward ops forgejo {
+    spec s
+    auth header-token { header H; value ssm S }
+    can create issue { op "issueCreateIssue" }
+
+    action create issue {
+        input repo { positional; required; help "owner/name" }
+        ` + inputBlock + `
+        call create issue { args { owner-repo $repo } }
+    }
+}`)
+	}
+
+	gf, err := Parse(action(`input labels {
+        flag
+        required
+        array
+        matches "priority/*" message="no priority label"
+        matches "autonomy/*"
+    }`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	want := Input{Name: "labels", Required: true, Array: true, Matches: []InputMatch{
+		{Glob: "priority/*", Message: "no priority label"},
+		{Glob: "autonomy/*"},
+	}}
+	if got := gf.Actions[0].Inputs[1]; !reflect.DeepEqual(got, want) {
+		t.Errorf("Input = %+v, want %+v", got, want)
+	}
+
+	for name, block := range map[string]string{
+		"no glob":          `input labels { flag; matches }`,
+		"empty glob":       `input labels { flag; matches "" }`,
+		"two globs":        `input labels { flag; matches "a" "b" }`,
+		"unknown property": `input labels { flag; matches "a" msg="x" }`,
+	} {
+		if _, err := Parse(action(block)); err == nil {
+			t.Errorf("%s: expected a fail-closed parse error", name)
+		}
+	}
+}

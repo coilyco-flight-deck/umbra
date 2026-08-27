@@ -117,6 +117,16 @@ type Input struct {
 	// Array makes the input repeatable, projected as a JSON array coerced to the
 	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
 	Array bool
+	// Matches constrains the bound value: on an `array` each entry demands at
+	// least one matching element. See specverb-actions.md.
+	Matches []InputMatch
+}
+
+// InputMatch is one `matches "<glob>" message="<why>"` constraint on an Input.
+// Message is operator-facing and names what is missing; "" takes a generated one.
+type InputMatch struct {
+	Glob    string
+	Message string
 }
 
 // ArgBind is one `args { <name> <value> }` binding for the polled leaf. A
@@ -1282,9 +1292,36 @@ func applyInputField(in *Input, c *kdl.Node) (kindSet bool, err error) {
 	case "array":
 		in.Array = true
 		return false, nil
+	case "matches":
+		m, merr := parseInputMatch(in.Name, c)
+		if merr != nil {
+			return false, merr
+		}
+		in.Matches = append(in.Matches, m)
+		return false, nil
 	default:
-		return false, fmt.Errorf("input %q: unknown field %q (want positional | flag | required | help | default | array; fail-closed)", in.Name, c.Name())
+		return false, fmt.Errorf("input %q: unknown field %q (want positional | flag | required | help | default | array | matches; fail-closed)", in.Name, c.Name())
 	}
+}
+
+// parseInputMatch reads one `matches "<glob>" message="<why>"` constraint.
+// `message` is the only property; any other fails closed.
+func parseInputMatch(name string, c *kdl.Node) (InputMatch, error) {
+	glob, err := singleArg(c)
+	if err != nil {
+		return InputMatch{}, fmt.Errorf("input %q: matches: %w (name a glob: `matches \"priority/*\"`)", name, err)
+	}
+	if glob == "" {
+		return InputMatch{}, fmt.Errorf("input %q: matches: the glob cannot be empty (fail-closed)", name)
+	}
+	m := InputMatch{Glob: glob}
+	for k, v := range c.Properties() {
+		if k != "message" {
+			return InputMatch{}, fmt.Errorf("input %q: matches %q: unknown property %q (want message; fail-closed)", name, glob, k)
+		}
+		m.Message = v.String()
+	}
+	return m, nil
 }
 
 // parseCall reads a `call <verb> <resource> { args {...}; as <name> }` step of a

@@ -24,6 +24,26 @@ This is what lets a shadow refuse **before** a write. `required` on an action in
 
 Two forms carry scalars only, and both fail closed rather than flattening. A `collect` step pages a request built from string bindings, so binding an `array` input there is a build-time error. An exec step takes argv tokens, so a list reaching one is refused.
 
+## `matches`: constraining the value, not just demanding one
+
+`required` gets presence. `matches "<glob>" message="<why>"` gets **composition**, so a shadow can demand a particular shape of value rather than any value at all.
+
+```kdl
+input labels {
+    flag
+    required
+    array
+    matches "priority/*" message="no priority label: pass --labels priority/P2 (P0-P4)"
+    matches "autonomy/*" message="no autonomy label: pass --labels autonomy/headless"
+}
+```
+
+On an `array` input each constraint demands **at least one** matching element, so the set above is refused when it carries no `priority/*` label however many other labels it has, and the error names that constraint rather than the whole set. On a scalar input the bound value itself must match. Constraints stack, and each is checked independently, which is what lets a refusal say *which* axis is missing instead of only that something is.
+
+Globs are `filepath.Match`, matched by the same helper the wrap-level `restrict` uses, so a malformed pattern matches nothing and fails closed rather than erroring out. `message` is the only property, and an unknown one fails closed at parse.
+
+Like `required`, this is enforced while the inputs bind, **before** the request is assembled. That is the whole point: a constraint checked after the response is a report, and the run ends with the hazard absent rather than described.
+
 ## `collect`: auto-pagination
 
 A `collect` action walks a granted list leaf page by page, appending every array response until a page returns fewer than the page size, then emits one array bound to `as`. It takes `page-param`, `limit-param`, `default-limit`, and an optional `cache "<ttl>"` served from the on-disk TTL cache. Granted-only, audited per page plus an envelope row, and dry-runnable.

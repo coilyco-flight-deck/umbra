@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -531,8 +532,31 @@ func (sc bindScope) bindArray(in guardfile.Input, c *cli.Command) error {
 		return missingRequiredFlag(in, "supply at least one value")
 	}
 	vals := c.StringSlice(in.Name)
+	if err := checkMatches(in, vals); err != nil {
+		return err
+	}
 	sc.slices[in.Name] = vals
 	sc.jmes[in.Name] = coerceScalars(vals)
+	return nil
+}
+
+// checkMatches enforces in's `matches` constraints while inputs bind, before any
+// request exists. Constraints are independent so a refusal names one. #322.
+func checkMatches(in guardfile.Input, vals []string) error {
+	for _, m := range in.Matches {
+		if slices.ContainsFunc(vals, func(v string) bool {
+			return opcore.MatchesAnyGlob(v, []string{m.Glob})
+		}) {
+			continue
+		}
+		reason := m.Message
+		if reason == "" {
+			reason = fmt.Sprintf("no value matching %q", m.Glob)
+		}
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("--%s: %s", in.Name, reason),
+			fmt.Sprintf("supply a value matching %q", m.Glob))
+	}
 	return nil
 }
 
@@ -547,6 +571,9 @@ func (sc bindScope) bindPositional(in guardfile.Input, positional []string, pi *
 	}
 	val := positional[*pi]
 	*pi++
+	if err := checkMatches(in, []string{val}); err != nil {
+		return err
+	}
 	sc.str[in.Name] = val
 	sc.jmes[in.Name] = coerceScalar(val)
 	return nil
@@ -558,6 +585,9 @@ func (sc bindScope) bindFlag(in guardfile.Input, c *cli.Command) error {
 		return missingRequiredFlag(in, "supply it on the command line")
 	}
 	val := c.String(in.Name)
+	if err := checkMatches(in, []string{val}); err != nil {
+		return err
+	}
 	sc.str[in.Name] = val
 	sc.jmes[in.Name] = coerceScalar(val)
 	return nil

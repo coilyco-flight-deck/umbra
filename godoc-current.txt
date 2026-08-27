@@ -869,9 +869,20 @@ type Input struct {
 	// Array makes the input repeatable, projected as a JSON array coerced to the
 	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
 	Array bool
+	// Matches constrains the bound value: on an `array` each entry demands at
+	// least one matching element. See specverb-actions.md.
+	Matches []InputMatch
 }
     Input is one parameter an Action declares (a positional arg or a flag).
     Its name doubles as the JMESPath `$name` variable in `until`/`fail-when`.
+
+type InputMatch struct {
+	Glob    string
+	Message string
+}
+    InputMatch is one `matches "<glob>" message="<why>"` constraint on an Input.
+    Message is operator-facing and names what is missing; "" takes a generated
+    one.
 
 type Poll struct {
 	Verb     string
@@ -1025,6 +1036,10 @@ func DestructiveVerb(verb string) bool
 func FillPath(template string, values []string) string
     FillPath substitutes the i-th positional value into the i-th `{...}` slot.
     The caller has already enforced len(values) == number of slots.
+
+func MatchesAnyGlob(val string, globs []string) bool
+    MatchesAnyGlob reports whether val matches at least one filepath.Match glob.
+    A malformed pattern matches nothing (fail closed), never errors out.
 
 func MethodForVerb(verb string) (string, bool)
     MethodForVerb returns the HTTP method a verb maps to by convention;

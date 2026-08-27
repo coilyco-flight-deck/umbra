@@ -480,3 +480,106 @@ func TestActionArrayInputRejectedOnCollect(t *testing.T) {
 		t.Errorf("want a message naming the collect limit, got: %v", berr)
 	}
 }
+
+// labelCompositionGuardfile is agentic-os#1105's shape, checked by name so no
+// per-org id table is needed. The leaf's `items: {}` union is what carries names.
+func labelCompositionGuardfile(t *testing.T) *guardfile.Guardfile {
+	t.Helper()
+	gf, err := guardfile.Parse([]byte(`wrap ward ops forgejo {
+		spec forgejo.swagger.v1.json
+		base-url "https://forgejo.coilysiren.me/api/v1"
+		auth header-token { header Authorization; prefix "token "; value ssm "/forgejo/api-token" }
+		can add issue-label { op "issueAddLabel" }
+		action label {
+			describe "Apply a label set, refusing one missing a priority or an autonomy label."
+			input repo   { positional; required; help "owner/name" }
+			input index  { positional; required; help "issue number" }
+			input labels {
+				flag
+				required
+				array
+				help "label name, repeatable"
+				matches "priority/*" message="no priority label: pass --labels priority/P2 (P0-P4)"
+				matches "autonomy/*" message="no autonomy label: pass --labels autonomy/headless"
+			}
+			call add issue-label {
+				args { owner-repo $repo; index $index; labels $labels }
+			}
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("parse label-composition guardfile: %v", err)
+	}
+	return gf
+}
+
+// compositionConfig builds a Config whose transport fails the test, so anything
+// reaching the wire is a bug rather than a soft assertion.
+func compositionConfig(t *testing.T) Config {
+	t.Helper()
+	return Config{
+		Guardfile:  labelCompositionGuardfile(t),
+		Spec:       actionSpec(t),
+		HTTPClient: &http.Client{Transport: failingTransport{t}},
+		Providers:  map[string]Provider{"ssm": func(context.Context, string) (string, error) { return "x", nil }},
+	}
+}
+
+// TestActionInputMatchesRefusesMissingPriority is agentic-os#1105's control: the
+// refusal lands before the write and names which axis is missing.
+func TestActionInputMatchesRefusesMissingPriority(t *testing.T) {
+	_, err := runTree(t, compositionConfig(t), "forgejo", "action", "label", "kai/demo", "7",
+		"--labels", "autonomy/headless", "--labels", "role/platform")
+	if err == nil {
+		t.Fatal("a set with no priority label must be refused before the write")
+	}
+	if !strings.Contains(err.Error(), "no priority label") {
+		t.Errorf("the refusal must name the missing axis, got: %v", err)
+	}
+}
+
+// TestActionInputMatchesRefusesMissingAutonomy is the other half: naming only
+// the priority axis must not satisfy the autonomy constraint.
+func TestActionInputMatchesRefusesMissingAutonomy(t *testing.T) {
+	_, err := runTree(t, compositionConfig(t), "forgejo", "action", "label", "kai/demo", "7",
+		"--labels", "priority/P2")
+	if err == nil {
+		t.Fatal("a set with no autonomy label must be refused before the write")
+	}
+	if !strings.Contains(err.Error(), "no autonomy label") {
+		t.Errorf("the refusal must name the missing axis, got: %v", err)
+	}
+}
+
+// TestActionInputMatchesAcceptsCompleteSet proves it constrains rather than
+// denies: a complete set reaches the wire as names, extras untouched.
+func TestActionInputMatchesAcceptsCompleteSet(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer srv.Close()
+
+	cfg := compositionConfig(t)
+	cfg.HTTPClient = nil
+	cfg.BaseURL = srv.URL
+	if _, err := runTree(t, cfg, "forgejo", "action", "label", "kai/demo", "7",
+		"--labels", "priority/P2", "--labels", "autonomy/headless", "--labels", "role/platform",
+		"--output", "json"); err != nil {
+		t.Fatalf("a complete label set must pass: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal([]byte(gotBody), &body); err != nil {
+		t.Fatalf("body is not JSON: %q", gotBody)
+	}
+	labels, ok := body["labels"].([]any)
+	if !ok || len(labels) != 3 {
+		t.Fatalf("want three label names on the wire, got %#v (body %q)", body["labels"], gotBody)
+	}
+	if labels[0] != "priority/P2" || labels[2] != "role/platform" {
+		t.Errorf("names must reach the wire unquoted-to-string, got %#v", labels)
+	}
+}
