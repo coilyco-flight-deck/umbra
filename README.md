@@ -14,9 +14,8 @@ and `http/` around outbound requests.
 It validates argv before `execve`, checks a scope token per verb, refuses
 repo-shaped verbs on a dirty tree, gates egress through a per-invocation CONNECT
 proxy, and appends every call to a rotating JSONL audit log. A public exit-code
-taxonomy lets an orchestrator tell a policy refusal from a tool failure.
-Inventory in [docs/FEATURES.md](docs/FEATURES.md), surfaces in
-[docs/architecture.md](docs/architecture.md).
+taxonomy separates a policy refusal from a tool failure. Full documentation in
+[docs/index.md](docs/index.md).
 
 **umbra is not a sandbox.** It performs no execution isolation, and that is
 deliberate rather than unfinished. Validating argv, gating egress, and auditing
@@ -56,14 +55,12 @@ locks and build, so Go has to be present.
 
 ## Try it
 
-[`examples/`](examples/) holds one runnable app per primitive. The shortest:
+[`examples/`](examples/) holds one runnable app per primitive, and
+[docs/getting-started.md](docs/getting-started.md) walks the first run. The shortest:
 
 ```sh
 go run ./examples/policy unsafe 'foo; rm -rf /'
 ```
-
-[`examples/README.md`](examples/README.md) gives a reading order from the
-minimum useful program to the network gate.
 
 ## Status and development
 
@@ -77,7 +74,6 @@ consumer of one, so its dev verbs run through the [`Makefile`](Makefile):
 ## See also
 
 - [AGENTS.md](AGENTS.md) - agent-facing operating rules.
-- [docs/specgen.md](docs/specgen.md) - the no-code driver in depth.
 - [a new issue](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/new) - bugs and requests, under the [Code of Conduct](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md).
 - [mcp-beaver](https://forgejo.coilysiren.me/coilyco-flight-deck/mcp-beaver) - the sibling that renders a guardfile into a guarded MCP server.
 

@@ -24,11 +24,9 @@ body {
 
 Supported types are string, integer, number, boolean, object, and array. An `items` of `any` takes each element as supplied, the union rule an empty swagger `items` schema implies. The declared type reaches the model-facing schema too, so the tool says what the wire will carry rather than always saying string.
 
-**A caller supplying the wrong shape is refused before the request fires**, which is the point. A mapped leaf used to project a string in every configuration, so an upstream wanting an object at a mapped parameter was unreachable and every call was its 400. Measured against Exa's `/search`: absent is 200, `contents={"text": true}` is 200, and `contents="text"` is **HTTP 400** with `expected object, received string`. That 400 was the first and only notice, and it arrived in production against a metered API.
+**A caller supplying the wrong shape is refused before the request fires.** Mapped leaves once projected a string in every configuration, leaving an upstream that wants an object unreachable. The mode no longer restricts the type.
 
-The limit was easy to reach without choosing it. `map` is the only construct that renames an input to a different upstream key, because a body field carrying an upstream alias is refused outright. So a guardfile whose upstream needs a parameter name colliding with a reserved engine flag was forced into mapped-body mode for that leaf, and mapped-body mode then forbade every non-string value on that leaf, including parameters unrelated to the collision that forced it. **Neither rule stated the combination, and an author reading either alone would not predict it.** That is closed: the mode no longer restricts the type.
-
-An unsupported type, an `items` outside an array, and an unknown property all fail at parse time. See coilyco-flight-deck/umbra#312.
+An unsupported type, an `items` outside an array, and an unknown property all fail at parse time. Reasoning: coilyco-flight-deck/umbra#312.
 
 ## The shell-metachar gate is location-aware
 
@@ -38,14 +36,12 @@ An unsupported type, an `items` outside an array, and an unknown property all fa
 
 Auth resolves the secret through the value-provider registry. `--dry-run` prints the resolved request with the secret redacted and fires nothing. Live responses render through the `--query`/`--output` rail, and an empty 2xx prints an `ok:` line. The client refuses redirects for mutating methods, so a renamed target cannot silently swallow a write.
 
-A wrap may declare `header "<name>" "<value>"`, applied to every leaf, which is how an author states the contact address some APIs ask for in an agent. `Authorization` is refused, since `auth` owns it and a second path would be an unreviewed credential surface, and so is `Content-Type`, which the runtime sets from the body and would silently overwrite. A duplicate name, an empty value, and a wrong argument count fail closed.
-
-Absent a declared one, every request carries `opcore.DefaultUserAgent`. Naming your client is the stated etiquette for the volunteer and nonprofit APIs a Guardfile reads.
+A wrap may declare `header "<name>" "<value>"`, applied to every leaf, which is how an author states the contact address some APIs ask for. `Authorization` is refused, since `auth` owns it and a second path would be an unreviewed credential surface, and so is `Content-Type`, which the runtime sets from the body. A duplicate name, an empty value, and a wrong argument count fail closed. Absent a declared one, every request carries `opcore.DefaultUserAgent`.
 
 ## Non-JSON responses
 
 An operation whose success response offers no JSON writes its body to stdout byte for byte. The spec-driven path infers this from the declared media type, and an inline grant says it outright with a bare `raw-response` node. A response listing JSON beside something else is negotiating content rather than declaring bytes, so it is parsed.
 
-Both paths choose **before** firing rather than after reading, the whole of umbra#289: decoding first fails on a plaintext or ZIP body, leaving the raw branch unreachable. Only the decode is skipped, never a gate, and `--query` is refused rather than ignored.
+Both paths choose **before** firing rather than after reading (umbra#289): decoding first fails on a plaintext or ZIP body, leaving the raw branch unreachable. Only the decode is skipped, never a gate, and `--query` is refused rather than ignored.
 
 Fixed non-Swagger leaves live in [fetch overlays](specverb-fetch.md).

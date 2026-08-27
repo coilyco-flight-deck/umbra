@@ -1,24 +1,40 @@
 # umbra
 
-umbra is a security-boundary framework for [urfave/cli](https://github.com/urfave/cli) v3 applications, designed to sit between AI agents (or any semi-trusted automation) and the host system.
+umbra is a security-boundary framework for [urfave/cli](https://github.com/urfave/cli) v3
+applications, sitting between AI agents (or any semi-trusted automation) and the host system.
+What you did not declare does not get through. Policy lives in a KDL guardfile rather than in
+code, enforced across two surfaces: `cli/` around subprocess exec, `http/` around outbound requests.
 
-It provides:
+## Start here
+- [Getting started](getting-started.md) - install it, then watch a refusal.
+- [Features](FEATURES.md) - the inventory of what ships today.
+- [Examples](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/src/branch/main/examples) - one runnable app per primitive.
 
-- argv validation rejecting shell metacharacters before they reach `execve`
-- append-only JSONL audit log with lumberjack rotation
-- read / write / delete scope tokens
-- best-effort RepoRoot stamping that records each audit row's git toplevel (empty outside any repo)
-- clean+synced gate refusing repo-shaped verbs on a dirty tree
-- per-repo config under a consumer-chosen filename
-- thin pass-through wrapper for embedding existing CLIs as audited subcommands
-- per-invocation CONNECT proxy with consumer-supplied egress allowlist
-- public exit-code taxonomy for orchestrators
+## Concepts
+- [Architecture](architecture.md) - the two guarded surfaces and the shared core.
+- [Spec-driven verbs](specverb.md) - the three-layer engine behind the HTTP surface.
+- [Exec-dialect verbs](execverb.md) - the same grammar aimed at wrapped binaries.
 
-## Where to go next
+## Guides
+- [The no-code driver](specgen.md) - author policy and locks, never Go.
+- [Materialization](specgen-materialization.md) - how `run` and `build` cache a generated binary.
+- [Passthrough](passthrough.md) - wrap a tool whole when naming every verb is impractical.
+- [Fetch overlays](specverb-fetch.md) - mount fixed HTTP leaves straight from the guardfile.
 
-- **[Features](FEATURES.md)** - feature inventory.
-- **[Examples](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/src/branch/main/examples)** - one runnable demo per primitive, with a reading order.
-- **CLI reference** - run `make docs-serve` to render the command tree for every example locally.
-- **[Source on Forgejo](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra)** - issues, releases, code.
+## Reference
+- [Policy](specverb-policy.md) - auth, deny, restrict, tiering.
+- [Op resolution](specverb-resolution.md) - verbs, wildcards, unrecognised shapes.
+- [Request semantics](specverb-request.md) - how a mounted leaf assembles and fires.
+- [Complex actions](specverb-actions.md) - composite verbs and their five invariants.
+- [Describe model](specverb-describe.md) - generated visibility for a generated surface.
+- [Inline operations](opcore-inline.md) - descriptors stated directly in KDL.
+- [Body projection](opcore-body.md) - `map`, `set`, and pinned values.
+- [Value providers](value-providers.md) - `env`, `file`, `literal`, and minted tokens.
+- [Broker](broker.md) - the root credential broker protocol.
+- [ward helpers](ward-helpers.md) - reusable packages lifted out of ward.
+
+## Contributing
+- [Contributing](CONTRIBUTING.md) - how to propose a change.
+- [Release pipeline](release-pipeline.md) - Forgejo-canonical publication and the mark.
 
 Sibling repo: [mcp-beaver](https://forgejo.coilysiren.me/coilyco-flight-deck/mcp-beaver).
