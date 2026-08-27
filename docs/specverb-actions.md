@@ -26,19 +26,24 @@ Two forms carry scalars only, and both fail closed rather than flattening. A `co
 
 ## `matches`: constraining the value, not just demanding one
 
-`required` gets presence. `matches "<glob>" message="<why>"` gets **composition**, so a shadow can demand a particular shape of value rather than any value at all.
+`required` gets presence. `matches "<glob...>" message="<why>"` gets **composition**, so a shadow can demand a particular shape of value rather than any value at all.
 
 ```kdl
 input labels {
     flag
     required
     array
-    matches "priority/*" message="no priority label: pass --labels priority/P2 (P0-P4)"
-    matches "autonomy/*" message="no autonomy label: pass --labels autonomy/headless"
+    matches "priority/P[0-4]" message="no priority label: pass --labels priority/P2 (P0-P4)"
+    matches "autonomy/headless" "autonomy/live-collab" "autonomy/async-consult" "autonomy/epic" \
+        message="no autonomy label: pass --labels autonomy/headless"
 }
 ```
 
-On an `array` input each constraint demands **at least one** matching element, so the set above is refused when it carries no `priority/*` label however many other labels it has, and the error names that constraint rather than the whole set. On a scalar input the bound value itself must match. Constraints stack, and each is checked independently, which is what lets a refusal say *which* axis is missing instead of only that something is.
+Globs within one constraint are **alternatives**, variadic like `restrict <param> matches <glob...>`. Constraints **stack**, and each is checked independently, which is what lets a refusal say *which* axis is missing instead of only that something is.
+
+On an `array` input each constraint demands **at least one** matching element, so the set above is refused when it carries no priority label however many other labels it has. On a scalar input the bound value itself must match.
+
+Enumerate rather than wildcard when the vocabulary is fixed and the downstream ignores what it does not recognise. A loose `priority/*` accepts `priority/NOPE`, which the Forgejo labels endpoint drops silently while returning 200, so the guard would pass and apply nothing.
 
 Globs are `filepath.Match`, matched by the same helper the wrap-level `restrict` uses, so a malformed pattern matches nothing and fails closed rather than erroring out. `message` is the only property, and an unknown one fails closed at parse.
 

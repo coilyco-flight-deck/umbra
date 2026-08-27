@@ -877,12 +877,12 @@ type Input struct {
     Its name doubles as the JMESPath `$name` variable in `until`/`fail-when`.
 
 type InputMatch struct {
-	Glob    string
+	Globs   []string
 	Message string
 }
-    InputMatch is one `matches "<glob>" message="<why>"` constraint on an Input.
-    Message is operator-facing and names what is missing; "" takes a generated
-    one.
+    InputMatch is one `matches "<glob...>" message="<why>"` constraint on an
+    Input. Globs are alternatives; Message names what is missing, "" taking a
+    generated one.
 
 type Poll struct {
 	Verb     string

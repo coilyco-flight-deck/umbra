@@ -545,17 +545,17 @@ func (sc bindScope) bindArray(in guardfile.Input, c *cli.Command) error {
 func checkMatches(in guardfile.Input, vals []string) error {
 	for _, m := range in.Matches {
 		if slices.ContainsFunc(vals, func(v string) bool {
-			return opcore.MatchesAnyGlob(v, []string{m.Glob})
+			return opcore.MatchesAnyGlob(v, m.Globs)
 		}) {
 			continue
 		}
 		reason := m.Message
 		if reason == "" {
-			reason = fmt.Sprintf("no value matching %q", m.Glob)
+			reason = fmt.Sprintf("no value matching %v", m.Globs)
 		}
 		return exitcode.New(exitcode.UserError, "user_error",
 			fmt.Errorf("--%s: %s", in.Name, reason),
-			fmt.Sprintf("supply a value matching %q", m.Glob))
+			fmt.Sprintf("supply a value matching one of %v", m.Globs))
 	}
 	return nil
 }

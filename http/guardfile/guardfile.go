@@ -122,10 +122,10 @@ type Input struct {
 	Matches []InputMatch
 }
 
-// InputMatch is one `matches "<glob>" message="<why>"` constraint on an Input.
-// Message is operator-facing and names what is missing; "" takes a generated one.
+// InputMatch is one `matches "<glob...>" message="<why>"` constraint on an Input.
+// Globs are alternatives; Message names what is missing, "" taking a generated one.
 type InputMatch struct {
-	Glob    string
+	Globs   []string
 	Message string
 }
 
@@ -1304,20 +1304,24 @@ func applyInputField(in *Input, c *kdl.Node) (kindSet bool, err error) {
 	}
 }
 
-// parseInputMatch reads one `matches "<glob>" message="<why>"` constraint.
-// `message` is the only property; any other fails closed.
+// parseInputMatch reads one `matches "<glob...>" message="<why>"` constraint,
+// variadic like `restrict`. `message` is the only property; any other fails closed.
 func parseInputMatch(name string, c *kdl.Node) (InputMatch, error) {
-	glob, err := singleArg(c)
-	if err != nil {
-		return InputMatch{}, fmt.Errorf("input %q: matches: %w (name a glob: `matches \"priority/*\"`)", name, err)
+	args := c.Arguments()
+	if len(args) == 0 {
+		return InputMatch{}, fmt.Errorf("input %q: matches: name at least one glob, e.g. `matches \"priority/*\"` (fail-closed)", name)
 	}
-	if glob == "" {
-		return InputMatch{}, fmt.Errorf("input %q: matches: the glob cannot be empty (fail-closed)", name)
+	m := InputMatch{}
+	for _, a := range args {
+		g := a.String()
+		if g == "" {
+			return InputMatch{}, fmt.Errorf("input %q: matches: a glob cannot be empty (fail-closed)", name)
+		}
+		m.Globs = append(m.Globs, g)
 	}
-	m := InputMatch{Glob: glob}
 	for k, v := range c.Properties() {
 		if k != "message" {
-			return InputMatch{}, fmt.Errorf("input %q: matches %q: unknown property %q (want message; fail-closed)", name, glob, k)
+			return InputMatch{}, fmt.Errorf("input %q: matches %v: unknown property %q (want message; fail-closed)", name, m.Globs, k)
 		}
 		m.Message = v.String()
 	}

@@ -875,24 +875,24 @@ func TestParseInputMatches(t *testing.T) {
         required
         array
         matches "priority/*" message="no priority label"
-        matches "autonomy/*"
+        matches "autonomy/headless" "autonomy/epic"
     }`))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
 	want := Input{Name: "labels", Required: true, Array: true, Matches: []InputMatch{
-		{Glob: "priority/*", Message: "no priority label"},
-		{Glob: "autonomy/*"},
+		{Globs: []string{"priority/*"}, Message: "no priority label"},
+		{Globs: []string{"autonomy/headless", "autonomy/epic"}},
 	}}
 	if got := gf.Actions[0].Inputs[1]; !reflect.DeepEqual(got, want) {
 		t.Errorf("Input = %+v, want %+v", got, want)
 	}
 
 	for name, block := range map[string]string{
-		"no glob":          `input labels { flag; matches }`,
-		"empty glob":       `input labels { flag; matches "" }`,
-		"two globs":        `input labels { flag; matches "a" "b" }`,
-		"unknown property": `input labels { flag; matches "a" msg="x" }`,
+		"no glob":            `input labels { flag; matches }`,
+		"empty glob":         `input labels { flag; matches "" }`,
+		"empty glob in list": `input labels { flag; matches "a" "" }`,
+		"unknown property":   `input labels { flag; matches "a" msg="x" }`,
 	} {
 		if _, err := Parse(action(block)); err == nil {
 			t.Errorf("%s: expected a fail-closed parse error", name)

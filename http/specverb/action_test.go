@@ -499,8 +499,8 @@ func labelCompositionGuardfile(t *testing.T) *guardfile.Guardfile {
 				required
 				array
 				help "label name, repeatable"
-				matches "priority/*" message="no priority label: pass --labels priority/P2 (P0-P4)"
-				matches "autonomy/*" message="no autonomy label: pass --labels autonomy/headless"
+				matches "priority/P[0-4]" message="no priority label: pass --labels priority/P2 (P0-P4)"
+				matches "autonomy/headless" "autonomy/live-collab" "autonomy/async-consult" "autonomy/epic" message="no autonomy label: pass --labels autonomy/headless"
 			}
 			call add issue-label {
 				args { owner-repo $repo; index $index; labels $labels }
@@ -581,5 +581,21 @@ func TestActionInputMatchesAcceptsCompleteSet(t *testing.T) {
 	}
 	if labels[0] != "priority/P2" || labels[2] != "role/platform" {
 		t.Errorf("names must reach the wire unquoted-to-string, got %#v", labels)
+	}
+}
+
+// TestActionInputMatchesRefusesANearMiss is why the globs enumerate: the labels
+// endpoint drops an unknown name silently, so `priority/*` would apply nothing.
+func TestActionInputMatchesRefusesANearMiss(t *testing.T) {
+	for _, bad := range []string{"priority/P9", "priority/p2", "priority/NOPE"} {
+		_, err := runTree(t, compositionConfig(t), "forgejo", "action", "label", "kai/demo", "7",
+			"--labels", bad, "--labels", "autonomy/headless")
+		if err == nil {
+			t.Errorf("%q is outside the vocabulary and must be refused", bad)
+			continue
+		}
+		if !strings.Contains(err.Error(), "no priority label") {
+			t.Errorf("%q: want the priority refusal, got: %v", bad, err)
+		}
 	}
 }
