@@ -5,9 +5,6 @@
 # exact path and catalog-trifecta wants README, AGENTS, and FEATURES to link
 # it, both upstream in agentic-os.
 
-agent:
-  workflow: merge-remote-main
-
 catalog:
   description: "Security framework for guarded command-line tools with scoped authority, validation, and audit logs. The generic engine Ward and ward-mcp build against."
   dependsOn: []
