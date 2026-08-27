@@ -17,12 +17,14 @@ type Provider func(ctx context.Context, address string) (string, error)
 // wiring. A consumer entry of the same name overrides one via Merge.
 func Builtins() map[string]Provider {
 	return map[string]Provider{
+		// Trimmed like file and a provider exec: an env var is usually a
+		// file's bytes one hop on, and a newline reaches the auth header.
 		"env": func(_ context.Context, name string) (string, error) {
 			v, ok := os.LookupEnv(name)
 			if !ok {
 				return "", fmt.Errorf("env var %q is not set", name)
 			}
-			return v, nil
+			return strings.TrimSpace(v), nil
 		},
 		"file": func(_ context.Context, path string) (string, error) {
 			b, err := os.ReadFile(path) //nolint:gosec // path is author-supplied trusted policy
@@ -31,6 +33,8 @@ func Builtins() map[string]Provider {
 			}
 			return strings.TrimSpace(string(b)), nil
 		},
+		// literal is not trimmed: it is author-supplied, visible in review,
+		// and the one place trailing space could plausibly be deliberate.
 		"literal": func(_ context.Context, v string) (string, error) { return v, nil },
 	}
 }

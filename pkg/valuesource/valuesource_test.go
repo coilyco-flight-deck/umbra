@@ -3,6 +3,8 @@ package valuesource
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -124,5 +126,62 @@ func TestResolveFirstMissingProvider(t *testing.T) {
 	}
 	if got != "from-ssm" {
 		t.Errorf("value = %q, want from-ssm (unregistered vault skipped)", got)
+	}
+}
+
+// The newline an editor left in an uploaded credential survives every layer
+// down to the env var, and Go then refuses to write the header (#304).
+func TestBuiltinEnvTrimsSoACredentialCanReachAnAuthHeader(t *testing.T) {
+	t.Setenv("UMBRA_TEST_TOKEN", "  abc\n")
+	got, err := Builtins()["env"](context.Background(), "UMBRA_TEST_TOKEN")
+	if err != nil {
+		t.Fatalf("env: %v", err)
+	}
+	if got != "abc" {
+		t.Fatalf("env resolved %q, want the value trimmed like file", got)
+	}
+
+	seen := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Get("Authorization")
+	}))
+	defer srv.Close()
+	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bot "+got)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("the resolved value must be writable as a header: %v", err)
+	}
+	_ = resp.Body.Close()
+	if header := <-seen; header != "Bot abc" {
+		t.Fatalf("upstream saw %q", header)
+	}
+}
+
+// Whitespace-only resolves empty rather than to a blank that reads as a
+// value, so ResolveFirst falls through to the next source in the chain.
+func TestBuiltinEnvResolvesWhitespaceOnlyToEmpty(t *testing.T) {
+	t.Setenv("UMBRA_TEST_TOKEN", " \n\t ")
+	got, err := Builtins()["env"](context.Background(), "UMBRA_TEST_TOKEN")
+	if err != nil {
+		t.Fatalf("env: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("env resolved %q, want empty", got)
+	}
+}
+
+// literal keeps every byte: it is author-supplied in the guardfile rather than
+// arriving through a store, so trailing space there is visible in review.
+func TestBuiltinLiteralKeepsWhatTheAuthorWrote(t *testing.T) {
+	got, err := Builtins()["literal"](context.Background(), " spaced ")
+	if err != nil {
+		t.Fatalf("literal: %v", err)
+	}
+	if got != " spaced " {
+		t.Fatalf("literal resolved %q, want it untouched", got)
 	}
 }
