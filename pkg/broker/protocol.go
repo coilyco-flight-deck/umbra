@@ -5,7 +5,7 @@
 // the credential itself.
 //
 // The package is deliberately self-contained. It carries no git, docker, or
-// ward-kdl knowledge: the privileged side is injected as an [Executor], and
+// ward knowledge: the privileged side is injected as an [Executor], and
 // the write-tier policy as an [Authorizer]. That keeps broker importable by a
 // consumer (ward) without a dependency cycle, and keeps this high-risk
 // live-dispatch path's surface minimal and auditable.

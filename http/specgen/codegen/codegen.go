@@ -24,7 +24,7 @@ const (
 // Guardfile. The spec-lock fields are empty for an exec member. See specverb.md.
 type Params struct {
 	Transport     string // TransportSpec | TransportExec
-	Binary        string // binary name, e.g. ward-kdl (Guardfile group[0])
+	Binary        string // binary name, e.g. ward (Guardfile group[0])
 	GuardfileName string // embedded Guardfile filename, e.g. forgejo.guardfile.kdl
 	SpecLockName  string // committed gzip lock filename, e.g. forgejo.swagger.lock.json.gz
 	SpecURL       string // upstream Swagger URL; the `specgen lock` source and bootstrap fallback
