@@ -36,7 +36,7 @@ func deniedKeys(gf *guardfile.Guardfile) map[grantKey]guardfile.Grant {
 }
 
 // denyDescriptors resolves every cannot/never grant into a teaching leaf (first-seen
-// order); a deny an `override can` lifts mounts none. See specverb-override.md.
+// order); a deny an `override can` lifts mounts none. See specverb-policy.md.
 func denyDescriptors(gf *guardfile.Guardfile) []denyDescriptor {
 	overridden := overriddenKeys(gf)
 	var out []denyDescriptor

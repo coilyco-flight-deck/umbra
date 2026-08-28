@@ -8,12 +8,17 @@ set -eu
 export GOOS=linux
 
 gen() {
-  for pkg in $(go list ./... | grep -v '/examples/'); do
-    echo "## ${pkg}"
-    echo
-    go doc -all "${pkg}"
-    echo
-  done
+  # Substitution drops trailing newlines and printf restores exactly one, so
+  # this generator and end-of-file-fixer agree on the file they share.
+  body=$(
+    for pkg in $(go list ./... | grep -v '/examples/'); do
+      echo "## ${pkg}"
+      echo
+      go doc -all "${pkg}"
+      echo
+    done
+  )
+  printf '%s\n' "$body"
 }
 
 case "${1:-}" in

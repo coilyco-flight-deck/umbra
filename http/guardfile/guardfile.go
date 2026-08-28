@@ -20,7 +20,7 @@ type ValueSource struct {
 func (v ValueSource) IsZero() bool { return v.Provider == "" }
 
 // ValueChain is an ordered fallback list of value sources: resolution takes the
-// first yielding a non-empty value. See specverb-value-chain.md.
+// first yielding a non-empty value. See value-providers.md.
 type ValueChain []ValueSource
 
 // IsZero reports whether the chain names no source.
@@ -112,7 +112,7 @@ type Input struct {
 	Required   bool   // enforced at invocation
 	Help       string // one-line help, "" if none
 	// Default is a JMESPath pre-flight binding for an absent input (poll actions
-	// only); mutually exclusive with Required. See specverb-action-defaults.md.
+	// only); mutually exclusive with Required. See specverb-actions.md.
 	Default string
 	// Array makes the input repeatable, projected as a JSON array coerced to the
 	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
@@ -259,7 +259,7 @@ type ProviderDecl struct {
 var modals = map[string]bool{"can": true, "cannot": true, "never": true}
 
 // overrideNode is the escalation directive's node name: `override can <verb>
-// <resource>` re-grants a single denied class by name. See specverb-inherit.md.
+// <resource>` re-grants a single denied class by name. See specverb-policy.md.
 const overrideNode = "override"
 
 // isDenyModal reports whether a modal denies (cannot/never) rather than grants.
@@ -452,7 +452,7 @@ func ParseValueBlock(n *kdl.Node, node string) (ValueChain, error) {
 }
 
 // parseValueChain reads a `value` node in either form (inline `value <p> "<a>"`
-// or a `{ ... }` fallback block) into a ValueChain. See specverb-value-chain.md.
+// or a `{ ... }` fallback block) into a ValueChain. See value-providers.md.
 func parseValueChain(n *kdl.Node) (ValueChain, error) {
 	_, hasBlock := n.ChildrenInline()
 	args := n.Arguments()
@@ -757,7 +757,7 @@ func parseGrantOrOverride(n *kdl.Node) (Grant, error) {
 }
 
 // parseOverride reads `override can <verb> <resource>`: only the `can` form is
-// valid and the resource must be named (`*` rejected). See specverb-override.md.
+// valid and the resource must be named (`*` rejected). See specverb-policy.md.
 func parseOverride(n *kdl.Node) (Grant, error) {
 	args := n.Arguments()
 	if len(args) < 3 || args[0].String() != "can" {

@@ -864,7 +864,7 @@ type Input struct {
 	Required   bool   // enforced at invocation
 	Help       string // one-line help, "" if none
 	// Default is a JMESPath pre-flight binding for an absent input (poll actions
-	// only); mutually exclusive with Required. See specverb-action-defaults.md.
+	// only); mutually exclusive with Required. See specverb-actions.md.
 	Default string
 	// Array makes the input repeatable, projected as a JSON array coerced to the
 	// element type the bound leaf field declares. Flags only. See specverb-actions.md.
@@ -929,7 +929,7 @@ func ParseRestrictNode(n *kdl.Node) (Restriction, error)
 
 type ValueChain []ValueSource
     ValueChain is an ordered fallback list of value sources: resolution takes
-    the first yielding a non-empty value. See specverb-value-chain.md.
+    the first yielding a non-empty value. See value-providers.md.
 
 func ParseBaseURL(n *kdl.Node) (raw string, chain ValueChain, err error)
     ParseBaseURL reads a base-url node: a bare string (raw) or a `{ value ...
@@ -1022,8 +1022,8 @@ func CheckFlagCollisions(desc Descriptor) error
 
 func CoerceItems(items string, tokens []string) ([]any, error)
     CoerceItems lowers CLI tokens to the JSON element type an array field
-    declares. An empty `items` schema (ItemsAny) resolves each token
-    independently, because that is the only encoding a both-types spec allows.
+    declares. An empty `items` (ItemsAny) resolves per token, the only
+    both-types encoding.
 
 func CoerceScalar(fieldType, token string) (any, error)
     CoerceScalar lowers one CLI token to the JSON type a body field declares,
@@ -1094,9 +1094,8 @@ func (b *ArgBinder) Bind(name, val string) error
 
 func (b *ArgBinder) BindSlice(name string, vals []string) error
     BindSlice routes one resolved arg whose value is a list. A query target
-    repeats the parameter; a body or form target lands as a JSON array coerced
-    to the element type the leaf's own schema declares, so an action shadow
-    encodes exactly what the leaf it shadows would.
+    repeats the parameter, a body or form target lands a JSON array in the
+    leaf's own type.
 
 func (b *ArgBinder) FieldFor(name string) (Field, bool)
     FieldFor returns the leaf's declared query/body/form field of that name.
@@ -3079,13 +3078,13 @@ type Runner interface {
 
 type SliceOf func(string) ([]string, bool)
     SliceOf reports whether an argument value references a list-valued input,
-    and with what elements. It is consulted before Resolve, so a list never
-    reaches the scalar path and flattens there unnoticed.
+    and with what elements. Consulted before Resolve, so no list reaches scalar
+    path.
 
 func SliceRefs(sliceVars map[string][]string) SliceOf
     SliceRefs builds a SliceOf over the list-valued inputs bound for this run.
-    A step-output reference (`$step.field`) is never a list: only a declared
-    `array` input is.
+    A step-output reference (`$step.field`) is never a list, only a declared
+    array.
 
 type Step struct {
 	Leaf Leaf
@@ -3254,5 +3253,3 @@ func LooksReleased(v string) bool
 func Parse(tag string) (parts [3]int, ok bool)
     Parse splits a vX.Y.Z tag into 3 numeric parts, tolerating a missing v,
     a short tag, and a -pre/+build suffix. ok is false on a bad or empty tag.
-
-

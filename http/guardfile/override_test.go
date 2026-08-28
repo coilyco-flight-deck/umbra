@@ -29,7 +29,7 @@ func TestOverrideParses(t *testing.T) {
 		if g.Override {
 			found = true
 			if g.Modal != "can" || g.Verb != "delete" || g.Resource != "repo" {
-				t.Errorf("override grant mis-parsed: %+v", g)
+				t.Errorf("override grant misparsed: %+v", g)
 			}
 		}
 	}

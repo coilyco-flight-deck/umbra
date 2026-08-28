@@ -36,8 +36,7 @@ type Step struct {
 type Resolve func(string) (string, error)
 
 // SliceOf reports whether an argument value references a list-valued input, and
-// with what elements. It is consulted before Resolve, so a list never reaches
-// the scalar path and flattens there unnoticed.
+// with what elements. Consulted before Resolve, so no list reaches scalar path.
 type SliceOf func(string) ([]string, bool)
 
 // Runner fires or plans one already-resolved step.
@@ -49,8 +48,7 @@ type Runner interface {
 }
 
 // SliceRefs builds a SliceOf over the list-valued inputs bound for this run. A
-// step-output reference (`$step.field`) is never a list: only a declared
-// `array` input is.
+// step-output reference (`$step.field`) is never a list, only a declared array.
 func SliceRefs(sliceVars map[string][]string) SliceOf {
 	return func(value string) ([]string, bool) {
 		if len(sliceVars) == 0 || !strings.HasPrefix(value, "$") {

@@ -44,8 +44,7 @@ func (r *execStepRunner) Fire(ctx context.Context, c *cli.Command, leaf stepflow
 }
 
 // refuseSliceArgs fails closed when a list-valued input reaches an exec step.
-// argv is a flat token list, so a list here could only be joined or spread, and
-// both are a guess about what the pinned command meant.
+// argv is flat, so joining or spreading would guess what the pinned command meant.
 func refuseSliceArgs(args []guardfile.ArgBind, sliceOf stepflow.SliceOf) error {
 	if sliceOf == nil {
 		return nil

@@ -20,6 +20,7 @@ func mustRead(t *testing.T, path string) string {
 func TestReleasePipelinePinsDraftTagContract(t *testing.T) {
 	promote := mustRead(t, "../../.forgejo/workflows/promote.yml")
 	release := mustRead(t, "../../.forgejo/workflows/release.yml")
+	publish := mustRead(t, "../../scripts/ci/publish-draft-tag.sh")
 	doc := mustRead(t, "../../docs/release-pipeline.md")
 	features := mustRead(t, "../../docs/FEATURES.md")
 
@@ -29,8 +30,10 @@ func TestReleasePipelinePinsDraftTagContract(t *testing.T) {
 		want string
 	}{
 		{
+			// The derivation moved into the script promote.yml invokes, so the
+			// contract is unchanged and the file that carries it is not.
 			name: "promote draft tag",
-			text: promote,
+			text: publish,
 			want: "draft_tag=\"draft-${GITHUB_SHA}\"",
 		},
 		{

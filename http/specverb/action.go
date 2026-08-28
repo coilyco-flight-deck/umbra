@@ -124,10 +124,7 @@ func resolveAction(spec *spec, gf *guardfile.Guardfile, granted map[grantKey]gua
 }
 
 // validateArrayInputs fails an action at Build time when a list input reaches a
-// form that cannot carry one. A collect step assembles its own paged request
-// from string bindings, so a list arriving there would flatten silently, and the
-// whole point of a typed input is that it refuses instead. Poll and call steps
-// both bind lists properly and are unaffected.
+// form that cannot carry one: a collect step would flatten it silently.
 func validateArrayInputs(a guardfile.Action) error {
 	if a.Collect == nil {
 		return nil
@@ -247,7 +244,7 @@ func validateArgs(a guardfile.Action, leaf opDescriptor, inputNames map[string]b
 }
 
 // validateDefaults checks each input `default <jmespath>`: it must parse, and a
-// defaulted input may not also bind a poll arg. See specverb-action-defaults.md.
+// defaulted input may not also bind a poll arg. See specverb-actions.md.
 func validateDefaults(a guardfile.Action) error {
 	for _, in := range a.Inputs {
 		if in.Default == "" {
@@ -458,7 +455,7 @@ func pendingDefaults(ad actionDescriptor, strVars map[string]string) []guardfile
 }
 
 // resolveDefaults fires the poll leaf once as an audited pre-flight, then binds
-// each absent defaulted input. Fails closed. See specverb-action-defaults.md.
+// each absent defaulted input. Fails closed. See specverb-actions.md.
 func (rt *runtime) resolveDefaults(ctx context.Context, c *cli.Command, ad actionDescriptor, method, url string, body []byte, contentType string, pending []guardfile.Input, strVars map[string]string, jmesVars map[string]any) error {
 	decoded, _, ferr := rt.fireLeafAudited(ctx, ad, method, url, body, contentType, c)
 	if ferr != nil {
@@ -489,9 +486,8 @@ func (rt *runtime) resolveDefaults(ctx context.Context, c *cli.Command, ad actio
 	return nil
 }
 
-// bindScope is the three parallel scopes one action run binds its inputs into:
-// raw strings for the request, coerced values for conditions, and lists for the
-// arguments a scalar cannot carry.
+// bindScope is the three parallel scopes one action run binds inputs into: raw
+// strings for the request, coerced values for conditions, lists for arguments.
 type bindScope struct {
 	str    map[string]string
 	jmes   map[string]any
@@ -499,8 +495,7 @@ type bindScope struct {
 }
 
 // bindInputs reads inputs into strVars (raw, for the request) and jmesVars
-// (coerced, for conditions). Unset optional flags bind in neither scope, and a
-// missing required one ends the run before any request is built.
+// (coerced, for conditions). A missing required one ends the run pre-request.
 func bindInputs(ad actionDescriptor, c *cli.Command) (strVars map[string]string, jmesVars map[string]any, sliceVars map[string][]string, err error) {
 	sc := bindScope{str: map[string]string{}, jmes: map[string]any{}, slices: map[string][]string{}}
 	positional := c.Args().Slice()
@@ -595,8 +590,7 @@ func (sc bindScope) bindFlag(in guardfile.Input, c *cli.Command) error {
 }
 
 // missingRequiredFlag is the pre-write refusal for an absent required flag, and
-// nil for an absent optional one. A control that returned an error after the
-// write would leave the hazard in place, so this fires before the request exists.
+// nil for an absent optional one. Firing after the write would leave the hazard.
 func missingRequiredFlag(in guardfile.Input, hint string) error {
 	if !in.Required {
 		return nil
@@ -605,9 +599,8 @@ func missingRequiredFlag(in guardfile.Input, hint string) error {
 		fmt.Errorf("missing required flag --%s", in.Name), hint)
 }
 
-// coerceScalars lowers a list input for the condition scope, element by element,
-// matching the single-value coercion so `contains($labels, ...)` sees numbers as
-// numbers.
+// coerceScalars lowers a list input for the condition scope element by element,
+// so `contains($labels, ...)` sees numbers as numbers.
 func coerceScalars(vals []string) []any {
 	out := make([]any, 0, len(vals))
 	for _, v := range vals {

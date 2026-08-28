@@ -34,4 +34,4 @@ Some legacy cross-surface imports still exist (for example `cli/passthrough` rea
 ## See also
 
 - [FEATURES.md](FEATURES.md) - the per-package inventory, grouped by surface.
-- [features-detail.md](features-detail.md) - per-primitive details.
+- [FEATURES.md](FEATURES.md) - per-primitive details.

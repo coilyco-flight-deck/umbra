@@ -132,10 +132,8 @@ func (b *ArgBinder) FieldFor(name string) (Field, bool) {
 	return f, ok
 }
 
-// BindSlice routes one resolved arg whose value is a list. A query target
-// repeats the parameter; a body or form target lands as a JSON array coerced to
-// the element type the leaf's own schema declares, so an action shadow encodes
-// exactly what the leaf it shadows would.
+// BindSlice routes one resolved arg whose value is a list. A query target repeats
+// the parameter, a body or form target lands a JSON array in the leaf's own type.
 func (b *ArgBinder) BindSlice(name string, vals []string) error {
 	switch {
 	case name == OwnerRepoArg || hasKey(b.pathIdx, name):
@@ -159,9 +157,8 @@ func (b *ArgBinder) BindSlice(name string, vals []string) error {
 	return nil
 }
 
-// CoerceItems lowers CLI tokens to the JSON element type an array field
-// declares. An empty `items` schema (ItemsAny) resolves each token
-// independently, because that is the only encoding a both-types spec allows.
+// CoerceItems lowers CLI tokens to the JSON element type an array field declares.
+// An empty `items` (ItemsAny) resolves per token, the only both-types encoding.
 func CoerceItems(items string, tokens []string) ([]any, error) {
 	out := make([]any, 0, len(tokens))
 	for _, t := range tokens {

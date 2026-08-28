@@ -4,4 +4,12 @@ org = "coilyco-flight-deck"
 [tool.agentic-os.documentation-layout]
 # Declared rather than defaulted: an undeclared repo and a deliberately
 # small one were the same file, and only one had the decision made.
-band = "small"
+# Large, not small. `small` was stamped fleet-wide by the agentic-os#1108
+# sweep rather than chosen: 22 docs against its 20-doc cap, and per-file caps
+# half the pre-band flat one. See inbox#439.
+band = "large"
+
+# The managed markers are stamped inside the pre-commit YAML and
+# cannot form a single top-of-file comment block.
+[tool.agentic-os.code-comments]
+excludes = [".pre-commit-config.yaml"]

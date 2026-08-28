@@ -1,0 +1,19 @@
+# Words this repo means as written. The hook reports rather than rewrites, so an
+# entry here is a claim that the flagged spelling is correct, not a silencer.
+
+[files]
+# Vendored upstream API specs. Their text belongs to the publisher, and editing
+# it would make the fixtures stop matching what the real service returns.
+extend-exclude = ["http/specverb/testdata/"]
+
+[default]
+# The HTTP method, pluralised. typos reads the CONNEC inside CONNECTs as a
+# misspelt CONNECT and would rewrite the method name itself.
+extend-ignore-identifiers-re = ["CONNECTs?"]
+
+[default.extend-words]
+# TestMapTypeFailsClosed feeds "objekt" as a type that does not exist. Correcting
+# it to "object" would make the test assert the opposite of what it is for.
+objekt = "objekt"
+# A standard variant, used in version.go's own prose.
+unparseable = "unparseable"

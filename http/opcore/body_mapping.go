@@ -289,9 +289,8 @@ func walkMappedPath(body map[string]any, path []string) (any, error) {
 	return current, nil
 }
 
-// coerceMapped checks the leaf against its declared type. A caller supplying
-// the wrong shape is refused here rather than by the upstream, which is the
-// whole point: the 400 used to be the first and only notice (umbra#312).
+// coerceMapped checks the leaf against its declared type, refusing a wrong shape
+// here rather than letting the upstream 400 be the first notice (umbra#312).
 func coerceMapped(value any, mapping BodyMapping) (any, error) {
 	switch mapping.Type {
 	case "", "string":

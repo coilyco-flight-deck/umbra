@@ -33,9 +33,8 @@ func bodyEcho(t *testing.T, desc opcore.Descriptor) (*opcore.Operation, *map[str
 	return &opcore.Operation{RT: rt, Desc: desc}, &got
 }
 
-// The Exa shape from #311: a required upstream parameter whose name collides
-// with a reserved engine flag, so it has to be mapped, beside an operator
-// constant the model must not be able to name or vary.
+// The Exa shape from #311: a required parameter colliding with a reserved engine
+// flag, so it must be mapped, beside a constant the model must not name or vary.
 func TestExecuteMappedBodyCarriesPinnedConstants(t *testing.T) {
 	op, got := bodyEcho(t, opcore.Descriptor{
 		Method:       http.MethodPost,
@@ -165,9 +164,8 @@ func TestPinnedBodyWithoutMappingsStillSendsPinsAlone(t *testing.T) {
 	}
 }
 
-// The whole #311 shape end to end, in the guardfile spelling a consumer writes:
-// a reserved-word-colliding required parameter renamed through `map`, beside an
-// object constant `set` pins because a KDL property cannot hold one.
+// The whole #311 shape end to end in guardfile spelling: a colliding required
+// parameter renamed through `map`, beside an object constant `set` pins.
 func TestInlineMappedBodyWithPinnedObjectReachesTheWire(t *testing.T) {
 	src := `wrap ward mcp exa {
         base-url "https://api.exa.ai"

@@ -130,7 +130,7 @@ func mergeInherited(wrap *kdl.Node, dir string, refs []string, stack []string) e
 		m.absorb(pWrap)
 	}
 	// Precedence check before the splice: provenance (inherited vs local) is only
-	// knowable here. Deny set is every parent deny. See specverb-override.md.
+	// knowable here. Deny set is every parent deny. See specverb-policy.md.
 	if err := validateInheritedPrecedence(wrap.Children().Nodes, m.parentDenies); err != nil {
 		return err
 	}

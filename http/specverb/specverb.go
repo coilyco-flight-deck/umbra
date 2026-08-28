@@ -301,7 +301,7 @@ func grantedGrants(gf *guardfile.Guardfile) map[grantKey]guardfile.Grant {
 }
 
 // resolveDescriptors resolves every `can` grant into a concrete descriptor; a deny
-// drops a matching plain `can` but an `override` crosses it. See specverb-override.md.
+// drops a matching plain `can` but an `override` crosses it. See specverb-policy.md.
 func resolveDescriptors(spec *spec, gf *guardfile.Guardfile) ([]opDescriptor, error) {
 	denied := deniedKeys(gf)
 	var descs []opDescriptor

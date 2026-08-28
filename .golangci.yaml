@@ -1,4 +1,4 @@
-# golangci-lint config for the cli-* family. Notes: docs/golangci-notes.md.
+# golangci-lint config for the cli-* family. Notes: docs/release-pipeline.md.
 
 version: "2"
 

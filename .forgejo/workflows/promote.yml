@@ -57,67 +57,28 @@ jobs:
         run: ./scripts/check-godoc-current.sh
 
       - name: go.mod tidy
-        run: |
-          set -euo pipefail
-          go mod tidy
-          git diff --exit-code -- go.mod go.sum
+        run: bash scripts/ci/go-mod-tidy.sh
 
       - name: golangci-lint
         timeout-minutes: 5
         run: golangci-lint run --timeout=5m ./...
 
       - name: Scan filesystem for secrets
-        run: |
-          set -euo pipefail
-          printf '(^|/)\\.git/\n' > /tmp/trufflehog-exclude
-          trufflehog filesystem . \
-            --no-verification --no-update --fail \
-            --exclude-paths=/tmp/trufflehog-exclude
+        run: bash scripts/ci/trufflehog-scan.sh
 
       - name: Publish draft release tag
         env:
           PROMOTE_TOKEN: ${{ secrets.CI_RELEASE_TOKEN }}
           REPO: ${{ github.repository }}
           SERVER: ${{ github.server_url }}
-        run: |
-          set -euo pipefail
-          if [ -z "${PROMOTE_TOKEN:-}" ]; then
-            echo "::error::CI_RELEASE_TOKEN not set; draft release publishing needs a real-user PAT so the release push enqueues release.yml (SSM /forgejo/ci-release-token, just sync-actions-secrets in aos)." >&2
-            exit 1
-          fi
-          # server_url resolves to the in-cluster http URL on this runner, so
-          # keep its scheme instead of assuming https.
-          proto="${SERVER%%://*}"
-          host="${SERVER#*://}"
-          remote_url="${proto}://oauth2:${PROMOTE_TOKEN}@${host}/${REPO}.git"
-          draft_tag="draft-${GITHUB_SHA}"
-          if git ls-remote --exit-code --tags "${remote_url}" "refs/tags/${draft_tag}" >/dev/null 2>&1; then
-            echo "draft tag already published: ${draft_tag}"
-            exit 0
-          fi
-          git tag "${draft_tag}"
-          git push "${remote_url}" "refs/tags/${draft_tag}"
-          echo "published ${draft_tag}"
+        run: bash scripts/ci/publish-draft-tag.sh
 
       - name: Promote main to release (fast-forward only)
         env:
           PROMOTE_TOKEN: ${{ secrets.CI_RELEASE_TOKEN }}
           REPO: ${{ github.repository }}
           SERVER: ${{ github.server_url }}
-        run: |
-          set -euo pipefail
-          if [ -z "${PROMOTE_TOKEN:-}" ]; then
-            echo "::error::CI_RELEASE_TOKEN not set; promotion needs a real-user PAT so the release push enqueues release.yml (SSM /forgejo/ci-release-token, just sync-actions-secrets in aos)." >&2
-            exit 1
-          fi
-          # server_url resolves to the in-cluster http URL on this runner, so
-          # keep its scheme instead of assuming https.
-          proto="${SERVER%%://*}"
-          host="${SERVER#*://}"
-          # Plain push: git refuses a non-fast-forward, so a diverged release
-          # branch fails loud here instead of being silently rewritten.
-          git push "${proto}://oauth2:${PROMOTE_TOKEN}@${host}/${REPO}.git" HEAD:release
-          echo "promoted $(git rev-parse --short HEAD) to release"
+        run: bash scripts/ci/promote-to-release.sh
 
       - name: Alert Telegram on main failure
         if: ${{ failure() && github.ref == 'refs/heads/main' }}
@@ -132,4 +93,4 @@ jobs:
           SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           API_BASE: https://api.telegram.org
-        run: "python3 -c 'exec(\"import os\\nimport sys\\nimport urllib.error\\nimport urllib.parse\\nimport urllib.request\\n\\ndef build_message():\\n    return \\\"\\\\n\\\".join([\\n        \\\"CI failed on main\\\",\\n        f\\\"repo: {os.environ['\"'\"'REPO'\"'\"']}\\\",\\n        f\\\"workflow: {os.environ['\"'\"'WORKFLOW'\"'\"']}\\\",\\n        f\\\"job: {os.environ['\"'\"'JOB'\"'\"']}\\\",\\n        f\\\"ref: {os.environ['\"'\"'REF'\"'\"']}\\\",\\n        f\\\"sha: {os.environ['\"'\"'SHA'\"'\"']}\\\",\\n        f\\\"run: {os.environ['\"'\"'RUN_URL'\"'\"']}\\\",\\n    ])\\n\\ndef main():\\n    bot_token = os.environ.get(\\\"BOT_TOKEN\\\", \\\"\\\")\\n    chat_id = os.environ.get(\\\"CHAT_ID\\\", \\\"\\\")\\n    if not bot_token or not chat_id:\\n        print(\\\"telegram alert missing required secret\\\", file=sys.stderr)\\n        return 2\\n    proxy_url = os.environ.get(\\\"FORGEJO_EGRESS_PROXY\\\", \\\"\\\").strip()\\n    payload = urllib.parse.urlencode(\\n        {\\n            \\\"chat_id\\\": chat_id,\\n            \\\"text\\\": build_message(),\\n            \\\"disable_web_page_preview\\\": \\\"true\\\",\\n        }\\n    ).encode(\\\"utf-8\\\")\\n    api_base = os.environ.get(\\\"API_BASE\\\", \\\"https://api.telegram.org\\\").rstrip(\\\"/\\\")\\n    request = urllib.request.Request(\\n        f\\\"{api_base}/bot{bot_token}/sendMessage\\\",\\n        data=payload,\\n        method=\\\"POST\\\",\\n    )\\n    opener = urllib.request.build_opener(\\n        urllib.request.ProxyHandler({\\\"https\\\": proxy_url})\\n        if proxy_url\\n        else urllib.request.ProxyHandler()\\n    )\\n    try:\\n        with opener.open(request, timeout=15) as response:\\n            response.read()\\n    except urllib.error.URLError as exc:\\n        print(f\\\"telegram alert failed ({type(exc).__name__})\\\", file=sys.stderr)\\n        return 1\\n    return 0\\n\\nraise SystemExit(main())\\n\")'"
+        run: python3 scripts/ci/telegram-alert.py

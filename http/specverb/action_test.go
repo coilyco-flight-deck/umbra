@@ -348,8 +348,7 @@ func TestActionWritesPerCallAndEnvelopeAudit(t *testing.T) {
 }
 
 // labelArrayGuardfile is #317's blocked shape: a mount shadow over `create issue`
-// whose required `--labels` carries a list through to the create call, so the
-// refusal happens before the write instead of being reported after it.
+// whose required `--labels` must refuse before the write rather than after it.
 func labelArrayGuardfile(t *testing.T) *guardfile.Guardfile {
 	t.Helper()
 	gf, err := guardfile.Parse([]byte(`wrap ward ops forgejo {
@@ -426,9 +425,8 @@ func TestActionArrayInputRefusesWrongElementType(t *testing.T) {
 	}
 }
 
-// TestActionRequiredFlagRefusesBeforeTheWrite is the control this issue exists
-// for: a missing required flag ends the run before any request is built, so the
-// hazard is removed rather than reported afterwards.
+// TestActionRequiredFlagRefusesBeforeTheWrite is the control this issue exists for:
+// a missing required flag ends the run before any request is built.
 func TestActionRequiredFlagRefusesBeforeTheWrite(t *testing.T) {
 	cfg := Config{
 		Guardfile:  labelArrayGuardfile(t),
