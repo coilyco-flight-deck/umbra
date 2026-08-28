@@ -11,7 +11,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 ## HTTP request surface (`http/`)
 
-- **egress** - Per-invocation CONNECT proxy with a consumer-supplied allowlist, in enforce or observe mode.
+- **egress** - Per-invocation CONNECT proxy with a consumer-supplied allowlist, in enforce or observe mode. Resolves each host and refuses an internal address, dialling the address it checked, and bounds the CONNECT port. See [egress.md](egress.md).
 - **specverb / guardfile** - Spec-driven verbs: [resolution](specverb-resolution.md), [policy](specverb-policy.md), [requests](specverb-request.md), [actions](specverb-actions.md), [describe](specverb-describe.md), [fetch](specverb-fetch.md).
 - **specgen / codegen** - The no-code driver: discovery, locks, generation. See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
 - **opcore** - The frozen inline grammar: typed query, body projection, GraphQL and SQL grants, JMESPath postconditions, MCP proxy grants, and a named client. See [opcore-inline.md](opcore-inline.md) and [opcore-body.md](opcore-body.md).

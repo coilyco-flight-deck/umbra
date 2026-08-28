@@ -25,6 +25,7 @@ type config struct {
 	egressOn     bool
 	egressList   []string
 	egressMode   egress.Mode
+	egressPorts  []string
 	verbName     string
 	argvRewriter func(argv []string) []string
 	envFunc      func() (map[string]string, error)
@@ -43,6 +44,14 @@ func WithEgress(allowlist []string, mode egress.Mode) Option {
 		c.egressOn = true
 		c.egressList = allowlist
 		c.egressMode = mode
+	}
+}
+
+// WithEgressPorts widens the CONNECT ports the proxy dials. The default is 443
+// alone, so this is the way to another HTTPS port. See docs/egress.md.
+func WithEgressPorts(ports ...string) Option {
+	return func(c *config) {
+		c.egressPorts = append([]string(nil), ports...)
 	}
 }
 
@@ -89,7 +98,7 @@ func Command(bin string, r *shell.Runner, w *audit.Writer, opts ...Option) *cli.
 		SkipPolicy: cfg.skipPolicy,
 	}
 	if cfg.egressOn {
-		spec.Action, spec.OnComplete = withEgressAction(bin, r, cfg.egressList, cfg.egressMode, cfg.argvRewriter, cfg.envFunc)
+		spec.Action, spec.OnComplete = withEgressAction(bin, r, cfg.egressList, cfg.egressMode, cfg.egressPorts, cfg.argvRewriter, cfg.envFunc)
 	} else {
 		spec.Action, spec.OnComplete = withStderrTail(bin, r, cfg.argvRewriter, cfg.envFunc)
 	}
@@ -137,7 +146,7 @@ func withStderrTail(bin string, base *shell.Runner, rewriter func([]string) []st
 
 // withEgressAction wraps the standard exec action to start a per-invocation
 // proxy, inject HTTPS_PROXY/HTTP_PROXY into a per-call shadow Runner so
-func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode egress.Mode, rewriter func([]string) []string, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
+func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode egress.Mode, ports []string, rewriter func([]string) []string, envFunc func() (map[string]string, error)) (cli.ActionFunc, func(*audit.Record)) {
 	var rows []audit.EgressRow
 	tail := newTailBuffer(audit.MaxStderrTailBytes)
 	action := func(ctx context.Context, c *cli.Command) error {
@@ -146,6 +155,9 @@ func withEgressAction(bin string, base *shell.Runner, allowlist []string, mode e
 			argv = rewriter(argv)
 		}
 		p := egress.New(allowlist, mode)
+		if len(ports) > 0 {
+			p.AllowedPorts = ports
+		}
 		proxyURL, err := p.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("egress: start proxy: %w", err)

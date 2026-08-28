@@ -44,6 +44,14 @@ type Proxy struct {
 	// hijacked connections, so we count them ourselves and wait on Stop
 	inflight sync.WaitGroup
 
+	// AllowedPorts bounds which CONNECT ports may be dialled. New installs
+	// {"443"}; empty means any port. See docs/egress.md.
+	AllowedPorts []string
+
+	// allowLoopback lifts the loopback half of the resolved-address guard.
+	// Test-only, set through export_test.go, never from a consumer.
+	allowLoopback bool
+
 	// Now is overridable for tests.
 	Now func() time.Time
 }
@@ -63,10 +71,11 @@ func New(allowlist []string, mode Mode) *Proxy {
 		set[strings.ToLower(h)] = true
 	}
 	return &Proxy{
-		allowlist: set,
-		mode:      mode,
-		rows:      make(map[string]*hostStat),
-		Now:       time.Now,
+		allowlist:    set,
+		mode:         mode,
+		rows:         make(map[string]*hostStat),
+		AllowedPorts: []string{"443"},
+		Now:          time.Now,
 	}
 }
 
@@ -137,9 +146,9 @@ func (p *Proxy) handle(w http.ResponseWriter, r *http.Request) {
 	if hostport == "" {
 		hostport = r.RequestURI
 	}
-	host, _, err := net.SplitHostPort(hostport)
+	host, port, err := net.SplitHostPort(hostport)
 	if err != nil {
-		host = hostport
+		host, port = hostport, "443"
 	}
 	host = strings.ToLower(host)
 
@@ -148,13 +157,26 @@ func (p *Proxy) handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "egress: host denied by allowlist", http.StatusForbidden)
 		return
 	}
+	// The allowlist names hosts, so without this a CONNECT to an allowed
+	// host on port 22 tunnels SSH.
+	if !p.portAllowed(port) {
+		p.record(host, audit.EgressDeny, 0, 0, 0)
+		http.Error(w, "egress: port denied by allowlist", http.StatusForbidden)
+		return
+	}
 
 	start := p.now()
-	// hostport is taken from the CONNECT request line by design - this
-	// process IS the proxy and the whole point is to dial what the client
-	upstream, err := net.DialTimeout("tcp", hostport, 10*time.Second) //nolint:gosec // G107/G704: intentional proxy dial
+	// Resolves, refuses an internal answer, and dials the address it checked.
+	// The allowlist matched a name, and a name is not an address.
+	upstream, err := p.dialChecked(r.Context(), host, port)
 	if err != nil {
 		p.record(host, audit.EgressDeny, 0, 0, p.now().Sub(start).Milliseconds())
+		// Refusal and unreachability must not share a response, or a test
+		// cannot tell the guard firing from the address simply being down.
+		if errors.Is(err, ErrAddressRefused) {
+			http.Error(w, "egress: destination address refused", http.StatusForbidden)
+			return
+		}
 		http.Error(w, "egress: upstream unreachable", http.StatusBadGateway)
 		return
 	}
