@@ -11,9 +11,20 @@ var valueFlags = map[string]bool{
 	"--query": true,
 }
 
-// positionals returns argv with flags (and the values of known value-taking
-// flags) removed, preserving order.
-func positionals(argv []string) []string {
+// positionals returns argv with flags and known value-taking flags' values
+// removed. extra carries the grant's own `value-flag` list. docs/execverb.md.
+func positionals(argv []string, extra ...string) []string {
+	takesValue := func(tok string) bool {
+		if valueFlags[tok] {
+			return true
+		}
+		for _, f := range extra {
+			if f == tok {
+				return true
+			}
+		}
+		return false
+	}
 	out := make([]string, 0, len(argv))
 	for i := 0; i < len(argv); i++ {
 		tok := argv[i]
@@ -21,7 +32,7 @@ func positionals(argv []string) []string {
 			if strings.IndexByte(tok, '=') >= 0 {
 				continue // --flag=value, self-contained
 			}
-			if valueFlags[tok] && i+1 < len(argv) {
+			if takesValue(tok) && i+1 < len(argv) {
 				i++ // consume the value
 			}
 			continue

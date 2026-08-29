@@ -74,6 +74,7 @@ type Grant struct {
 	Wildcard   bool     // `can run *`: the whole binary passes through
 	AllowFlags []string // non-empty -> strict flag allowlist
 	DenyFlags  []string // default-allow minus these
+	ValueFlags []string // long flags whose value is a separate argv token
 	Gates      []GateSpec
 	Whens      []WhenClause
 	Describe   string
@@ -621,6 +622,36 @@ func (g Grant) validateShape() error {
 	if g.Sealed && !g.ArgvSet {
 		return fmt.Errorf("execverb: grant %q: `sealed` requires a pinned `argv` (nothing to seal without it; fail-closed)", g.subcommandLabel())
 	}
+	return g.validatePositionalSelectors()
+}
+
+// validatePositionalSelectors refuses an argN/any-arg guard beside a flag of
+// unknown arity, which would bind silently wrong. docs/execverb.md.
+func (g Grant) validatePositionalSelectors() error {
+	uses := false
+	for _, wc := range g.Whens {
+		if wc.Selector == "any-arg" || (strings.HasPrefix(wc.Selector, "arg") && isAllDigits(wc.Selector[len("arg"):])) {
+			uses = true
+			break
+		}
+	}
+	if !uses {
+		return nil
+	}
+	declared := make(map[string]bool, len(g.ValueFlags))
+	for _, f := range g.ValueFlags {
+		declared[f] = true
+	}
+	for _, f := range g.AllowFlags {
+		if !strings.HasPrefix(f, "--") || valueFlags[f] || declared[f] {
+			continue
+		}
+		return fmt.Errorf(
+			"execverb: grant %q guards a positional (`argN`/`any-arg`) and allows %q, whose arity is unknown. "+
+				"If it takes a separate value token, declare `value-flag %q` so the value is not read as a positional. "+
+				"If it is a boolean, declare it anyway to state that (fail-closed)",
+			g.subcommandLabel(), f, f)
+	}
 	return nil
 }
 
@@ -789,6 +820,8 @@ func (g *Grant) applyPolicyNode(c *kdl.Node) error {
 		g.DenyFlags = append(g.DenyFlags, v)
 	case "allow-flag":
 		g.AllowFlags = append(g.AllowFlags, v)
+	case "value-flag":
+		g.ValueFlags = append(g.ValueFlags, v)
 	case "describe":
 		g.Describe = v
 	default:

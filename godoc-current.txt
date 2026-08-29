@@ -79,6 +79,7 @@ type Grant struct {
 	Wildcard   bool     // `can run *`: the whole binary passes through
 	AllowFlags []string // non-empty -> strict flag allowlist
 	DenyFlags  []string // default-allow minus these
+	ValueFlags []string // long flags whose value is a separate argv token
 	Gates      []GateSpec
 	Whens      []WhenClause
 	Describe   string

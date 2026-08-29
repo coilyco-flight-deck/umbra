@@ -379,7 +379,7 @@ func checkWhens(ctx context.Context, whens []WhenClause, g Grant, args []string,
 // evalWhen applies a guard's match rule: only/when refuses on no match, never/
 // deny-when on a match. Selector is argv or a `shell <cmd>` fact. See docs.
 func evalWhen(ctx context.Context, wc WhenClause, g Grant, args []string, host HostResolver) error {
-	values, err := selectorValues(ctx, wc, args, host)
+	values, err := selectorValues(ctx, wc, g, args, host)
 	if err != nil {
 		return err // a shell source that fails to resolve fails the guard closed
 	}
@@ -398,9 +398,9 @@ func evalWhen(ctx context.Context, wc WhenClause, g Grant, args []string, host H
 
 // selectorValues resolves a guard's value(s): an argv slot for an argv selector,
 // or the trimmed stdout of a `shell <cmd>` source resolved once via host.
-func selectorValues(ctx context.Context, wc WhenClause, args []string, host HostResolver) ([]string, error) {
+func selectorValues(ctx context.Context, wc WhenClause, g Grant, args []string, host HostResolver) ([]string, error) {
 	if len(wc.SourceCmd) == 0 {
-		return resolveSelector(wc.Selector, args), nil
+		return resolveSelector(wc.Selector, args, g.ValueFlags...), nil
 	}
 	out, err := host(ctx, wc.SourceCmd)
 	if err != nil {
@@ -442,13 +442,13 @@ func firstMatch(values, patterns []string) (val, pat string, ok bool) {
 
 // resolveSelector reads the argv slot a selector names: `any-arg`, `argN`, or
 // the `--<selector>` flag value. Selector forms: docs/execverb.md.
-func resolveSelector(sel string, args []string) []string {
+func resolveSelector(sel string, args []string, valueFlags ...string) []string {
 	switch {
 	case sel == "any-arg":
-		return positionals(args)
+		return positionals(args, valueFlags...)
 	case strings.HasPrefix(sel, "arg") && isAllDigits(sel[len("arg"):]):
 		idx, _ := strconv.Atoi(sel[len("arg"):])
-		pos := positionals(args)
+		pos := positionals(args, valueFlags...)
 		if idx >= 0 && idx < len(pos) {
 			return []string{pos[idx]}
 		}

@@ -30,4 +30,6 @@ A wrap may declare `action` nodes: ordered `call run <grant>` sequences over gra
 
 ## Value flags
 
-`valueFlags` in `cli/execverb/argv.go` names the long flags whose value arrives as a separate token. Without it `--region us-east-1` leaves `us-east-1` looking positional, slipping past an `argN` guard. The table is one vendor's shape and belongs in the guardfile. Dropping an entry weakens any `argN` guard on a binary taking that flag, and does it silently. umbra#282.
+`valueFlags` in `cli/execverb/argv.go` names the long flags whose value arrives as a separate token. Without it `--region us-east-1` leaves `us-east-1` looking positional, slipping past an `argN` guard. The table is one vendor's shape, so a grant declares its own with `value-flag <name>`, merged over the built-ins. umbra#282.
+
+A grant that guards `argN` or `any-arg` while allowing a long flag neither the table nor its own `value-flag` list names is **refused when the guardfile parses**, not at runtime. The arity is unknowable from the flag alone, and guessing it wrong binds the guard to the wrong token with no signal. Declare the flag either way: as a value-taker so the value is consumed, or to state that it is a boolean. agentic-os#1351.
