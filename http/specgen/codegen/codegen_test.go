@@ -350,3 +350,30 @@ func TestRenderWiresProvidersByUsage(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderWiresPlacementHint covers what an operator sees when a wrapped
+// tool's flag lands before the verb: without it the parse error reads as a refusal.
+func TestRenderWiresPlacementHint(t *testing.T) {
+	gf, err := guardfile.Parse([]byte(fixture))
+	if err != nil {
+		t.Fatalf("parse fixture: %v", err)
+	}
+	out, err := Render(gf, "forgejo.guardfile.kdl")
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), "main.go", out, parser.AllErrors); err != nil {
+		t.Fatalf("generated source does not parse: %v", err)
+	}
+	src := string(out)
+	for _, want := range []string{
+		"OnUsageError: placementHint",
+		"func placementHint(",
+		"flag provided but not defined",
+		"not a denied capability",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated source is missing %q", want)
+		}
+	}
+}
