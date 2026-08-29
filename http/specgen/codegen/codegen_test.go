@@ -369,6 +369,8 @@ func TestRenderWiresPlacementHint(t *testing.T) {
 	for _, want := range []string{
 		"OnUsageError: placementHint",
 		"func placementHint(",
+		"func hintPlacement(",
+		"hintPlacement(app.Commands)",
 		"flag provided but not defined",
 		"not a denied capability",
 	} {

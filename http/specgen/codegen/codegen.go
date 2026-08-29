@@ -279,6 +279,17 @@ func main() {
 	}
 }
 
+// hintPlacement sets the handler on every mounted command. urfave raises the
+// parse error on the command that owns the flag, so the root alone never sees it.
+func hintPlacement(cmds []*cli.Command) {
+	for _, c := range cmds {
+		if c.OnUsageError == nil {
+			c.OnUsageError = placementHint
+		}
+		hintPlacement(c.Commands)
+	}
+}
+
 // placementHint keeps an unknown-flag parse error from reading as a refusal.
 // A wrapped tool's flag is rejected before the verb and passes after it.
 func placementHint(_ context.Context, _ *cli.Command, err error, _ bool) error {
@@ -299,6 +310,7 @@ func run() error {
 {{end}}	if err := mountOps(app, w{{if .HasEmbeds}}, embeddedFiles{{end}}); err != nil {
 		return err
 	}
+	hintPlacement(app.Commands)
 	return app.Run(context.Background(), os.Args)
 }
 
