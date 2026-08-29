@@ -1673,6 +1673,11 @@ func Build(cfg Config) (*cli.Command, error)
     leaf command (e.g. `forgejo`). Fails closed: an unresolvable grant is an
     error.
 
+func Descriptors(cfg DescriptorConfig) ([]opcore.Descriptor, opcore.RuntimeConfig, error)
+    Descriptors resolves a spec-driven Guardfile into the pair ParseInline
+    returns. Deny is absence and the cli-only nodes fail closed:
+    specverb-descriptors.md.
+
 func Mount(root *cli.Command, cfg Config) error
     Mount builds the guarded group and grafts it onto root, generating the
     intermediate path groups the Guardfile names. See docs/specverb.md.
@@ -1788,6 +1793,25 @@ type DenyInfo struct {
     DenyInfo is one blocked (verb,resource) class for the describe surface:
     its CLI placement and the teaching message an operator sees when they reach
     for it.
+
+type DescriptorConfig struct {
+	// Guardfile is the parsed L2 policy. Use ParseFile to flatten inherit first.
+	Guardfile *guardfile.Guardfile
+
+	// Spec is the raw Swagger 2.0 / OpenAPI 3.x document bytes, decompressed.
+	Spec []byte
+
+	// Providers registers the resolvers a `value <provider>` source names.
+	Providers map[string]Provider
+
+	// HTTPClient fires the live request. nil uses http.DefaultClient.
+	HTTPClient *http.Client
+
+	// BaseURL overrides the Guardfile base-url. "" uses the Guardfile value.
+	BaseURL string
+}
+    DescriptorConfig is what resolution needs and nothing more. It names no cli
+    type, so a non-cli consumer never reaches for a projection it will not use.
 
 type FetchEnvInfo struct {
 	Name   string `json:"name"`

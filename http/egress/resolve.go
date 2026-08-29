@@ -14,9 +14,8 @@ import (
 // differently from an address that is merely unreachable.
 var ErrAddressRefused = errors.New("egress: destination address refused")
 
-// internalReason names why an address must not be dialled, or "" when it is
-// routable. 169.254.169.254 is link-local, so the cloud metadata endpoint is
-// covered by that case rather than by a special one.
+// internalReason names why an address must not be dialled, or "" when routable.
+// The cloud metadata endpoint is link-local, not a special case: docs/egress.md.
 func internalReason(ip net.IP) string {
 	switch {
 	case ip.IsUnspecified():
@@ -33,12 +32,8 @@ func internalReason(ip net.IP) string {
 	return ""
 }
 
-// resolveRoutable resolves host and returns every address it may be dialled
-// at, refusing the whole host when any single answer is internal.
-//
-// Refusing on any rather than all is deliberate: a rebinding answer mixes a
-// routable address with an internal one, so requiring all to be internal
-// would let the attacker choose which one gets dialled.
+// resolveRoutable returns every address host may be dialled at, refusing the
+// host when any single answer is internal. Any, not all: docs/egress.md.
 func (p *Proxy) resolveRoutable(ctx context.Context, host string) ([]net.IP, error) {
 	if ip := net.ParseIP(host); ip != nil {
 		if reason := p.refuse(ip); reason != "" {
