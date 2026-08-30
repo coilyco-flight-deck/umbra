@@ -71,7 +71,20 @@ Every tool input is a flag, typed from the locked input schema, sorted by name s
 
 ## Credentials and the stdio spawn
 
-A stdio upstream takes its secrets through `env`, never `argv`, because argv is readable by any local process. An http upstream uses the ordinary `auth` block. Both stay symbolic in the parse and resolve per call, so a rotated credential needs no rebuild.
+A stdio upstream takes its secrets through `env`, never `argv`, because argv is readable by any local process. An http upstream uses the ordinary `auth` block, `header-token` or `bearer`. Both stay symbolic in the parse and resolve per call, so a rotated credential needs no rebuild.
+
+**umbra reads a token, it does not go and get one.** MCP's own auth story is OAuth 2.1 `authorization_code` with a browser round-trip and refresh-token storage, and umbra has neither an interactive flow nor anywhere to keep a rotating secret. Any upstream whose credential is already a value somewhere works today; one that only offers the browser flow needs a token minted outside and named through a value chain. [umbra#340](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/340) holds that decision.
+
+So a refusal says which of the two it is, rather than the SDK's bare `Unauthorized`:
+
+```
+mcpclient: connect api (https://host/mcp): the upstream refused the credential
+(HTTP 401); this `mcp http` block declares no `auth`. It advertises OAuth, which
+umbra does not acquire: supply an already-minted token through
+`auth bearer { value ... }`
+```
+
+It distinguishes a credential that was never configured from one that resolved and was rejected, and it says when the server asked for OAuth. A 500 gets none of that, because sending an operator after a token that was never the problem is worse than saying nothing.
 
 **A stdio transport starts a subprocess**, so its command and argv go through `pkg/policy`'s shell-metacharacter check, the same gate every other umbra exec passes. A spawn does not get a weaker gate for arriving through the request surface. The client itself lives in `pkg/mcpclient` rather than a surface, because it expresses no permission.
 

@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os/exec"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
@@ -97,11 +99,27 @@ func Connect(ctx context.Context, s Server) (*Session, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err
 	}
-	sess, err := connect(ctx, s.transport(ctx))
+	transport, probe := s.transportWithProbe(ctx)
+	sess, err := connect(ctx, transport)
 	if err != nil {
+		if probe != nil {
+			if hint := probe.refusal(len(s.HTTP.Headers) > 0); hint != "" {
+				return nil, fmt.Errorf("mcpclient: connect %s: %s: %w", s.label(), hint, err)
+			}
+		}
 		return nil, fmt.Errorf("mcpclient: connect %s: %w", s.label(), err)
 	}
 	return sess, nil
+}
+
+// transportWithProbe builds the transport and, for http, the observer that
+// turns a bare 401 into something an operator can act on.
+func (s Server) transportWithProbe(ctx context.Context) (mcp.Transport, *headerTransport) {
+	if s.HTTP == nil {
+		return s.transport(ctx), nil
+	}
+	client, probe := s.httpClient()
+	return &mcp.StreamableClientTransport{Endpoint: s.HTTP.URL, HTTPClient: client}, probe
 }
 
 // connect completes the handshake over an already-built transport. Separate
@@ -118,10 +136,8 @@ func connect(ctx context.Context, t mcp.Transport) (*Session, error) {
 // transport builds the SDK transport for the declared shape.
 func (s Server) transport(ctx context.Context) mcp.Transport {
 	if s.HTTP != nil {
-		return &mcp.StreamableClientTransport{
-			Endpoint:   s.HTTP.URL,
-			HTTPClient: s.httpClient(),
-		}
+		client, _ := s.httpClient()
+		return &mcp.StreamableClientTransport{Endpoint: s.HTTP.URL, HTTPClient: client}
 	}
 	cmd := exec.CommandContext(ctx, s.Stdio.Command, s.Stdio.Argv...) //nolint:gosec // argv is guardfile-declared and policy-validated above
 	if len(s.Stdio.Env) > 0 {
@@ -130,25 +146,28 @@ func (s Server) transport(ctx context.Context) mcp.Transport {
 	return &mcp.CommandTransport{Command: cmd, TerminateDuration: terminateGrace}
 }
 
-// httpClient returns the caller's client, or one carrying the declared headers.
-func (s Server) httpClient() *http.Client {
+// httpClient returns a client carrying the declared headers, wrapped so a
+// refusal is observed rather than reduced to "Unauthorized".
+func (s Server) httpClient() (*http.Client, *headerTransport) {
 	base := s.HTTP.Client
 	if base == nil {
 		base = &http.Client{Timeout: DefaultTimeout}
 	}
-	if len(s.HTTP.Headers) == 0 {
-		return base
-	}
+	ht := &headerTransport{base: base.Transport, headers: s.HTTP.Headers}
 	clone := *base
-	clone.Transport = &headerTransport{base: base.Transport, headers: s.HTTP.Headers}
-	return &clone
+	clone.Transport = ht
+	return &clone, ht
 }
 
-// headerTransport adds the declared headers to every request. The SDK owns the
-// request construction, so auth attaches here rather than at the call site.
+// headerTransport adds the declared headers to every request and remembers a
+// refusal. The SDK owns request construction, so both happen here.
 type headerTransport struct {
 	base    http.RoundTripper
 	headers map[string]string
+
+	mu        sync.Mutex
+	status    int
+	challenge string
 }
 
 func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -161,7 +180,44 @@ func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	for k, v := range t.headers {
 		out.Header.Set(k, v)
 	}
-	return base.RoundTrip(out)
+	resp, err := base.RoundTrip(out)
+	if err == nil && resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
+		t.mu.Lock()
+		t.status = resp.StatusCode
+		t.challenge = resp.Header.Get("WWW-Authenticate")
+		t.mu.Unlock()
+	}
+	return resp, err
+}
+
+// refusal returns guidance when the upstream rejected the credential, or "".
+// The SDK reports a 401 as the bare word "Unauthorized". See docs/mcpverb.md.
+func (t *headerTransport) refusal(authConfigured bool) string {
+	t.mu.Lock()
+	status, challenge := t.status, t.challenge
+	t.mu.Unlock()
+	if status == 0 {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "the upstream refused the credential (HTTP %d)", status)
+	switch {
+	case !authConfigured:
+		b.WriteString("; this `mcp http` block declares no `auth`")
+	default:
+		b.WriteString("; the declared `auth` value resolved but was rejected")
+	}
+	if wantsOAuth(challenge) {
+		b.WriteString(". It advertises OAuth, which umbra does not acquire: supply an already-minted token through `auth bearer { value ... }`. See docs/mcpverb.md")
+	}
+	return b.String()
+}
+
+// wantsOAuth reports whether a WWW-Authenticate challenge asks for OAuth. The
+// scheme is `Bearer`, and MCP servers add an OAuth resource-metadata pointer.
+func wantsOAuth(challenge string) bool {
+	c := strings.ToLower(challenge)
+	return strings.Contains(c, "bearer") || strings.Contains(c, "oauth")
 }
 
 // label names the upstream in an error without leaking a resolved secret.
