@@ -13,11 +13,12 @@ import (
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 )
 
-// Transport is the dialect one merged member speaks: spec (HTTP/specverb) or
-// exec (wrapped binary/execverb). See docs/specgen.md.
+// Transport is the dialect one merged member speaks: spec (HTTP/specverb),
+// exec (wrapped binary/execverb), or mcp (upstream MCP server/mcpverb).
 const (
 	TransportSpec = "spec"
 	TransportExec = "exec"
+	TransportMCP  = "mcp"
 )
 
 // Params is the per-consumer data the template binds to, derived from the
@@ -85,6 +86,22 @@ func Plan(gf *guardfile.Guardfile, guardfileName string) (Params, error) {
 	}, nil
 }
 
+// PlanMCP derives an mcp member's Params from its wrap group and the provider
+// names its transport uses. No SpecURL: `mcp <transport>` already says where.
+func PlanMCP(group, providers []string, guardfileName string, decls []guardfile.ProviderDecl) (Params, error) {
+	if len(group) == 0 {
+		return Params{}, fmt.Errorf("codegen: mcp Guardfile has no command group")
+	}
+	return Params{
+		Transport:     TransportMCP,
+		Binary:        group[0],
+		GuardfileName: guardfileName,
+		SpecLockName:  group[len(group)-1] + ".tools.lock.json.gz",
+		Providers:     providers,
+		ProviderDecls: decls,
+	}, nil
+}
+
 // PlanExec derives an exec member's Params from its wrap group and the provider
 // names its env injections use; no upstream spec. See specgen.md.
 func PlanExec(group, providers []string, guardfileName string, decls []guardfile.ProviderDecl) (Params, error) {
@@ -101,12 +118,13 @@ func PlanExec(group, providers []string, guardfileName string, decls []guardfile
 }
 
 // SetParams binds the merged-binary template: one shared Binary and N mounts.
-// HasSpec/HasExec gate the per-transport imports the template emits.
+// HasSpec/HasExec/HasMCP gate the per-transport imports the template emits.
 type SetParams struct {
 	Binary    string
 	Mounts    []Params
 	HasSpec   bool
 	HasExec   bool
+	HasMCP    bool
 	HasEmbeds bool
 	// ExecProviders are the consumer-declared resolvers actually named by some
 	// member, deduped. umbra itself ships none. See docs/value-providers.md.
@@ -251,6 +269,9 @@ import (
 {{if .HasSpec}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
 {{end}}{{if .HasExec}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
+{{end}}{{if .HasMCP}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/mcpverb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/mcpclient"
+	"encoding/json"
 {{end}}{{if .HasEmbeds}}	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/embedfile"
 {{end}}	"github.com/urfave/cli/v3"
 )
@@ -260,7 +281,7 @@ import (
 {{range $i, $m := .Mounts}}
 //go:embed {{$m.GuardfileName}}
 var embeddedGuardfile{{$i}} []byte
-{{if eq $m.Transport "spec"}}
+{{if ne $m.Transport "exec"}}
 //go:embed {{$m.SpecLockName}}
 var embeddedSpec{{$i}} []byte
 {{end}}{{range $j, $e := $m.EmbeddedFiles}}
@@ -320,6 +341,9 @@ func mountOps(app *cli.Command, w *audit.Writer{{if .HasEmbeds}}, embeddedFiles 
 	wrap := wrapWith(w)
 	provs := providerRegistry()
 {{range $i, $m := .Mounts}}{{if eq $m.Transport "spec"}}	if err := mountSpec(app, wrap, provs, embeddedGuardfile{{$i}}, embeddedSpec{{$i}}, "{{$m.SpecURL}}", "{{$m.SpecEnvVar}}"); err != nil {
+		return err
+	}
+{{else if eq $m.Transport "mcp"}}	if err := mountMCP(app, wrap, provs, embeddedGuardfile{{$i}}, embeddedSpec{{$i}}); err != nil {
 		return err
 	}
 {{else}}	if err := mountExec(app, wrap, provs, embeddedGuardfile{{$i}}{{if $.HasEmbeds}}, embeddedFiles[{{$i}}]{{end}}); err != nil {
@@ -406,6 +430,20 @@ func fetchSpec(u string) ([]byte, error) {
 		return nil, fmt.Errorf("GET %s -> %s", u, resp.Status)
 	}
 	return io.ReadAll(resp.Body)
+}
+{{end}}{{if .HasMCP}}
+// mountMCP parses one mcp member's policy plus its committed tool lock and
+// mounts the mcpverb tree onto app. Mounting is offline; the first call is not.
+func mountMCP(app *cli.Command, wrap func(verb.Spec) cli.ActionFunc, provs map[string]valuesource.Provider, gfBytes, toolLock []byte) error {
+	gf, err := mcpverb.Parse(gfBytes)
+	if err != nil {
+		return fmt.Errorf("parse mcp guardfile: %w", err)
+	}
+	var tools []mcpclient.Tool
+	if err := json.Unmarshal(toolLock, &tools); err != nil {
+		return fmt.Errorf("decode tool lock: %w", err)
+	}
+	return mcpverb.Mount(app, mcpverb.Config{Guardfile: gf, Tools: tools, Wrap: wrap, Providers: provs})
 }
 {{end}}{{if .HasExec}}
 // mountExec parses one exec member's policy and mounts the execverb tree onto

@@ -12,15 +12,17 @@ Member paths are normalized relative to the root and sorted lexically before ren
 
 ## Mixed transports
 
-A merged binary can hold both dialects: spec members (HTTP APIs) and exec members (wrapped binaries), which ships `ops forgejo` and `ops aws` as one binary. The driver sniffs each transport and both derive their name from `Group[0]`. Generated `main.go` dispatches through `specverb.Mount` or `execverb.Mount`, with spec-only imports gated behind a spec member, so the binary compiles with either dialect alone or both.
+A merged binary can hold all three dialects: spec members (HTTP APIs), exec members (wrapped binaries), and mcp members (upstream MCP servers, see [mcpverb.md](mcpverb.md)), which ships `ops forgejo`, `ops aws`, and `ops fixture` as one binary. The driver sniffs each transport off a child of the `wrap` block (`exec`, `mcp`, otherwise spec) and all three derive their name from `Group[0]`. Generated `main.go` dispatches through `specverb.Mount`, `execverb.Mount`, or `mcpverb.Mount`, with each dialect's imports gated behind a member that needs them, so the binary compiles with any one alone or all three.
 
-An exec member skips every spec-only seam: no spec lock, no fetch or skew, no token. Exec grants may add [embedded fixed files](specgen-materialization.md).
+The `mcp` in a command path like `wrap ward mcp forgejo` is a positional argument rather than a child, so it never sniffs as an mcp transport.
+
+An exec member skips every lock-bearing seam: no lock, no fetch or skew, no token. Exec grants may add [embedded fixed files](specgen-materialization.md). An mcp member has a lock like a spec member, holding its pruned tool surface rather than a pruned Swagger document.
 
 ## The five verbs
 
 - **`gen`** - render merged `main.go` into the cache, or `--out` to inspect it.
-- **`lock`** - the deliberate online step. Per member it reads a vendored source or fetches upstream Swagger, **prunes to the granted surface**, writes a deterministic gzip lock, then freezes the module graph in `specverb.lock`.
-- **`skew`** - prune live upstream to the granted surface and diff against each lock. Exit 3 on drift, never write.
+- **`lock`** - the deliberate online step. Per spec member it reads a vendored source or fetches upstream Swagger; per mcp member it connects and runs `tools/list`. Either way it **prunes to the granted surface**, writes a deterministic gzip lock, then freezes the module graph in `specverb.lock`.
+- **`skew`** - prune live upstream to the granted surface and diff against each lock. Exit 3 on drift, never write. For an mcp member that is tool-schema drift, including a moved `_meta`, which nothing else in the ecosystem detects.
 - **`build`** - materialize out-of-band and copy to `--out` (default `bin`) rather than exec it, following `go build -o`. `--set-version` stamps `--version` via `-ldflags`. Refuses without committed locks.
 - **`run`** - materialize out-of-band and exec with passed-through args. Every spec may carry a top-level [`description`](value-providers.md) node.
 

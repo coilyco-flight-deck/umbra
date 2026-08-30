@@ -26,7 +26,9 @@ is a container's job, and umbra is the gate in front of it.
 
 **Generate the CLI.** `specgen` reads KDL policy plus committed locks out of a
 `.specgen/` directory and builds a standalone guarded CLI with no hand-written
-Go. `--skills-out` also renders a native agent skill and a lazy command index.
+Go, over three transports: an HTTP API from its OpenAPI contract, a wrapped
+binary, and an upstream MCP server. `--skills-out` also renders a native agent
+skill and a lazy command index.
 
 **Import the primitives.** Every package stands alone if you are adding a
 boundary to an existing [urfave/cli](https://github.com/urfave/cli) v3 app.

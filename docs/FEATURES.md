@@ -13,7 +13,8 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 - **egress** - Per-invocation CONNECT proxy with a consumer-supplied allowlist, in enforce or observe mode. Resolves each host and refuses an internal address, dialling the address it checked, and bounds the CONNECT port. See [egress.md](egress.md).
 - **specverb / guardfile** - Spec-driven verbs: [resolution](specverb-resolution.md), [policy](specverb-policy.md), [requests](specverb-request.md), [actions](specverb-actions.md), [describe](specverb-describe.md), [fetch](specverb-fetch.md), [descriptors](specverb-descriptors.md) for a consumer that mounts operations onto something other than a cli tree.
-- **specgen / codegen** - The no-code driver: discovery, locks, generation. See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
+- **mcpverb** - MCP-shaped verbs: one `can call` grant per guarded leaf against an upstream MCP server, flags typed from the committed tool lock, deny by absence. See [mcpverb.md](mcpverb.md).
+- **specgen / codegen** - The no-code driver: discovery, locks, generation, over three transports (spec, exec, mcp). See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
 - **opcore** - The frozen inline grammar: typed query, body projection, GraphQL and SQL grants, JMESPath postconditions, MCP proxy grants, and a named client. See [opcore-inline.md](opcore-inline.md) and [opcore-body.md](opcore-body.md).
 - **respfmt** - JSON renderer with optional JMESPath projection and five output formats, mirroring the aws CLI `--query` / `--output` surface.
 
@@ -27,6 +28,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
   read. See [value providers](value-providers.md).
 - **config** / **stepflow** - Layered-config primitives with a generic `OverlayFile[T]`, and a transport-agnostic ordered sequence engine.
 - **broker** / **credseed** / **provenance** - Credential broker, env seeder, and origin envelope. See [broker.md](broker.md).
+- **mcpclient** - The Model Context Protocol client the mcp dialect speaks: one declared upstream over stdio or Streamable HTTP, and the three calls the dialect needs. Policy-free, so it sits in the core.
 - **scan** / **attribution** / **flock** / **version** / **issueref** / **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
 
 ## See also

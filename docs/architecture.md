@@ -5,7 +5,13 @@ umbra guards two surfaces an agent uses to cause chaos, plus a shared core. The 
 ## The two surfaces
 
 - **CLI passthrough** (`cli/`) - the original reason umbra exists: sit between an agent and an existing binary, audit and validate every argv before `execve`.
-- **HTTP requests** (`http/`) - the extension for load-bearing platforms with no first-class CLI (Forgejo). Guard the request, not the subprocess.
+- **Outbound requests** (`http/`) - the extension for load-bearing platforms with no first-class CLI (Forgejo), and for upstream MCP servers ([mcpverb](mcpverb.md)). Guard the request, not the subprocess.
+
+### The mcp dialect does not make a third surface
+
+It reaches an upstream service, so it belongs to the request surface, and one detail is worth stating rather than leaving to be discovered: **an mcp stdio transport starts a subprocess.** That looks like `cli/` work sitting in `http/`.
+
+It is not, because the split is about what is guarded rather than about syscalls. `cli/` guards a subprocess the operator asked for, where argv **is** the request. An mcp stdio child is transport for a call whose real payload is a tool name and a JSON object, and it is never caller-supplied. The spawn still passes `pkg/policy`, the same argv gate `cli/` uses, so it gains no weaker check by living here. `pkg/mcpclient` holds the client itself, in the core rather than either surface, because it expresses no permission.
 ## The shared core
 
 - **pkg** (`pkg/`) - everything the two surfaces share: audit, policy, scope, exit-code taxonomy, the config/cache plumbing, and the generic skill/command-tree renderers.

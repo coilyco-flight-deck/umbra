@@ -54,6 +54,10 @@ type Runtime struct {
 	dbOnce   sync.Once
 	db       *sqldb.DB
 	dbErr    error
+
+	// MCP is the wrap-level upstream backing `mcp` dialect leaves. Its value
+	// chains stay symbolic here and resolve per call, never at parse.
+	MCP MCPUpstream
 }
 
 // RuntimeConfig is the input to NewRuntime: BaseURL is raw (scheme + trim
@@ -67,6 +71,7 @@ type RuntimeConfig struct {
 	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
 	Database     Database
+	MCP          MCPUpstream
 }
 
 // NewRuntime assembles a Runtime, defaulting the base-url scheme and the HTTP
@@ -85,6 +90,7 @@ func NewRuntime(c RuntimeConfig) *Runtime {
 		Headers:      c.Headers,
 		BaseURLValue: c.BaseURLValue,
 		Database:     c.Database,
+		MCP:          c.MCP,
 	}
 }
 

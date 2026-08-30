@@ -9,7 +9,9 @@ extend-exclude = ["http/specverb/testdata/"]
 [default]
 # The HTTP method, pluralised. typos reads the CONNEC inside CONNECTs as a
 # misspelt CONNECT and would rewrite the method name itself.
-extend-ignore-identifiers-re = ["CONNECTs?"]
+# ser8 is a real host in the fleet, named in an execverb test. typos reads the
+# ser inside it as a misspelt set and would rewrite the machine's name.
+extend-ignore-identifiers-re = ["CONNECTs?", "ser8"]
 
 [default.extend-words]
 # TestMapTypeFailsClosed feeds "objekt" as a type that does not exist. Correcting

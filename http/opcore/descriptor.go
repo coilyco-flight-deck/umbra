@@ -27,6 +27,7 @@ type Descriptor struct {
 	Proxy          *Proxy         // non-nil for an inline MCP proxy grant
 	GraphQL        *GraphQL       // non-nil for a `graphql` grant; owns the whole body
 	SQL            *SQL           // non-nil for a `sql` grant; reaches a database, not a URL
+	MCP            *MCPCall       // non-nil for an `mcp` dialect leaf; reaches a session, not a URL
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-request.md.
 	RawResponse bool

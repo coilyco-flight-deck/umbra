@@ -17,6 +17,7 @@ import (
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/mcpverb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/flock"
@@ -53,8 +54,9 @@ type member struct {
 	Path string
 	// SourcePath is the validated on-disk path used only while loading source.
 	SourcePath string
-	GF         *guardfile.Guardfile // spec dialect; nil for exec members
-	ExecGF     *execverb.Guardfile  // exec dialect; nil for spec members
+	GF         *guardfile.Guardfile // spec dialect; nil for exec and mcp members
+	ExecGF     *execverb.Guardfile  // exec dialect; nil for spec and mcp members
+	MCPGF      *mcpverb.Guardfile   // mcp dialect; nil for spec and exec members
 	Params     codegen.Params
 	Bytes      []byte
 	Embeds     []embeddedFile
@@ -71,6 +73,13 @@ const maxEmbeddedFileBytes = 4 << 20
 
 // isExec reports whether the member speaks the exec dialect.
 func (m member) isExec() bool { return m.Params.Transport == codegen.TransportExec }
+
+// isMCP reports whether the member speaks the mcp dialect.
+func (m member) isMCP() bool { return m.Params.Transport == codegen.TransportMCP }
+
+// hasLock reports whether the member commits an upstream contract: a pruned
+// Swagger document for a spec member, a pruned tool surface for an mcp one.
+func (m member) hasLock() bool { return !m.isExec() }
 
 // group is the operation members that compose one merged binary.
 type group struct {
@@ -130,8 +139,8 @@ func newGroup(dir, selector string, members []member, binaryName string) (*group
 	return &group{Dir: dir, Binary: selector, RuntimeBinary: runtimeBinary, Members: members}, nil
 }
 
-// sniffTransport reads a guardfile's dialect: an `exec` child of the `wrap`
-// block is exec, otherwise spec. Lets the driver pick the right parser.
+// sniffTransport reads a guardfile's dialect from a child of the `wrap` block:
+// `exec` is exec, `mcp` is mcp, otherwise spec. A command path is not a child.
 func sniffTransport(src []byte) (string, error) {
 	doc, err := kdl.ParseString(string(src))
 	if err != nil {
@@ -142,8 +151,11 @@ func sniffTransport(src []byte) (string, error) {
 		return "", fmt.Errorf("specgen: missing top-level `wrap` node")
 	}
 	for _, n := range wrap.Children().Nodes {
-		if n.Name() == "exec" {
+		switch n.Name() {
+		case "exec":
 			return codegen.TransportExec, nil
+		case mcpverb.TransportNode:
+			return codegen.TransportMCP, nil
 		}
 	}
 	return codegen.TransportSpec, nil
@@ -160,24 +172,54 @@ func readMember(path, identity string) (member, error) {
 	if err != nil {
 		return member{}, fmt.Errorf("specgen: sniff %s: %w", path, err)
 	}
-	if transport == codegen.TransportExec {
-		egf, err := execverb.Parse(b)
-		if err != nil {
-			return member{}, fmt.Errorf("specgen: parse exec guardfile %s: %w", path, err)
-		}
-		p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity, egf.ProviderDecls)
-		if err != nil {
-			return member{}, err
-		}
-		embeds, err := readEmbeddedFiles(path, identity, egf.EmbedPaths())
-		if err != nil {
-			return member{}, err
-		}
-		for _, embedded := range embeds {
-			p.EmbeddedFiles = append(p.EmbeddedFiles, codegen.EmbeddedFile{Source: embedded.Source, Name: embedded.Name})
-		}
-		return member{Path: identity, SourcePath: path, ExecGF: egf, Params: p, Bytes: b, Embeds: embeds}, nil
+	switch transport {
+	case codegen.TransportMCP:
+		return readMCPMember(path, identity, b)
+	case codegen.TransportExec:
+		return readExecMember(path, identity, b)
+	default:
+		return readSpecMember(path, identity)
 	}
+}
+
+// readMCPMember parses an mcp-dialect guardfile and plans its member.
+func readMCPMember(path, identity string, src []byte) (member, error) {
+	gf, err := mcpverb.Parse(src)
+	if err != nil {
+		return member{}, fmt.Errorf("specgen: parse mcp guardfile %s: %w", path, err)
+	}
+	p, err := codegen.PlanMCP(gf.Group, gf.Providers(), identity, gf.ProviderDecls)
+	if err != nil {
+		return member{}, err
+	}
+	// The lock stays beside its member's root-relative identity, so two members
+	// with the same wrap name in separate folders never collide.
+	p.SpecLockName = filepath.ToSlash(filepath.Join(filepath.Dir(identity), p.SpecLockName))
+	return member{Path: identity, SourcePath: path, MCPGF: gf, Params: p, Bytes: src}, nil
+}
+
+// readExecMember parses an exec-dialect guardfile and plans its member.
+func readExecMember(path, identity string, src []byte) (member, error) {
+	egf, err := execverb.Parse(src)
+	if err != nil {
+		return member{}, fmt.Errorf("specgen: parse exec guardfile %s: %w", path, err)
+	}
+	p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity, egf.ProviderDecls)
+	if err != nil {
+		return member{}, err
+	}
+	embeds, err := readEmbeddedFiles(path, identity, egf.EmbedPaths())
+	if err != nil {
+		return member{}, err
+	}
+	for _, embedded := range embeds {
+		p.EmbeddedFiles = append(p.EmbeddedFiles, codegen.EmbeddedFile{Source: embedded.Source, Name: embedded.Name})
+	}
+	return member{Path: identity, SourcePath: path, ExecGF: egf, Params: p, Bytes: src, Embeds: embeds}, nil
+}
+
+// readSpecMember parses a spec-dialect guardfile and plans its member.
+func readSpecMember(path, identity string) (member, error) {
 	// Resolve `inherit` into one self-contained document before the typed parse,
 	// so every downstream stage sees the merged grant set (docs/specverb-policy.md).
 	flat, err := guardfile.Flatten(path)
@@ -501,9 +543,12 @@ func (g *group) render() ([]byte, error) {
 	sp := codegen.SetParams{Binary: g.runtimeBinary()}
 	for _, m := range g.Members {
 		sp.Mounts = append(sp.Mounts, m.Params)
-		if m.isExec() {
+		switch {
+		case m.isExec():
 			sp.HasExec = true
-		} else {
+		case m.isMCP():
+			sp.HasMCP = true
+		default:
 			sp.HasSpec = true
 		}
 	}
@@ -617,7 +662,13 @@ func (g *group) commandTree() (*cli.Command, error) {
 func lockSpecs(g *group) (map[string][]byte, error) {
 	specs := map[string][]byte{}
 	for _, m := range g.Members {
-		if m.isExec() {
+		if !m.hasLock() {
+			continue
+		}
+		if m.isMCP() {
+			if err := lockTools(g, m, specs); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		full, err := loadFullSpec(m)
@@ -642,6 +693,62 @@ func lockSpecs(g *group) (map[string][]byte, error) {
 		fmt.Fprintf(os.Stderr, "specgen: locked %s (%d encoded bytes, %d decoded, pruned from %d)\n", m.Params.SpecLockName, encodedSize, len(specBytes), len(full))
 	}
 	return specs, nil
+}
+
+// lockTools connects to an mcp member's upstream, prunes the tool surface to
+// the granted set, and writes the lock through the spec dialect's encoder.
+func lockTools(g *group, m member, specs map[string][]byte) error {
+	live, err := fetchTools(m)
+	if err != nil {
+		return fmt.Errorf("specgen: list tools %s: %w", m.Params.GuardfileName, err)
+	}
+	pruned, err := pruneTools(m.MCPGF, live)
+	if err != nil {
+		return fmt.Errorf("specgen: prune tools %s: %w", m.Params.GuardfileName, err)
+	}
+	encoded, err := encodeTools(pruned)
+	if err != nil {
+		return fmt.Errorf("specgen: %s: %w", m.Params.GuardfileName, err)
+	}
+	lockPath := filepath.Join(g.Dir, m.Params.SpecLockName)
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o750); err != nil {
+		return fmt.Errorf("specgen: create tool lock dir: %w", err)
+	}
+	size, err := writeSpecLock(lockPath, encoded)
+	if err != nil {
+		return fmt.Errorf("specgen: write tool lock: %w", err)
+	}
+	specs[m.Path] = encoded
+	fmt.Fprintf(os.Stderr, "specgen: locked %s (%d encoded bytes, %d tools of %d upstream)\n",
+		m.Params.SpecLockName, size, len(pruned), len(live))
+	return nil
+}
+
+// skewTools reports drift between an mcp member's committed tool lock and its
+// live upstream, pruned to the same granted surface.
+func skewTools(g *group, m member) ([]string, error) {
+	committedBytes, err := readSpecLock(g.Dir, m)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("specgen: no tool lock %s: %w", m.Params.SpecLockName, ErrNoLock)
+		}
+		return nil, fmt.Errorf("specgen: read tool lock: %w", err)
+	}
+	committed, err := decodeTools(committedBytes)
+	if err != nil {
+		return nil, fmt.Errorf("specgen: %s: %w", m.Params.SpecLockName, err)
+	}
+	live, err := fetchTools(m)
+	if err != nil {
+		return nil, fmt.Errorf("specgen: list tools %s: %w", m.Params.GuardfileName, err)
+	}
+	// Pruning live to the same granted surface keeps drift attributable to what
+	// this consumer actually mounts, matching the spec dialect.
+	livePruned, err := pruneTools(m.MCPGF, live)
+	if err != nil {
+		return nil, fmt.Errorf("specgen: prune tools %s: %w", m.Params.GuardfileName, err)
+	}
+	return diffTools(committed, livePruned)
 }
 
 // loadFullSpec returns the member's full upstream spec: a spec vendored beside
@@ -696,8 +803,8 @@ func Lock(opts Options) error {
 	return emitSkill(g, opts.SkillsOut)
 }
 
-// Skew reports operation-level drift between the committed spec lock and live
-// upstream, never writing. ErrSkew signals drift; a fetch failure is a plain error.
+// Skew reports drift between each member's committed lock and live upstream,
+// never writing. ErrSkew signals drift; a fetch failure is a plain error.
 func Skew(opts Options) error {
 	g, err := loadGroup(opts)
 	if err != nil {
@@ -705,45 +812,55 @@ func Skew(opts Options) error {
 	}
 	var drift []string
 	for _, m := range g.Members {
-		if m.isExec() {
-			continue // exec members have no upstream spec to drift against
+		if !m.hasLock() {
+			continue // exec members have no upstream contract to drift against
 		}
-		committed, err := readSpecLock(g.Dir, m)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("specgen: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
-			}
-			return fmt.Errorf("specgen: read spec lock: %w", err)
+		var d []string
+		if m.isMCP() {
+			d, err = skewTools(g, m)
+		} else {
+			d, err = skewSpec(g, m)
 		}
-		live, err := fetchSpec(m.Params.SpecURL)
-		if err != nil {
-			return fmt.Errorf("specgen: fetch spec %s: %w", m.Params.GuardfileName, err)
-		}
-		// Prune live to the same granted slice the committed lock holds, so
-		// drift is reported only for operations this consumer exposes.
-		livePruned, err := specverb.Prune(live, m.GF)
-		if err != nil {
-			return fmt.Errorf("specgen: prune live spec %s: %w", m.Params.GuardfileName, err)
-		}
-		d, err := diffSpecs(committed, livePruned)
 		if err != nil {
 			return err
 		}
 		// Prefix each line with the member so a merged binary's drift is
-		// attributable to the API that moved.
+		// attributable to the upstream that moved.
 		for _, line := range d {
 			drift = append(drift, m.Params.GuardfileName+": "+line)
 		}
 	}
 	if len(drift) > 0 {
-		fmt.Fprintf(os.Stderr, "specgen: %d spec change(s) since lock:\n", len(drift))
+		fmt.Fprintf(os.Stderr, "specgen: %d change(s) since lock:\n", len(drift))
 		for _, d := range drift {
 			fmt.Fprintf(os.Stderr, "  %s\n", d)
 		}
 		return ErrSkew
 	}
-	fmt.Fprintln(os.Stderr, "specgen: no skew; committed spec locks match upstream")
+	fmt.Fprintln(os.Stderr, "specgen: no skew; committed locks match upstream")
 	return nil
+}
+
+// skewSpec diffs one spec member's committed lock against live upstream.
+func skewSpec(g *group, m member) ([]string, error) {
+	committed, err := readSpecLock(g.Dir, m)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("specgen: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
+		}
+		return nil, fmt.Errorf("specgen: read spec lock: %w", err)
+	}
+	live, err := fetchSpec(m.Params.SpecURL)
+	if err != nil {
+		return nil, fmt.Errorf("specgen: fetch spec %s: %w", m.Params.GuardfileName, err)
+	}
+	// Prune live to the same granted slice the committed lock holds, so drift is
+	// reported only for operations this consumer exposes.
+	livePruned, err := specverb.Prune(live, m.GF)
+	if err != nil {
+		return nil, fmt.Errorf("specgen: prune live spec %s: %w", m.Params.GuardfileName, err)
+	}
+	return diffSpecs(committed, livePruned)
 }
 
 // Run materializes the consumer binary out-of-band (building only when stale)
@@ -963,7 +1080,7 @@ func materializeModuleDir(dir string, main []byte, mems []member, specByPath map
 	files := map[string][]byte{"main.go": main}
 	for _, m := range mems {
 		files[m.Params.GuardfileName] = m.Bytes
-		if !m.isExec() {
+		if m.hasLock() {
 			files[m.Params.SpecLockName] = specByPath[m.Path]
 		}
 		for _, embedded := range m.Embeds {

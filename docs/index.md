@@ -3,7 +3,8 @@
 umbra is a security-boundary framework for [urfave/cli](https://github.com/urfave/cli) v3
 applications, sitting between AI agents (or any semi-trusted automation) and the host system.
 What you did not declare does not get through. Policy lives in a KDL guardfile rather than in
-code, enforced across two surfaces: `cli/` around subprocess exec, `http/` around outbound requests.
+code, enforced across two surfaces: `cli/` around subprocess exec, `http/` around outbound requests
+(HTTP APIs and MCP servers alike).
 
 ## Start here
 - [Getting started](getting-started.md) - install it, then watch a refusal.
@@ -14,6 +15,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Architecture](architecture.md) - the two guarded surfaces and the shared core.
 - [Spec-driven verbs](specverb.md) - the three-layer engine behind the HTTP surface.
 - [Exec-dialect verbs](execverb.md) - the same grammar aimed at wrapped binaries.
+- [MCP-dialect verbs](mcpverb.md) - the same grammar aimed at upstream MCP servers.
 
 ## Guides
 - [The no-code driver](specgen.md) - author policy and locks, never Go.

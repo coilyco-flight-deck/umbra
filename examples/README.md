@@ -11,8 +11,9 @@ Each subdirectory is a self-contained urfave/cli app that exercises one feature 
 | [`repocfg/`](repocfg/main.go) | Per-repo verb allowlist loaded from `.ward/ward.yaml`. |
 | [`exitcode/`](exitcode/main.go) | The public exit-code taxonomy for orchestrators. |
 | [`egress/`](egress/main.go) | Per-invocation CONNECT proxy with an allowlist (used by `passthrough.WithEgress`). |
+| [`mcpverb/`](mcpverb/main.go) | The mcp dialect against an MCP server the example starts itself: a granted tool, a guarded argument, and two absent ones. |
 
-Every feature is built on top of `audit`. The other examples wire `audit` in implicitly via `verb.Wrap` or `passthrough.Command`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`.
+Every feature is built on top of `audit`. The other examples wire `audit` in implicitly via `verb.Wrap` or `passthrough.Command`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal.
 
 ## Running
 
@@ -26,6 +27,8 @@ go run ./examples/gittree build
 cd examples/repocfg && go run . list && cd -
 go run ./examples/exitcode policy ; echo "exit: $?"
 go run ./examples/egress allowed
+go run ./examples/mcpverb ops demo list-issue --owner coilyco
+go run ./examples/mcpverb ops demo list-issue --owner admin  # refused by the deny guard
 ```
 
 ## Reading order
