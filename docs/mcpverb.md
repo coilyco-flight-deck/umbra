@@ -71,12 +71,17 @@ A stdio upstream takes its secrets through `env`, never `argv`, because argv is 
 
 **A stdio transport starts a subprocess**, so its command and argv go through `pkg/policy`'s shell-metacharacter check, the same gate every other umbra exec passes. A spawn does not get a weaker gate for arriving through the request surface. The client itself lives in `pkg/mcpclient` rather than a surface, because it expresses no permission.
 
+## Cost per invocation
+
+Each invocation opens a session and closes it, so there is no keep-alive daemon and a stdio child never outlives the call that wanted it. Measured numbers and what they settled: [mcpverb-cost.md](mcpverb-cost.md).
+
 ## What this is not
 
-Each invocation opens a session and closes it, so there is no keep-alive daemon and a stdio child never outlives the call that wanted it. The cost is a cold start per invocation. There is no OAuth browser flow, no editor config import, and no aggregating proxy: those are [umbra#336](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/336)'s deliberate non-goals, and the first one is waiting on a measurement rather than a decision.
+There is no OAuth browser flow, no editor config import, and no aggregating proxy: those are [umbra#336](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/issues/336)'s deliberate non-goals.
 
 ## See also
 
 - [specgen.md](specgen.md) - the driver, its five verbs, and mixed transports.
+- [mcpverb-cost.md](mcpverb-cost.md) - what a call costs, and why there is no daemon.
 - [specverb-descriptors.md](specverb-descriptors.md) - the deny-by-absence rule this inherits.
 - [opcore-inline.md](opcore-inline.md) - the inline grammar's own proxy grants.

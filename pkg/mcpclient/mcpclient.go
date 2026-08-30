@@ -28,6 +28,10 @@ const clientName = "umbra"
 // supplies no deadline, so a silent stdio server cannot hang the CLI.
 const DefaultTimeout = 60 * time.Second
 
+// terminateGrace bounds Close's wait for a stdio child to exit before SIGTERM.
+// The SDK's 5s default costs that per call. See docs/mcpverb.md.
+const terminateGrace = 100 * time.Millisecond
+
 // Server is one fully declared upstream. Exactly one transport is set, which
 // Validate enforces: an under-declared server is a policy hole, not a default.
 type Server struct {
@@ -123,7 +127,7 @@ func (s Server) transport(ctx context.Context) mcp.Transport {
 	if len(s.Stdio.Env) > 0 {
 		cmd.Env = append(cmd.Environ(), s.Stdio.Env...)
 	}
-	return &mcp.CommandTransport{Command: cmd}
+	return &mcp.CommandTransport{Command: cmd, TerminateDuration: terminateGrace}
 }
 
 // httpClient returns the caller's client, or one carrying the declared headers.

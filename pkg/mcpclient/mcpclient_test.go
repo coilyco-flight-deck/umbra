@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -224,5 +225,29 @@ func TestValidate(t *testing.T) {
 				t.Errorf("Validate = %v, want it to contain %q", err, c.wantErr)
 			}
 		})
+	}
+}
+
+func TestStdioTransport_BoundsTheTerminateWait(t *testing.T) {
+	// Measured at 5.2s per call against the reference server before this was
+	// set, because it does not exit when stdin closes. See umbra#338.
+	s := Server{Name: "x", Stdio: &Stdio{Command: "node", Argv: []string{"server.js"}}}
+	ct, ok := s.transport(context.Background()).(*mcp.CommandTransport)
+	if !ok {
+		t.Fatalf("stdio transport = %T, want *mcp.CommandTransport", s.transport(context.Background()))
+	}
+	if ct.TerminateDuration <= 0 {
+		t.Fatal("TerminateDuration is unset, so Close falls back to the SDK's 5s")
+	}
+	if ct.TerminateDuration > time.Second {
+		t.Errorf("TerminateDuration = %v, want well under a second", ct.TerminateDuration)
+	}
+}
+
+func TestHTTPTransport_CarriesNoTerminateWait(t *testing.T) {
+	// Nothing is spawned, so there is nothing to wait for.
+	s := Server{Name: "x", HTTP: &HTTPEndpoint{URL: "https://host/mcp"}}
+	if _, ok := s.transport(context.Background()).(*mcp.StreamableClientTransport); !ok {
+		t.Errorf("http transport = %T, want *mcp.StreamableClientTransport", s.transport(context.Background()))
 	}
 }
