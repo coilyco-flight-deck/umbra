@@ -28,6 +28,9 @@ type Descriptor struct {
 	GraphQL        *GraphQL       // non-nil for a `graphql` grant; owns the whole body
 	SQL            *SQL           // non-nil for a `sql` grant; reaches a database, not a URL
 	MCP            *MCPCall       // non-nil for an `mcp` dialect leaf; reaches a session, not a URL
+	// Meta is upstream `_meta`, kept verbatim and never interpreted. A served
+	// surface forwards it; MCP Apps addresses its widget there.
+	Meta map[string]any
 	// RawResponse marks a success response offering no JSON, written through
 	// untouched. See docs/specverb-request.md.
 	RawResponse bool
@@ -88,6 +91,7 @@ type Field struct {
 	Raw          bool
 	Required     bool // required in the schema, enforced at request assembly
 	Desc         string
+	Enum         []any    // permitted values, when the upstream schema names a closed set
 	Minimum      *float64 // inclusive numeric lower bound
 	Maximum      *float64 // inclusive numeric upper bound
 	MinItems     *int     // inclusive array-length lower bound

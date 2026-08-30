@@ -65,6 +65,10 @@ An MCP tool name is a flat identifier, so it lowers to one kebab-case leaf direc
 
 Every tool input is a flag, typed from the locked input schema, sorted by name so generated help and the lock stay stable. An `enum` reaches the flag's help text, since it is the constraint a caller cannot infer from the type. A nested object arrives as JSON in a single flag. `restrict` gates the bound arguments, which is this dialect's equivalent of the path segments it gates elsewhere.
 
+## Serving the granted surface
+
+`mcpverb.ServedTools` projects the same grants into the tool definitions a server advertises, for a consumer that serves them. umbra builds that surface and does not serve it. See [mcpverb-serving.md](mcpverb-serving.md).
+
 ## Credentials and the stdio spawn
 
 A stdio upstream takes its secrets through `env`, never `argv`, because argv is readable by any local process. An http upstream uses the ordinary `auth` block. Both stay symbolic in the parse and resolve per call, so a rotated credential needs no rebuild.
@@ -84,4 +88,5 @@ There is no OAuth browser flow, no editor config import, and no aggregating prox
 - [specgen.md](specgen.md) - the driver, its five verbs, and mixed transports.
 - [mcpverb-cost.md](mcpverb-cost.md) - what a call costs, and why there is no daemon.
 - [specverb-descriptors.md](specverb-descriptors.md) - the deny-by-absence rule this inherits.
+- [mcpverb-serving.md](mcpverb-serving.md) - projecting the same grants into a served surface.
 - [opcore-inline.md](opcore-inline.md) - the inline grammar's own proxy grants.

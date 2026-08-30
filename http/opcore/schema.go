@@ -25,6 +25,7 @@ type Property struct {
 	Location     string // path|query|body|form (neutral hint)
 	UpstreamName string // outgoing query parameter when it differs from the local property name
 	Description  string
+	Enum         []any
 	Minimum      *float64
 	Maximum      *float64
 	MinItems     *int
@@ -81,6 +82,7 @@ func (f Field) toProperty(loc string) Property {
 		Location:     loc,
 		UpstreamName: f.UpstreamName,
 		Description:  f.Desc,
+		Enum:         f.Enum,
 		Raw:          f.Raw,
 		Minimum:      f.Minimum,
 		Maximum:      f.Maximum,
@@ -197,6 +199,9 @@ func (p Property) schemaEntry() map[string]any {
 	entry := map[string]any{"type": p.Type}
 	if p.Description != "" {
 		entry["description"] = p.Description
+	}
+	if len(p.Enum) > 0 {
+		entry["enum"] = p.Enum
 	}
 	if p.Raw {
 		entry["x-opcore-raw"] = true

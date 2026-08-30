@@ -68,6 +68,9 @@ func fieldFromSchema(name string, schema map[string]any, depth int) (opcore.Fiel
 		Type: schemaType(schema),
 		Desc: describe(schema),
 	}
+	if values, ok := schema["enum"].([]any); ok && len(values) > 0 {
+		f.Enum = values
+	}
 	f.Minimum = numberAt(schema, "minimum")
 	f.Maximum = numberAt(schema, "maximum")
 	f.MinItems = intAt(schema, "minItems")

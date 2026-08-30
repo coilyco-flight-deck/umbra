@@ -90,6 +90,8 @@ func descriptorFor(group []string, g Grant, tool mcpclient.Tool) (opcore.Descrip
 		Describe:    describe,
 		Destructive: g.Destructive,
 		FailWhen:    g.FailWhen,
+		// Forwarded verbatim for a served surface, never interpreted here.
+		Meta: tool.Meta,
 		// Every input is a key of the tool's single argument object, so they all
 		// land in the body slot. MCP has no path or query to split them across.
 		BodyFlags: fields,
