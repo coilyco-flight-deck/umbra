@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -273,8 +274,13 @@ func (w *Writer) WrapHook(ctx context.Context, base Record, fn func() error, onC
 	rec.ExitCode = 0
 	rec.DurationMS = w.now().Sub(start).Milliseconds()
 	if err != nil {
-		rec.ExitCode = 1
+		// The taxonomy the error already carries, rather than a flat 1: a row
+		// that cannot separate a refusal from a bad flag is read weeks later.
+		rec.ExitCode = exitcode.Of(err)
 		rec.Error = err.Error()
+		if rec.ExitCode == exitcode.PolicyDenied {
+			rec.Decision = DecisionReject
+		}
 	}
 	if onComplete != nil {
 		onComplete(&rec)

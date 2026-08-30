@@ -87,6 +87,18 @@ func (e *CodedError) WithReason(reason string) *CodedError {
 	return e
 }
 
+// Of returns the exit code err declares, or Generic when it declares none.
+// A nil error is Success. See docs/architecture.md.
+func Of(err error) int {
+	if err == nil {
+		return Success
+	}
+	if c := From(err); c != nil {
+		return c.Code()
+	}
+	return Generic
+}
+
 // From returns the deepest Coded error in the chain, or nil if none.
 func From(err error) Coded {
 	var c Coded

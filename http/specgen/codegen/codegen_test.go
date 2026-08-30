@@ -379,3 +379,31 @@ func TestRenderWiresPlacementHint(t *testing.T) {
 		}
 	}
 }
+
+// TestRender_GeneratedMainHonoursTheTaxonomy guards umbra#341: the template
+// printed a coded error and exited 1, discarding the code the engines build.
+func TestRender_GeneratedMainHonoursTheTaxonomy(t *testing.T) {
+	gf, err := guardfile.Parse([]byte(fixture))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	main, err := Render(gf, "forgejo.guardfile.kdl")
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	src := string(main)
+	for _, want := range []string{
+		"os.Exit(exitcode.Of(err))",
+		"os.Exit(exitcode.UserError)",
+		"CommandNotFound: unknownVerb",
+		"umbra/pkg/exitcode",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated main is missing %q", want)
+		}
+	}
+	// The flat exit that made the taxonomy unreadable must not come back.
+	if strings.Contains(src, "os.Exit(1)") {
+		t.Error("generated main still exits 1 on a coded error")
+	}
+}
