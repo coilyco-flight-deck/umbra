@@ -80,7 +80,28 @@ type Grant struct {
 	Allow    []opcore.ProxyRule
 	Deny     []opcore.ProxyRule
 	PostCall []opcore.ProxyRule
+
+	// Widget declares what this tool's MCP Apps view may call back. Absent
+	// means nothing reaches the upstream. See docs/mcpapps.md.
+	Widget *Widget
 }
+
+// Widget is the `widget { ... }` block inside a grant, taking the same
+// `can call` sentence the outer block does.
+type Widget struct {
+	Grants []Grant
+	Reads  []ReadRule
+}
+
+// ReadRule is one `can read` / `never read` sentence: an unanchored regex over
+// the whole resource URI, deny by absence like the tool grants.
+type ReadRule struct {
+	Modal   string // can | cannot | never
+	Pattern string
+}
+
+// IsDeny reports whether the read rule closes a URI rather than opening it.
+func (r ReadRule) IsDeny() bool { return r.Modal == "cannot" || r.Modal == "never" }
 
 // IsDeny reports whether the grant closes a tool rather than opening it.
 func (g Grant) IsDeny() bool { return g.Modal == "cannot" || g.Modal == "never" }
@@ -294,7 +315,7 @@ func (gf *Guardfile) applyGrant(n *kdl.Node) error {
 			return fmt.Errorf("mcpverb: %s call %s: %w", g.Modal, tool, err)
 		}
 	}
-	if g.IsDeny() && (len(g.Allow) > 0 || len(g.Deny) > 0 || len(g.PostCall) > 0 || g.FailWhen != "") {
+	if g.IsDeny() && (len(g.Allow) > 0 || len(g.Deny) > 0 || len(g.PostCall) > 0 || g.FailWhen != "" || g.Widget != nil) {
 		return fmt.Errorf("mcpverb: %s call %s: a deny mounts no leaf, so it carries no guards (fail-closed)", g.Modal, tool)
 	}
 	gf.Grants = append(gf.Grants, g)
@@ -320,9 +341,109 @@ func applyGrantChild(g *Grant, c *kdl.Node) error {
 		return nil
 	case "allow", "deny", "post-call":
 		return appendRule(g, c)
+	case "widget":
+		return applyWidget(g, c)
 	default:
-		return fmt.Errorf("unknown node %q (want name | describe | message | fail-when | destructive | allow | deny | post-call; fail-closed)", c.Name())
+		return fmt.Errorf("unknown node %q (want name | describe | message | fail-when | destructive | allow | deny | post-call | widget; fail-closed)", c.Name())
 	}
+}
+
+// applyWidget reads the `widget { ... }` block: what the tool's MCP Apps view
+// may call back. One block per grant, so two cannot silently union.
+func applyWidget(g *Grant, n *kdl.Node) error {
+	if g.Widget != nil {
+		return fmt.Errorf("duplicate `widget` block; a grant declares one view policy (fail-closed)")
+	}
+	if len(n.Arguments()) > 0 {
+		return fmt.Errorf("`widget` takes no arguments, only a body (fail-closed)")
+	}
+	w := &Widget{}
+	for _, c := range n.Children().Nodes {
+		if err := applyWidgetChild(w, c); err != nil {
+			return fmt.Errorf("widget: %w", err)
+		}
+	}
+	g.Widget = w
+	return nil
+}
+
+// applyWidgetChild dispatches one sentence of a widget body.
+func applyWidgetChild(w *Widget, c *kdl.Node) error {
+	switch c.Name() {
+	case "can", "cannot", "never":
+	default:
+		return fmt.Errorf("unknown node %q (want can | cannot | never; fail-closed)", c.Name())
+	}
+	args := c.Arguments()
+	if len(args) < 1 {
+		return fmt.Errorf("`%s` needs `call <tool>` or `read \"<regex>\"` (fail-closed)", c.Name())
+	}
+	switch args[0].String() {
+	case "call":
+		return applyWidgetCall(w, c)
+	case "read":
+		return applyWidgetRead(w, c)
+	default:
+		return fmt.Errorf("`%s %s` is not a widget sentence (want call | read; fail-closed)", c.Name(), args[0].String())
+	}
+}
+
+// applyWidgetCall reads one `<modal> call <tool> { ... }` sentence inside a
+// widget block. A wildcard is refused here even though the outer block takes one.
+func applyWidgetCall(w *Widget, c *kdl.Node) error {
+	args := c.Arguments()
+	if len(args) != 2 {
+		return fmt.Errorf("`%s call` needs exactly one tool name (fail-closed)", c.Name())
+	}
+	tool := args[1].String()
+	switch tool {
+	case "":
+		return fmt.Errorf("`%s call` needs a non-empty tool name", c.Name())
+	case WildcardTool:
+		return fmt.Errorf("`%s call *` is refused inside `widget`; name each tool a view may call (fail-closed)", c.Name())
+	}
+	g := Grant{Modal: c.Name(), Tool: tool}
+	for _, b := range c.Children().Nodes {
+		if err := applyWidgetGrantChild(&g, b); err != nil {
+			return fmt.Errorf("%s call %s: %w", g.Modal, tool, err)
+		}
+	}
+	if g.IsDeny() && (len(g.Allow) > 0 || len(g.Deny) > 0) {
+		return fmt.Errorf("%s call %s: a deny grants no call, so it carries no guards (fail-closed)", g.Modal, tool)
+	}
+	w.Grants = append(w.Grants, g)
+	return nil
+}
+
+// applyWidgetGrantChild dispatches one child of a widget grant body. A view call
+// mounts no CLI leaf, so the leaf-shaped settings are refused.
+func applyWidgetGrantChild(g *Grant, c *kdl.Node) error {
+	switch c.Name() {
+	case "allow", "deny":
+		return appendRule(g, c)
+	default:
+		return fmt.Errorf("unknown node %q; a view call mounts no leaf, so it takes only allow | deny (fail-closed)", c.Name())
+	}
+}
+
+// applyWidgetRead reads one `<modal> read "<regex>"` sentence.
+func applyWidgetRead(w *Widget, c *kdl.Node) error {
+	args := c.Arguments()
+	if len(args) != 2 {
+		return fmt.Errorf("`%s read` needs exactly one regex, e.g. `%s read \"^ui://\"` (fail-closed)", c.Name(), c.Name())
+	}
+	pattern := args[1].String()
+	if pattern == "" {
+		return fmt.Errorf("`%s read` has an empty regex (fail-closed)", c.Name())
+	}
+	if _, err := regexp.Compile(pattern); err != nil {
+		return fmt.Errorf("`%s read` regex %q does not compile: %w", c.Name(), pattern, err)
+	}
+	if len(c.Children().Nodes) > 0 {
+		return fmt.Errorf("`%s read` takes no body (fail-closed)", c.Name())
+	}
+	w.Reads = append(w.Reads, ReadRule{Modal: c.Name(), Pattern: pattern})
+	return nil
 }
 
 // stringTarget maps a grant-body node name onto the field it sets, nil when the

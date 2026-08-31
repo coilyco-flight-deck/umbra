@@ -13,6 +13,7 @@ Each subdirectory is a self-contained urfave/cli app that exercises one feature 
 | [`egress/`](egress/main.go) | Per-invocation CONNECT proxy with an allowlist (used by `passthrough.WithEgress`). |
 | [`mcpverb/`](mcpverb/main.go) | The mcp dialect against an MCP server the example starts itself: a granted tool, a guarded argument, and two absent ones. |
 | [`mcpverb-cli/`](mcpverb-cli/README.md) | The same dialect the product way: KDL policy plus a committed lock, no Go, over the published MCP reference server via stdio. |
+| [`mcpapps/`](mcpapps/main.go) | The MCP Apps host bridge: a widget's real frame sequence replayed against a live session, with the calls its `widget` block does not grant refused. |
 
 Every feature is built on top of `audit`. The other examples wire `audit` in implicitly via `verb.Wrap` or `passthrough.Command`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal. `mcpverb-cli/` has no Go at all: it is a `.specgen` project built by the driver.
 
@@ -30,6 +31,7 @@ go run ./examples/exitcode policy ; echo "exit: $?"
 go run ./examples/egress allowed
 go run ./examples/mcpverb ops demo list-issue --owner coilyco
 go run ./examples/mcpverb ops demo list-issue --owner admin  # refused by the deny guard
+go run ./examples/mcpapps                                   # the frame log, granted calls and refusals
 ```
 
 `mcpverb-cli/` is built rather than `go run`, and needs `npx` on PATH for its

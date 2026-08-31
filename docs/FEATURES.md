@@ -13,7 +13,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 - **egress** - Per-invocation CONNECT proxy with a consumer-supplied allowlist, in enforce or observe mode. Resolves each host and refuses an internal address, dialling the address it checked, and bounds the CONNECT port. See [egress.md](egress.md).
 - **specverb / guardfile** - Spec-driven verbs: [resolution](specverb-resolution.md), [policy](specverb-policy.md), [requests](specverb-request.md), [actions](specverb-actions.md), [describe](specverb-describe.md), [fetch](specverb-fetch.md), [descriptors](specverb-descriptors.md) for a consumer that mounts operations onto something other than a cli tree.
-- **mcpverb** - MCP-shaped verbs: one `can call` grant per guarded leaf against an upstream MCP server, flags typed from the committed tool lock, deny by absence. `ServedTools` projects the same grants back into tool definitions for a consumer that serves them. See [mcpverb.md](mcpverb.md).
+- **mcpverb** - MCP-shaped verbs: one `can call` grant per guarded leaf against an upstream MCP server, flags typed from the committed tool lock, deny by absence. `ServedTools` projects the same grants back into tool definitions for a consumer that serves them, and a grant's `widget` block declares what that tool's MCP Apps view may call back. See [mcpverb.md](mcpverb.md).
 - **specgen / codegen** - The no-code driver: discovery, locks, generation, over three transports (spec, exec, mcp). See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
 - **opcore** - The frozen inline grammar: typed query, body projection, GraphQL and SQL grants, JMESPath postconditions, MCP proxy grants, and a named client. See [opcore-inline.md](opcore-inline.md) and [opcore-body.md](opcore-body.md).
 - **respfmt** - JSON renderer with optional JMESPath projection and five output formats, mirroring the aws CLI `--query` / `--output` surface.
@@ -29,6 +29,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 - **config** / **stepflow** - Layered-config primitives with a generic `OverlayFile[T]`, and a transport-agnostic ordered sequence engine.
 - **broker** / **credseed** / **provenance** - Credential broker, env seeder, and origin envelope. See [broker.md](broker.md).
 - **mcpclient** - The Model Context Protocol client the mcp dialect speaks: one declared upstream over stdio or Streamable HTTP, and the three calls the dialect needs. Policy-free, so it sits in the core.
+- **mcpapps** - The MCP Apps host bridge: the frames a rendered widget sends back, answered under the guardfile's `widget` block rather than forwarded. Transport-free and policy-free, so a consumer supplies the presenter and `http/mcpverb` supplies the policy. See [mcpapps.md](mcpapps.md).
 - **scan** / **attribution** / **flock** / **version** / **issueref** / **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
 
 ## See also

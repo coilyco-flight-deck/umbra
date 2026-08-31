@@ -180,7 +180,13 @@ func (rt *Runtime) mcpHeaders(ctx context.Context) (map[string]string, error) {
 
 // checkProxyRules enforces the request-side guards over the bound arguments.
 func checkProxyRules(call *MCPCall, args map[string]any) error {
-	for _, r := range call.Deny {
+	return CheckProxyRules(call.Allow, call.Deny, args)
+}
+
+// CheckProxyRules enforces request-side allow and deny guards over one argument
+// map. Exported so the MCP Apps host refuses on identical regex semantics.
+func CheckProxyRules(allow, deny []ProxyRule, args map[string]any) error {
+	for _, r := range deny {
 		v, ok := stringField(args, r.Field)
 		if !ok {
 			continue
@@ -189,7 +195,7 @@ func checkProxyRules(call *MCPCall, args map[string]any) error {
 			return proxyDenied(r, "deny", v)
 		}
 	}
-	for _, r := range call.Allow {
+	for _, r := range allow {
 		v, ok := stringField(args, r.Field)
 		if !ok {
 			continue

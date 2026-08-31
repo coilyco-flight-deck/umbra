@@ -40,7 +40,7 @@ A general MCP client calls tools. It has no policy, no audit row, no postconditi
 
 `specgen skew` prunes live upstream the same way and diffs, exiting 3 on drift. It reports a tool that went away, one that appeared inside the granted surface, and one whose input schema, output schema, `_meta`, annotations, description, or title moved. **Nothing else locks MCP tool schemas**, so nothing else can tell you one changed rather than print what it is today.
 
-`_meta` is preserved verbatim through the lock rather than parsed. MCP Apps addresses its widget at `_meta.ui`, and a lock that dropped unknown keys would lose that silently. It is part of the compared value, so a widget that repoints is drift.
+`_meta` is preserved verbatim through the lock rather than parsed. MCP Apps addresses its widget at `_meta.ui`, and a lock that dropped unknown keys would lose that silently. It is part of the compared value, so a widget that repoints is drift. What it may call back: [mcpapps.md](mcpapps.md).
 
 ## Grants
 
@@ -102,4 +102,5 @@ There is no OAuth browser flow, no editor config import, and no aggregating prox
 - [mcpverb-cost.md](mcpverb-cost.md) - what a call costs, and why there is no daemon.
 - [specverb-descriptors.md](specverb-descriptors.md) - the deny-by-absence rule this inherits.
 - [mcpverb-serving.md](mcpverb-serving.md) - projecting the same grants into a served surface.
+- [mcpapps.md](mcpapps.md) - the MCP Apps host and its `widget` block.
 - [opcore-inline.md](opcore-inline.md) - the inline grammar's own proxy grants.
