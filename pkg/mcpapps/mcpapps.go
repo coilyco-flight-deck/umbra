@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/mcpclient"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -29,10 +30,13 @@ const (
 	MethodInitialized   = "ui/notifications/initialized"
 	MethodToolResult    = "ui/notifications/tool-result"
 	MethodSizeChanged   = "ui/notifications/size-changed"
+	MethodOpenLink      = "ui/open-link"
+	MethodDownloadFile  = "ui/download-file"
 	MethodToolsCall     = "tools/call"
 	MethodToolsList     = "tools/list"
 	MethodResourcesRead = "resources/read"
 	MethodResourcesList = "resources/list"
+	MethodProgress      = "notifications/progress"
 )
 
 // JSON-RPC codes this host returns. PolicyDenied is in the implementation-
@@ -47,8 +51,9 @@ const (
 // Session is the upstream this host proxies to: the subset of
 // *mcpclient.Session a view can reach, which that type already satisfies.
 type Session interface {
-	CallTool(ctx context.Context, name string, args map[string]any) (mcpclient.Result, error)
+	Call(ctx context.Context, c mcpclient.Call) (mcpclient.Result, error)
 	ReadResource(ctx context.Context, uri string) (*mcp.ReadResourceResult, error)
+	ListResources(ctx context.Context) ([]mcpclient.Resource, error)
 }
 
 // Policy decides what a view may reach. This package holds the interface and
@@ -64,6 +69,14 @@ type Policy interface {
 
 	// CheckResourceRead reports why this view-initiated read is refused, or nil.
 	CheckResourceRead(uri string) error
+
+	// CheckOpenLink reports why opening this URL for the view is refused, or
+	// nil. Opening a URL an untrusted view chose is its own grant.
+	CheckOpenLink(url string) error
+
+	// CheckSaveFile reports why handing this resource to the viewer to save is
+	// refused, or nil. It gates the URI of a link and of an inline resource.
+	CheckSaveFile(uri string) error
 }
 
 // Implementation names a party to the handshake, matching MCP's own shape.
@@ -97,6 +110,35 @@ type Host struct {
 	// Policy gates every view-initiated call. A nil Policy permits none, which
 	// is what makes an undeclared widget inert.
 	Policy Policy
+
+	// Emit posts an unsolicited frame to the view. The SDK calls it from its own
+	// goroutine, so it must be safe concurrently. nil drops them.
+	Emit func(Reply)
+
+	// OpenLink opens a URL the policy permitted. nil leaves `openLinks`
+	// undeclared, so a view learns rather than asking for what never happens.
+	OpenLink func(ctx context.Context, url string) error
+
+	// SaveFile hands permitted contents to the viewer. nil leaves
+	// `downloadFile` undeclared, for the same reason.
+	SaveFile func(ctx context.Context, items []DownloadItem) error
+
+	// mu guards tokens, which correlates one upstream progress token back to
+	// the view's own. See docs/mcpapps.md.
+	mu     sync.Mutex
+	tokens map[string]any
+	nextID uint64
+}
+
+// DownloadItem is one entry of a ui/download-file request, a link the host
+// fetches or an inline resource. URI addresses both, and is what is gated.
+type DownloadItem struct {
+	URI      string
+	MIMEType string
+
+	// Raw is the item as the view sent it, so a handler saving inline bytes
+	// reads them without this package modelling every content shape.
+	Raw json.RawMessage
 }
 
 // Frame is one inbound JSON-RPC message from the view. ID is raw because a
@@ -195,11 +237,11 @@ func (h *Host) HandleFrame(ctx context.Context, f Frame) []Reply {
 	case MethodResourcesRead:
 		return h.replyOrNothing(f, h.resourcesRead(ctx, f.Params))
 	case MethodResourcesList:
-		// The view sees the surface the guardfile granted, and this host grants
-		// resources one read at a time rather than as a browsable list.
-		return h.replyOrNothing(f, func() (any, *RPCError) {
-			return map[string]any{"resources": []any{}}, nil
-		})
+		return h.replyOrNothing(f, h.resourcesList(ctx))
+	case MethodOpenLink:
+		return h.replyOrNothing(f, h.openLink(ctx, f.Params))
+	case MethodDownloadFile:
+		return h.replyOrNothing(f, h.downloadFile(ctx, f.Params))
 	default:
 		if !f.IsRequest() {
 			// An unsolicited notification (size-changed, cancelled) needs no
@@ -234,16 +276,25 @@ func (h *Host) initializeResult() map[string]any {
 	if info.Name == "" {
 		info = Implementation{Name: "umbra", Version: "v0"}
 	}
+	// Load-bearing rather than informational: a view that does not see
+	// serverTools declared will not send tools/call at all.
+	caps := map[string]any{
+		"serverTools":     map[string]any{"listChanged": false},
+		"serverResources": map[string]any{"listChanged": false},
+	}
+	// Declared only when wired. A capability this host would answer -32601 to
+	// is the same silent failure as omitting one it does answer.
+	if h.OpenLink != nil {
+		caps["openLinks"] = map[string]any{}
+	}
+	if h.SaveFile != nil {
+		caps["downloadFile"] = map[string]any{}
+	}
 	return map[string]any{
-		"protocolVersion": ProtocolVersion,
-		"hostInfo":        info,
-		"hostCapabilities": map[string]any{
-			// Load-bearing rather than informational: a view that does not see
-			// serverTools declared will not send tools/call at all.
-			"serverTools":     map[string]any{"listChanged": false},
-			"serverResources": map[string]any{"listChanged": false},
-		},
-		"hostContext": hostCtx,
+		"protocolVersion":  ProtocolVersion,
+		"hostInfo":         info,
+		"hostCapabilities": caps,
+		"hostContext":      hostCtx,
 	}
 }
 
@@ -290,6 +341,9 @@ func putIf(m map[string]any, key, val string) {
 type callParams struct {
 	Name      string         `json:"name"`
 	Arguments map[string]any `json:"arguments"`
+	Meta      struct {
+		ProgressToken any `json:"progressToken"`
+	} `json:"_meta"`
 }
 
 // toolsCall gates one view-initiated call and forwards what policy permits.
@@ -311,12 +365,69 @@ func (h *Host) toolsCall(ctx context.Context, raw json.RawMessage) func() (any, 
 		if h.Session == nil {
 			return nil, &RPCError{Code: CodeUpstreamFailed, Message: "this host has no upstream session"}
 		}
-		res, err := h.Session.CallTool(ctx, p.Name, p.Arguments)
+		upstream := h.mintToken(p.Meta.ProgressToken)
+		defer h.releaseToken(upstream)
+		res, err := h.Session.Call(ctx, mcpclient.Call{
+			Name: p.Name, Arguments: p.Arguments, ProgressToken: upstream,
+		})
 		if err != nil {
 			return nil, &RPCError{Code: CodeUpstreamFailed, Message: err.Error()}
 		}
 		return callResult(res), nil
 	}
+}
+
+// mintToken records the view's progress token under one this host owns, so two
+// views cannot collide on a token either one chose. See docs/mcpapps.md.
+func (h *Host) mintToken(viewToken any) any {
+	if viewToken == nil || h.Emit == nil {
+		return nil
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.tokens == nil {
+		h.tokens = map[string]any{}
+	}
+	h.nextID++
+	mine := fmt.Sprintf("umbra-%d", h.nextID)
+	h.tokens[mine] = viewToken
+	return mine
+}
+
+// releaseToken drops the correlation once its call has returned.
+func (h *Host) releaseToken(mine any) {
+	key, ok := mine.(string)
+	if !ok {
+		return
+	}
+	h.mu.Lock()
+	delete(h.tokens, key)
+	h.mu.Unlock()
+}
+
+// HandleProgress forwards one upstream progress notification to the view under
+// its own token. Wire it as mcpclient.Options.OnProgress.
+func (h *Host) HandleProgress(p mcpclient.Progress) {
+	key, ok := p.Token.(string)
+	if !ok || h.Emit == nil {
+		return
+	}
+	h.mu.Lock()
+	viewToken, known := h.tokens[key]
+	h.mu.Unlock()
+	if !known {
+		// A token this host did not mint belongs to no view in flight, so
+		// correlating it would report progress on the wrong call.
+		return
+	}
+	params := map[string]any{"progressToken": viewToken, "progress": p.Progress}
+	if p.Total != 0 {
+		params["total"] = p.Total
+	}
+	if p.Message != "" {
+		params["message"] = p.Message
+	}
+	h.Emit(Notify(MethodProgress, params))
 }
 
 // permitCall runs the two policy gates in the order the refusal should read:
@@ -413,6 +524,128 @@ func (h *Host) resourcesRead(ctx context.Context, raw json.RawMessage) func() (a
 		}
 		return res, nil
 	}
+}
+
+// resourcesList answers with the upstream listing the view may actually read,
+// so an enumeration and a read agree rather than advertising a refusal.
+func (h *Host) resourcesList(ctx context.Context) func() (any, *RPCError) {
+	return func() (any, *RPCError) {
+		if h.Policy == nil {
+			return map[string]any{"resources": []any{}}, nil
+		}
+		if h.Session == nil {
+			return nil, &RPCError{Code: CodeUpstreamFailed, Message: "this host has no upstream session"}
+		}
+		all, err := h.Session.ListResources(ctx)
+		if err != nil {
+			return nil, &RPCError{Code: CodeUpstreamFailed, Message: err.Error()}
+		}
+		out := make([]mcpclient.Resource, 0, len(all))
+		for _, r := range all {
+			if h.Policy.CheckResourceRead(r.URI) == nil {
+				out = append(out, r)
+			}
+		}
+		return map[string]any{"resources": out}, nil
+	}
+}
+
+// linkParams is the ui/open-link params a view sends.
+type linkParams struct {
+	URL string `json:"url"`
+}
+
+// openLink gates one URL and hands it to the wired opener.
+func (h *Host) openLink(ctx context.Context, raw json.RawMessage) func() (any, *RPCError) {
+	return func() (any, *RPCError) {
+		if h.OpenLink == nil {
+			return nil, &RPCError{Code: CodeMethodNotFound, Message: "not implemented: " + MethodOpenLink}
+		}
+		var p linkParams
+		if err := json.Unmarshal(raw, &p); err != nil || p.URL == "" {
+			return nil, &RPCError{Code: CodeInvalidParams, Message: MethodOpenLink + " needs a url"}
+		}
+		if rpcErr := h.gate(func(pol Policy) error { return pol.CheckOpenLink(p.URL) },
+			map[string]any{"url": p.URL}); rpcErr != nil {
+			return nil, rpcErr
+		}
+		if err := h.OpenLink(ctx, p.URL); err != nil {
+			// isError is the spec's own failure channel here, and the view
+			// renders it rather than treating the frame as unanswered.
+			return map[string]any{"isError": true}, nil
+		}
+		return map[string]any{"isError": false}, nil
+	}
+}
+
+// downloadParams is the ui/download-file params a view sends.
+type downloadParams struct {
+	Contents []json.RawMessage `json:"contents"`
+}
+
+// downloadFile gates every item's URI and hands the set to the wired saver.
+func (h *Host) downloadFile(ctx context.Context, raw json.RawMessage) func() (any, *RPCError) {
+	return func() (any, *RPCError) {
+		if h.SaveFile == nil {
+			return nil, &RPCError{Code: CodeMethodNotFound, Message: "not implemented: " + MethodDownloadFile}
+		}
+		var p downloadParams
+		if err := json.Unmarshal(raw, &p); err != nil || len(p.Contents) == 0 {
+			return nil, &RPCError{Code: CodeInvalidParams, Message: MethodDownloadFile + " needs a non-empty contents list"}
+		}
+		items := make([]DownloadItem, 0, len(p.Contents))
+		for _, c := range p.Contents {
+			item := decodeDownloadItem(c)
+			// Every item is gated, so one permitted entry does not carry an
+			// unpermitted one alongside it.
+			if rpcErr := h.gate(func(pol Policy) error { return pol.CheckSaveFile(item.URI) },
+				map[string]any{"uri": item.URI}); rpcErr != nil {
+				return nil, rpcErr
+			}
+			items = append(items, item)
+		}
+		if err := h.SaveFile(ctx, items); err != nil {
+			return map[string]any{"isError": true}, nil
+		}
+		return map[string]any{"isError": false}, nil
+	}
+}
+
+// decodeDownloadItem reads the URI and mime type off either content shape: a
+// resource link carries them directly, an embedded resource one level in.
+func decodeDownloadItem(raw json.RawMessage) DownloadItem {
+	var shape struct {
+		URI      string `json:"uri"`
+		MIMEType string `json:"mimeType"`
+		Resource struct {
+			URI      string `json:"uri"`
+			MIMEType string `json:"mimeType"`
+		} `json:"resource"`
+	}
+	_ = json.Unmarshal(raw, &shape)
+	item := DownloadItem{URI: shape.URI, MIMEType: shape.MIMEType, Raw: raw}
+	if item.URI == "" {
+		item.URI, item.MIMEType = shape.Resource.URI, shape.Resource.MIMEType
+	}
+	return item
+}
+
+// gate runs one policy check and renders its refusal, so the outward verbs
+// refuse in the same shape and with the same code a tool call does.
+func (h *Host) gate(check func(Policy) error, data map[string]any) *RPCError {
+	if h.Policy == nil {
+		return denied("this host has no widget policy, so the view reaches nothing", data)
+	}
+	if err := check(h.Policy); err != nil {
+		return denied(err.Error(), data)
+	}
+	return nil
+}
+
+// denied builds one policy refusal, tagging what the view's own data carries.
+func denied(reason string, data map[string]any) *RPCError {
+	data["reason"] = "guard"
+	return &RPCError{Code: CodePolicyDenied, Message: "policy_denied: " + reason, Data: data}
 }
 
 // WidgetURI returns the `ui://` resource a tool's view lives at, or "". It

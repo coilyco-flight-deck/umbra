@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/mcpapps"
@@ -28,6 +29,7 @@ func widgetTools() []mcpclient.Tool {
 				"properties": map[string]any{"scope": map[string]any{"type": "string"}},
 			},
 		},
+		{Name: "poll_system_stats_slow", InputSchema: map[string]any{"type": "object"}},
 		{Name: "delete_everything", InputSchema: map[string]any{"type": "object"}},
 	}
 }
@@ -55,6 +57,9 @@ const widgetPolicy = `wrap example ops monitor {
             }
             never call delete_everything
             can read "^ui://"
+            can open "^https://"
+            never open "^https://evil\\."
+            can save "^ui://"
         }
     }
     can call poll_system_stats
@@ -125,6 +130,61 @@ func TestWidgetPolicy_ReadsAreDenyByAbsence(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "can read") {
 		t.Errorf("error = %q, want the missing sentence named", err)
+	}
+}
+
+func TestWidgetPolicy_OpenAndSaveAreTheirOwnGrants(t *testing.T) {
+	// Being able to read a URI does not make it openable, and neither makes it
+	// savable. Three verbs, three sentences.
+	pol := gate(t, widgetPolicy)
+	if err := pol.CheckOpenLink("https://example.com"); err != nil {
+		t.Errorf("declared open refused: %v", err)
+	}
+	if err := pol.CheckOpenLink("https://evil.example.com"); err == nil {
+		t.Error("a `never open` match was permitted")
+	}
+	if err := pol.CheckOpenLink("http://example.com"); err == nil {
+		t.Error("plain http was permitted by a `can open \"^https://\"` sentence")
+	}
+	if err := pol.CheckSaveFile("ui://report.csv"); err != nil {
+		t.Errorf("declared save refused: %v", err)
+	}
+	err := pol.CheckSaveFile("file:///etc/passwd")
+	if err == nil {
+		t.Fatal("a URI no `can save` matches was permitted")
+	}
+	if !strings.Contains(err.Error(), "can save") {
+		t.Errorf("error = %q, want the missing sentence named", err)
+	}
+}
+
+func TestWidgetPolicy_NoOpenOrSaveSentenceGrantsNeither(t *testing.T) {
+	pol := gate(t, `wrap example ops monitor {
+    mcp stdio { command "monitor-server" }
+    can call get_system_info {
+        widget { can read "^ui://" }
+    }
+}`)
+	if err := pol.CheckOpenLink("https://example.com"); err == nil {
+		t.Error("a widget with no `can open` still opened a link")
+	}
+	if err := pol.CheckSaveFile("ui://report.csv"); err == nil {
+		t.Error("a widget with no `can save` still saved a file")
+	}
+}
+
+func TestParse_WidgetRefusesAnUnknownVerb(t *testing.T) {
+	_, err := Parse([]byte(`wrap example ops monitor {
+    mcp stdio { command "monitor-server" }
+    can call get_system_info {
+        widget { can delete "^ui://" }
+    }
+}`))
+	if err == nil {
+		t.Fatal("Parse accepted an unknown widget sentence")
+	}
+	if !strings.Contains(err.Error(), "call | read | open | save") {
+		t.Errorf("error = %q, want the grammar listed", err)
 	}
 }
 
@@ -217,7 +277,7 @@ func TestWidgetPolicy_ContradictionIsRefusedRatherThanResolved(t *testing.T) {
 
 // serveMonitor starts an upstream carrying the widget fixture's tools, so a
 // test drives the real protocol rather than a fake session.
-func serveMonitor(t *testing.T) string {
+func serveMonitor(t *testing.T, held <-chan struct{}) string {
 	t.Helper()
 	srv := mcp.NewServer(&mcp.Implementation{Name: "monitor", Version: "v0"}, nil)
 	srv.AddTool(&mcp.Tool{
@@ -232,6 +292,23 @@ func serveMonitor(t *testing.T) string {
 			StructuredContent: map[string]any{"uptime": "13h 38m", "scope": args.Scope},
 		}, nil
 	})
+	srv.AddTool(&mcp.Tool{Name: "poll_system_stats_slow", InputSchema: map[string]any{"type": "object"}},
+		func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if token := req.Params.GetProgressToken(); token != nil {
+				_ = req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+					ProgressToken: token, Progress: 3, Total: 10, Message: "reading",
+				})
+			}
+			// The SDK dispatches a notification on its own goroutine, so a tool
+			// that returned at once would race the frame it just sent.
+			if held != nil {
+				select {
+				case <-held:
+				case <-ctx.Done():
+				}
+			}
+			return &mcp.CallToolResult{StructuredContent: map[string]any{"uptime": "13h 38m"}}, nil
+		})
 	srv.AddTool(&mcp.Tool{Name: "delete_everything", InputSchema: map[string]any{"type": "object"}},
 		func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			t.Error("delete_everything ran; the guardfile denies it to the view")
@@ -247,7 +324,7 @@ func serveMonitor(t *testing.T) string {
 // call reaches a live upstream, and an ungranted one is refused and never runs.
 func TestHost_LiveSessionThroughMcpclient(t *testing.T) {
 	ctx := context.Background()
-	url := serveMonitor(t)
+	url := serveMonitor(t, nil)
 	sess, err := mcpclient.Connect(ctx, mcpclient.Server{Name: "monitor", HTTP: &mcpclient.HTTPEndpoint{URL: url}})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
@@ -286,6 +363,80 @@ func TestHost_LiveSessionThroughMcpclient(t *testing.T) {
 	}
 	if !strings.Contains(string(mustJSON(t, refused[0])), "delete_everything") {
 		t.Errorf("refusal = %s, want the refused tool named", mustJSON(t, refused[0]))
+	}
+}
+
+// TestHost_ProgressReachesTheViewFromALiveUpstream is the second acceptance
+// path: a token the view chose comes back on a notification it can correlate.
+func TestHost_ProgressReachesTheViewFromALiveUpstream(t *testing.T) {
+	ctx := context.Background()
+	// The tool holds its result until the notification has reached the view, so
+	// progress is observed mid-call rather than racing the reply.
+	seen := make(chan struct{})
+	url := serveMonitor(t, seen)
+
+	host := &mcpapps.Host{Info: mcpapps.Implementation{Name: "umbra-test-host", Version: "v0"}}
+	var mu sync.Mutex
+	var emitted []mcpapps.Reply
+	host.Emit = func(r mcpapps.Reply) {
+		mu.Lock()
+		emitted = append(emitted, r)
+		mu.Unlock()
+		close(seen)
+	}
+	sess, err := mcpclient.ConnectWith(ctx,
+		mcpclient.Server{Name: "monitor", HTTP: &mcpclient.HTTPEndpoint{URL: url}},
+		mcpclient.Options{OnProgress: host.HandleProgress})
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = sess.Close() }()
+	host.Session = sess
+	host.Policy = gate(t, `wrap example ops monitor {
+    mcp stdio { command "monitor-server" }
+    can call get_system_info {
+        widget { can call poll_system_stats_slow }
+    }
+}`)
+
+	raw, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": mcpapps.MethodToolsCall,
+		"params": map[string]any{
+			"name": "poll_system_stats_slow", "arguments": map[string]any{},
+			"_meta": map[string]any{"progressToken": "view-7"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal frame: %v", err)
+	}
+	replies := host.Handle(ctx, raw)
+	if len(replies) != 1 || replies[0].IsError() {
+		t.Fatalf("call failed: %s", mustJSON(t, replies[0]))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(emitted) != 1 {
+		t.Fatalf("emitted %d frames, want 1 progress notification", len(emitted))
+	}
+	var got struct {
+		Method string `json:"method"`
+		Params struct {
+			ProgressToken string  `json:"progressToken"`
+			Progress      float64 `json:"progress"`
+			Message       string  `json:"message"`
+		} `json:"params"`
+	}
+	if err := json.Unmarshal(mustJSON(t, emitted[0]), &got); err != nil {
+		t.Fatalf("decode notification: %v", err)
+	}
+	if got.Method != mcpapps.MethodProgress {
+		t.Errorf("method = %q, want %s", got.Method, mcpapps.MethodProgress)
+	}
+	if got.Params.ProgressToken != "view-7" {
+		t.Errorf("progressToken = %q, want the view's own view-7", got.Params.ProgressToken)
+	}
+	if got.Params.Progress != 3 || got.Params.Message != "reading" {
+		t.Errorf("params = %#v, want the upstream's own values", got.Params)
 	}
 }
 

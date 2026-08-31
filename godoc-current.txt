@@ -1110,16 +1110,6 @@ func (gf *Guardfile) Providers() []string
     Providers returns the distinct value-source provider names this guardfile
     names, so the driver wires exactly the resolvers in play.
 
-type ReadRule struct {
-	Modal   string // can | cannot | never
-	Pattern string
-}
-    ReadRule is one `can read` / `never read` sentence: an unanchored regex over
-    the whole resource URI, deny by absence like the tool grants.
-
-func (r ReadRule) IsDeny() bool
-    IsDeny reports whether the read rule closes a URI rather than opening it.
-
 type ServedTool struct {
 	Name        string
 	Title       string
@@ -1160,9 +1150,25 @@ type Server struct {
     Server is the declared upstream: exactly one transport, its credential
     material named as value chains that resolve at call time rather than parse.
 
+type URIRule struct {
+	Modal   string // can | cannot | never
+	Verb    string // read | open | save
+	Pattern string
+}
+    URIRule is one `can read` / `open` / `save` sentence: an unanchored regex
+    over the whole URI, deny by absence like the tool grants.
+
+func (r URIRule) IsDeny() bool
+    IsDeny reports whether the rule closes a URI rather than opening it.
+
 type Widget struct {
 	Grants []Grant
-	Reads  []ReadRule
+
+	// Reads, Opens, and Saves gate resources/read, ui/open-link, and
+	// ui/download-file. Each is its own grant: they reach different places.
+	Reads []URIRule
+	Opens []URIRule
+	Saves []URIRule
 }
     Widget is the `widget { ... }` block inside a grant, taking the same `can
     call` sentence the outer block does.
@@ -1177,9 +1183,17 @@ func WidgetPolicy(cfg Config, tool string) (*WidgetGate, error)
     WidgetPolicy resolves the `widget` block of one granted tool into the policy
     the host consults, failing closed at build time. See docs/mcpapps.md.
 
+func (w *WidgetGate) CheckOpenLink(url string) error
+    CheckOpenLink applies the `can open` rules. Opening a URL an untrusted view
+    chose is its own grant rather than a consequence of being able to read.
+
 func (w *WidgetGate) CheckResourceRead(uri string) error
     CheckResourceRead applies the read rules: a `never read` match refuses, and
     so does a URI no `can read` matches. Deny by absence, like every guard here.
+
+func (w *WidgetGate) CheckSaveFile(uri string) error
+    CheckSaveFile applies the `can save` rules, over the URI of a link and of an
+    inline resource alike.
 
 func (w *WidgetGate) CheckToolCall(tool string, args map[string]any) error
     CheckToolCall applies the view call's own allow and deny guards, through the
@@ -3084,10 +3098,13 @@ const (
 	MethodInitialized   = "ui/notifications/initialized"
 	MethodToolResult    = "ui/notifications/tool-result"
 	MethodSizeChanged   = "ui/notifications/size-changed"
+	MethodOpenLink      = "ui/open-link"
+	MethodDownloadFile  = "ui/download-file"
 	MethodToolsCall     = "tools/call"
 	MethodToolsList     = "tools/list"
 	MethodResourcesRead = "resources/read"
 	MethodResourcesList = "resources/list"
+	MethodProgress      = "notifications/progress"
 )
     The frame methods this host answers. A view sends the ui/* ones plus
     ordinary MCP; every other method gets a MethodNotFound reply rather than
@@ -3115,6 +3132,17 @@ func WidgetURI(t mcpclient.Tool) string
 
 
 TYPES
+
+type DownloadItem struct {
+	URI      string
+	MIMEType string
+
+	// Raw is the item as the view sent it, so a handler saving inline bytes
+	// reads them without this package modelling every content shape.
+	Raw json.RawMessage
+}
+    DownloadItem is one entry of a ui/download-file request, a link the host
+    fetches or an inline resource. URI addresses both, and is what is gated.
 
 type Frame struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -3148,6 +3176,20 @@ type Host struct {
 	// Policy gates every view-initiated call. A nil Policy permits none, which
 	// is what makes an undeclared widget inert.
 	Policy Policy
+
+	// Emit posts an unsolicited frame to the view. The SDK calls it from its own
+	// goroutine, so it must be safe concurrently. nil drops them.
+	Emit func(Reply)
+
+	// OpenLink opens a URL the policy permitted. nil leaves `openLinks`
+	// undeclared, so a view learns rather than asking for what never happens.
+	OpenLink func(ctx context.Context, url string) error
+
+	// SaveFile hands permitted contents to the viewer. nil leaves
+	// `downloadFile` undeclared, for the same reason.
+	SaveFile func(ctx context.Context, items []DownloadItem) error
+
+	// Has unexported fields.
 }
     Host answers one view's frames. It holds no transport: a caller reads a
     postMessage frame from wherever it arrives and hands the bytes to Handle.
@@ -3158,6 +3200,10 @@ func (h *Host) Handle(ctx context.Context, raw []byte) []Reply
 
 func (h *Host) HandleFrame(ctx context.Context, f Frame) []Reply
     HandleFrame is Handle over an already-decoded frame.
+
+func (h *Host) HandleProgress(p mcpclient.Progress)
+    HandleProgress forwards one upstream progress notification to the view under
+    its own token. Wire it as mcpclient.Options.OnProgress.
 
 type HostContext map[string]any
     HostContext is the environment the view renders against. A free map, because
@@ -3180,6 +3226,14 @@ type Policy interface {
 
 	// CheckResourceRead reports why this view-initiated read is refused, or nil.
 	CheckResourceRead(uri string) error
+
+	// CheckOpenLink reports why opening this URL for the view is refused, or
+	// nil. Opening a URL an untrusted view chose is its own grant.
+	CheckOpenLink(url string) error
+
+	// CheckSaveFile reports why handing this resource to the viewer to save is
+	// refused, or nil. It gates the URI of a link and of an inline resource.
+	CheckSaveFile(uri string) error
 }
     Policy decides what a view may reach. This package holds the interface and
     no rules: the guardfile is the policy, compiled above this by http/mcpverb.
@@ -3217,8 +3271,9 @@ func (r Reply) Method() string
     Method names the notification this reply is, or "" for a request answer.
 
 type Session interface {
-	CallTool(ctx context.Context, name string, args map[string]any) (mcpclient.Result, error)
+	Call(ctx context.Context, c mcpclient.Call) (mcpclient.Result, error)
 	ReadResource(ctx context.Context, uri string) (*mcp.ReadResourceResult, error)
+	ListResources(ctx context.Context) ([]mcpclient.Resource, error)
 }
     Session is the upstream this host proxies to: the subset of
     *mcpclient.Session a view can reach, which that type already satisfies.
@@ -3245,12 +3300,47 @@ const DefaultTimeout = 60 * time.Second
 
 TYPES
 
+type Call struct {
+	Name          string
+	Arguments     map[string]any
+	ProgressToken any
+}
+    Call is one tools/call. ProgressToken, when non-nil, rides as
+    `_meta.progressToken` so the upstream's progress notifications correlate.
+
 type HTTPEndpoint struct {
 	URL     string
 	Headers map[string]string
 	Client  *http.Client
 }
     HTTPEndpoint is the Streamable HTTP transport.
+
+type Options struct {
+	// OnProgress receives the upstream's progress for a call that carried a
+	// token. nil drops them, since a one-shot leaf has nowhere to show them.
+	OnProgress func(Progress)
+}
+    Options tune one session beyond its declaration. The zero value is what
+    Connect uses, and is what a CLI leaf wants.
+
+type Progress struct {
+	Token    any
+	Progress float64
+	Total    float64
+	Message  string
+}
+    Progress is one upstream notifications/progress, correlated by the token the
+    call carried. Total is zero when the upstream does not know it.
+
+type Resource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+}
+    Resource is one upstream resource as umbra records it, the fields a listing
+    shows. It is umbra's own type so the SDK's shape does not reach consumers.
 
 type Result struct {
 	Decoded any
@@ -3283,11 +3373,22 @@ func Connect(ctx context.Context, s Server) (*Session, error)
     Connect validates the declaration, starts or dials the transport, and
     completes the initialize handshake.
 
+func ConnectWith(ctx context.Context, s Server, opts Options) (*Session, error)
+    ConnectWith is Connect with session options, which a long-lived consumer
+    such as an MCP Apps host needs and a one-shot call does not.
+
+func (s *Session) Call(ctx context.Context, c Call) (Result, error)
+    Call fires one tool, carrying a progress token when the caller has one.
+
 func (s *Session) CallTool(ctx context.Context, name string, args map[string]any) (Result, error)
-    CallTool fires one tool with already-bound arguments.
+    CallTool fires one tool with already-bound arguments and no progress token.
 
 func (s *Session) Close() error
     Close ends the session, terminating a stdio child.
+
+func (s *Session) ListResources(ctx context.Context) ([]Resource, error)
+    ListResources walks every page and returns the full listing sorted by URI,
+    because resources/list order is unspecified.
 
 func (s *Session) ListTools(ctx context.Context) ([]Tool, error)
     ListTools walks every page and returns the full surface sorted by name,

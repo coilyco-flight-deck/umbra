@@ -30,7 +30,7 @@ func serveTools(t *testing.T, tools ...*mcp.Tool) *Session {
 	if _, err := srv.Connect(ctx, serverT, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
-	sess, err := connect(ctx, clientT)
+	sess, err := connect(ctx, clientT, Options{})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -249,5 +249,79 @@ func TestHTTPTransport_CarriesNoTerminateWait(t *testing.T) {
 	s := Server{Name: "x", HTTP: &HTTPEndpoint{URL: "https://host/mcp"}}
 	if _, ok := s.transport(context.Background()).(*mcp.StreamableClientTransport); !ok {
 		t.Errorf("http transport = %T, want *mcp.StreamableClientTransport", s.transport(context.Background()))
+	}
+}
+
+func TestCall_ProgressTokenRidesAndTheNotificationComesBack(t *testing.T) {
+	// The token is what correlates a notification to its call, so assert the
+	// server saw the one sent and the handler received it back.
+	var seen []Progress
+	srv := mcp.NewServer(&mcp.Implementation{Name: "fixture", Version: "v0"}, nil)
+	srv.AddTool(&mcp.Tool{Name: "slow", InputSchema: map[string]any{"type": "object"}},
+		func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			token := req.Params.GetProgressToken()
+			if token == nil {
+				t.Error("the tools/call carried no progress token")
+				return &mcp.CallToolResult{}, nil
+			}
+			err := req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+				ProgressToken: token, Progress: 3, Total: 10, Message: "reading",
+			})
+			if err != nil {
+				t.Errorf("NotifyProgress: %v", err)
+			}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "done"}}}, nil
+		})
+
+	ctx := context.Background()
+	clientT, serverT := mcp.NewInMemoryTransports()
+	if _, err := srv.Connect(ctx, serverT, nil); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	sess, err := connect(ctx, clientT, Options{OnProgress: func(p Progress) { seen = append(seen, p) }})
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = sess.Close() })
+
+	if _, err := sess.Call(ctx, Call{Name: "slow", ProgressToken: "umbra-1"}); err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if len(seen) != 1 {
+		t.Fatalf("received %d progress notifications, want 1", len(seen))
+	}
+	if seen[0].Token != "umbra-1" || seen[0].Progress != 3 || seen[0].Total != 10 || seen[0].Message != "reading" {
+		t.Errorf("progress = %#v, want the values the server sent under umbra-1", seen[0])
+	}
+}
+
+func TestListResources_SortsByURI(t *testing.T) {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "fixture", Version: "v0"}, nil)
+	for _, uri := range []string{"ui://z.html", "ui://a.html"} {
+		srv.AddResource(&mcp.Resource{URI: uri, Name: uri, MIMEType: "text/html"},
+			func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+				return &mcp.ReadResourceResult{}, nil
+			})
+	}
+	ctx := context.Background()
+	clientT, serverT := mcp.NewInMemoryTransports()
+	if _, err := srv.Connect(ctx, serverT, nil); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	sess, err := connect(ctx, clientT, Options{})
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = sess.Close() })
+
+	got, err := sess.ListResources(ctx)
+	if err != nil {
+		t.Fatalf("ListResources: %v", err)
+	}
+	if len(got) != 2 || got[0].URI != "ui://a.html" || got[1].URI != "ui://z.html" {
+		t.Fatalf("resources = %#v, want a.html then z.html", got)
+	}
+	if got[0].MIMEType != "text/html" {
+		t.Errorf("mimeType = %q, want text/html", got[0].MIMEType)
 	}
 }

@@ -23,8 +23,10 @@ type WidgetGate struct {
 	// guards are the per-tool argument rules, keyed by upstream tool name.
 	guards map[string]*opcore.MCPCall
 
-	// reads are the compiled `can read` / `never read` sentences.
-	reads []compiledRead
+	// reads, opens, and saves are the compiled URI sentences, one set per verb.
+	reads []compiledRule
+	opens []compiledRule
+	saves []compiledRule
 
 	// declared records whether the grant authored a `widget` block at all, so
 	// the refusal names the missing block rather than a missing grant.
@@ -35,9 +37,9 @@ type WidgetGate struct {
 // rather than discovered when a view's first call arrives.
 var _ mcpapps.Policy = (*WidgetGate)(nil)
 
-// compiledRead is one read rule with its regex already built, so a match costs
+// compiledRule is one URI rule with its regex already built, so a match costs
 // no compile and a malformed pattern was rejected at parse.
-type compiledRead struct {
+type compiledRule struct {
 	deny bool
 	re   *regexp.Regexp
 	raw  string
@@ -112,16 +114,31 @@ func buildGate(tool string, w *Widget, byName map[string]mcpclient.Tool) (*Widge
 		gate.guards[g.Tool] = &opcore.MCPCall{Tool: g.Tool, Allow: g.Allow, Deny: g.Deny}
 	}
 	sort.Slice(gate.surface, func(i, j int) bool { return gate.surface[i].Name < gate.surface[j].Name })
-	for _, r := range w.Reads {
-		// Compiled at parse already, so this cannot fail; the error is kept
-		// rather than dropped so a future pattern source cannot slip past.
-		re, err := regexp.Compile(r.Pattern)
+	for _, set := range []struct {
+		rules []URIRule
+		dst   *[]compiledRule
+	}{{w.Reads, &gate.reads}, {w.Opens, &gate.opens}, {w.Saves, &gate.saves}} {
+		compiled, err := compileRules(tool, set.rules)
 		if err != nil {
-			return nil, fmt.Errorf("mcpverb: widget of %s: read regex %q does not compile: %w", tool, r.Pattern, err)
+			return nil, err
 		}
-		gate.reads = append(gate.reads, compiledRead{deny: r.IsDeny(), re: re, raw: r.Pattern})
+		*set.dst = compiled
 	}
 	return gate, nil
+}
+
+// compileRules builds the regexes for one verb's sentences. Parse compiled them
+// already, so the error is kept rather than dropped only as a backstop.
+func compileRules(tool string, rules []URIRule) ([]compiledRule, error) {
+	out := make([]compiledRule, 0, len(rules))
+	for _, r := range rules {
+		re, err := regexp.Compile(r.Pattern)
+		if err != nil {
+			return nil, fmt.Errorf("mcpverb: widget of %s: %s regex %q does not compile: %w", tool, r.Verb, r.Pattern, err)
+		}
+		out = append(out, compiledRule{deny: r.IsDeny(), re: re, raw: r.Pattern})
+	}
+	return out, nil
 }
 
 // checkWidgetSelectors refuses a view guard naming an argument the called tool
@@ -160,27 +177,46 @@ func (w *WidgetGate) CheckToolCall(tool string, args map[string]any) error {
 // CheckResourceRead applies the read rules: a `never read` match refuses, and so
 // does a URI no `can read` matches. Deny by absence, like every guard here.
 func (w *WidgetGate) CheckResourceRead(uri string) error {
-	for _, r := range w.reads {
+	return w.checkURI("read", "readable", uri, w.reads)
+}
+
+// CheckOpenLink applies the `can open` rules. Opening a URL an untrusted view
+// chose is its own grant rather than a consequence of being able to read.
+func (w *WidgetGate) CheckOpenLink(url string) error {
+	return w.checkURI("open", "openable", url, w.opens)
+}
+
+// CheckSaveFile applies the `can save` rules, over the URI of a link and of an
+// inline resource alike.
+func (w *WidgetGate) CheckSaveFile(uri string) error {
+	return w.checkURI("save", "savable", uri, w.saves)
+}
+
+// checkURI is the one direction every URI verb reads: a deny match refuses, and
+// so does anything no allow matches.
+func (w *WidgetGate) checkURI(verb, adjective, uri string, rules []compiledRule) error {
+	for _, r := range rules {
 		if r.deny && r.re.MatchString(uri) {
-			return fmt.Errorf("resource %q is denied to the view of %s (never read %q)", uri, w.tool, r.raw)
+			return fmt.Errorf("%q is denied to the view of %s (never %s %q)", uri, w.tool, verb, r.raw)
 		}
 	}
-	for _, r := range w.reads {
+	for _, r := range rules {
 		if !r.deny && r.re.MatchString(uri) {
 			return nil
 		}
 	}
 	if !w.declared {
-		return fmt.Errorf("the grant for %s declares no `widget` block, so its view reads nothing", w.tool)
+		return fmt.Errorf("the grant for %s declares no `widget` block, so its view %ss nothing", w.tool, verb)
 	}
-	return fmt.Errorf("resource %q is not readable by the view of %s; add `can read` to its `widget` block%s", uri, w.tool, allowedReads(w.reads))
+	return fmt.Errorf("%q is not %s by the view of %s; add `can %s` to its `widget` block%s",
+		uri, adjective, w.tool, verb, allowedPatterns(rules))
 }
 
-// allowedReads names the patterns that would have permitted the read, so the
+// allowedPatterns names the patterns that would have permitted it, so the
 // refusal says what to widen rather than only that it refused.
-func allowedReads(reads []compiledRead) string {
+func allowedPatterns(rules []compiledRule) string {
 	var allowed []string
-	for _, r := range reads {
+	for _, r := range rules {
 		if !r.deny {
 			allowed = append(allowed, fmt.Sprintf("%q", r.raw))
 		}

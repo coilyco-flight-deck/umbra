@@ -90,18 +90,24 @@ type Grant struct {
 // `can call` sentence the outer block does.
 type Widget struct {
 	Grants []Grant
-	Reads  []ReadRule
+
+	// Reads, Opens, and Saves gate resources/read, ui/open-link, and
+	// ui/download-file. Each is its own grant: they reach different places.
+	Reads []URIRule
+	Opens []URIRule
+	Saves []URIRule
 }
 
-// ReadRule is one `can read` / `never read` sentence: an unanchored regex over
-// the whole resource URI, deny by absence like the tool grants.
-type ReadRule struct {
+// URIRule is one `can read` / `open` / `save` sentence: an unanchored regex over
+// the whole URI, deny by absence like the tool grants.
+type URIRule struct {
 	Modal   string // can | cannot | never
+	Verb    string // read | open | save
 	Pattern string
 }
 
-// IsDeny reports whether the read rule closes a URI rather than opening it.
-func (r ReadRule) IsDeny() bool { return r.Modal == "cannot" || r.Modal == "never" }
+// IsDeny reports whether the rule closes a URI rather than opening it.
+func (r URIRule) IsDeny() bool { return r.Modal == "cannot" || r.Modal == "never" }
 
 // IsDeny reports whether the grant closes a tool rather than opening it.
 func (g Grant) IsDeny() bool { return g.Modal == "cannot" || g.Modal == "never" }
@@ -378,13 +384,13 @@ func applyWidgetChild(w *Widget, c *kdl.Node) error {
 	if len(args) < 1 {
 		return fmt.Errorf("`%s` needs `call <tool>` or `read \"<regex>\"` (fail-closed)", c.Name())
 	}
-	switch args[0].String() {
+	switch verb := args[0].String(); verb {
 	case "call":
 		return applyWidgetCall(w, c)
-	case "read":
-		return applyWidgetRead(w, c)
+	case "read", "open", "save":
+		return applyWidgetURI(w, c, verb)
 	default:
-		return fmt.Errorf("`%s %s` is not a widget sentence (want call | read; fail-closed)", c.Name(), args[0].String())
+		return fmt.Errorf("`%s %s` is not a widget sentence (want call | read | open | save; fail-closed)", c.Name(), verb)
 	}
 }
 
@@ -426,23 +432,32 @@ func applyWidgetGrantChild(g *Grant, c *kdl.Node) error {
 	}
 }
 
-// applyWidgetRead reads one `<modal> read "<regex>"` sentence.
-func applyWidgetRead(w *Widget, c *kdl.Node) error {
+// applyWidgetURI reads one `<modal> <verb> "<regex>"` sentence, for the three
+// verbs that name a URI rather than a tool.
+func applyWidgetURI(w *Widget, c *kdl.Node, verb string) error {
 	args := c.Arguments()
 	if len(args) != 2 {
-		return fmt.Errorf("`%s read` needs exactly one regex, e.g. `%s read \"^ui://\"` (fail-closed)", c.Name(), c.Name())
+		return fmt.Errorf("`%s %s` needs exactly one regex, e.g. `%s %s \"^ui://\"` (fail-closed)", c.Name(), verb, c.Name(), verb)
 	}
 	pattern := args[1].String()
 	if pattern == "" {
-		return fmt.Errorf("`%s read` has an empty regex (fail-closed)", c.Name())
+		return fmt.Errorf("`%s %s` has an empty regex (fail-closed)", c.Name(), verb)
 	}
 	if _, err := regexp.Compile(pattern); err != nil {
-		return fmt.Errorf("`%s read` regex %q does not compile: %w", c.Name(), pattern, err)
+		return fmt.Errorf("`%s %s` regex %q does not compile: %w", c.Name(), verb, pattern, err)
 	}
 	if len(c.Children().Nodes) > 0 {
-		return fmt.Errorf("`%s read` takes no body (fail-closed)", c.Name())
+		return fmt.Errorf("`%s %s` takes no body (fail-closed)", c.Name(), verb)
 	}
-	w.Reads = append(w.Reads, ReadRule{Modal: c.Name(), Pattern: pattern})
+	rule := URIRule{Modal: c.Name(), Verb: verb, Pattern: pattern}
+	switch verb {
+	case "read":
+		w.Reads = append(w.Reads, rule)
+	case "open":
+		w.Opens = append(w.Opens, rule)
+	default:
+		w.Saves = append(w.Saves, rule)
+	}
 	return nil
 }
 

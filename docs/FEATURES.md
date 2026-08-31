@@ -28,8 +28,8 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
   read. See [value providers](value-providers.md).
 - **config** / **stepflow** - Layered-config primitives with a generic `OverlayFile[T]`, and a transport-agnostic ordered sequence engine.
 - **broker** / **credseed** / **provenance** - Credential broker, env seeder, and origin envelope. See [broker.md](broker.md).
-- **mcpclient** - The Model Context Protocol client the mcp dialect speaks: one declared upstream over stdio or Streamable HTTP, and the three calls the dialect needs. Policy-free, so it sits in the core.
-- **mcpapps** - The MCP Apps host bridge: the frames a rendered widget sends back, answered under the guardfile's `widget` block rather than forwarded. Transport-free and policy-free, so a consumer supplies the presenter and `http/mcpverb` supplies the policy. See [mcpapps.md](mcpapps.md).
+- **mcpclient** - The Model Context Protocol client the mcp dialect speaks: one declared upstream over stdio or Streamable HTTP, the calls the dialect needs, and an optional progress sink. Policy-free, so it sits in the core.
+- **mcpapps** - The MCP Apps host bridge: the frames a rendered widget sends back, answered under the guardfile's `widget` block rather than forwarded. Tool calls, resource reads, link opens, and downloads each take their own grant, and progress rides back under the view's own token. Transport-free and policy-free, so a consumer supplies the presenter and `http/mcpverb` supplies the policy. See [mcpapps.md](mcpapps.md).
 - **scan** / **attribution** / **flock** / **version** / **issueref** / **ownertrust** - Ward-lifted helpers. See [ward-helpers.md](ward-helpers.md).
 
 ## See also

@@ -93,14 +93,37 @@ type Session struct {
 	cs *mcp.ClientSession
 }
 
+// Progress is one upstream notifications/progress, correlated by the token the
+// call carried. Total is zero when the upstream does not know it.
+type Progress struct {
+	Token    any
+	Progress float64
+	Total    float64
+	Message  string
+}
+
+// Options tune one session beyond its declaration. The zero value is what
+// Connect uses, and is what a CLI leaf wants.
+type Options struct {
+	// OnProgress receives the upstream's progress for a call that carried a
+	// token. nil drops them, since a one-shot leaf has nowhere to show them.
+	OnProgress func(Progress)
+}
+
 // Connect validates the declaration, starts or dials the transport, and
 // completes the initialize handshake.
 func Connect(ctx context.Context, s Server) (*Session, error) {
+	return ConnectWith(ctx, s, Options{})
+}
+
+// ConnectWith is Connect with session options, which a long-lived consumer
+// such as an MCP Apps host needs and a one-shot call does not.
+func ConnectWith(ctx context.Context, s Server, opts Options) (*Session, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err
 	}
 	transport, probe := s.transportWithProbe(ctx)
-	sess, err := connect(ctx, transport)
+	sess, err := connect(ctx, transport, opts)
 	if err != nil {
 		if probe != nil {
 			if hint := probe.refusal(len(s.HTTP.Headers) > 0); hint != "" {
@@ -124,13 +147,29 @@ func (s Server) transportWithProbe(ctx context.Context) (mcp.Transport, *headerT
 
 // connect completes the handshake over an already-built transport. Separate
 // from Connect so a test drives an in-memory transport without a subprocess.
-func connect(ctx context.Context, t mcp.Transport) (*Session, error) {
-	client := mcp.NewClient(&mcp.Implementation{Name: clientName, Version: "v0"}, nil)
+func connect(ctx context.Context, t mcp.Transport, opts Options) (*Session, error) {
+	client := mcp.NewClient(&mcp.Implementation{Name: clientName, Version: "v0"}, clientOptions(opts))
 	cs, err := client.Connect(ctx, t, nil)
 	if err != nil {
 		return nil, err
 	}
 	return &Session{cs: cs}, nil
+}
+
+// clientOptions adapts umbra's session options onto the SDK's, or nil when
+// nothing is set so the SDK keeps its own defaults.
+func clientOptions(opts Options) *mcp.ClientOptions {
+	if opts.OnProgress == nil {
+		return nil
+	}
+	return &mcp.ClientOptions{
+		ProgressNotificationHandler: func(_ context.Context, req *mcp.ProgressNotificationClientRequest) {
+			p := req.Params
+			opts.OnProgress(Progress{
+				Token: p.ProgressToken, Progress: p.Progress, Total: p.Total, Message: p.Message,
+			})
+		},
+	}
 }
 
 // transport builds the SDK transport for the declared shape.
@@ -309,9 +348,27 @@ type Result struct {
 	IsError bool
 }
 
-// CallTool fires one tool with already-bound arguments.
+// Call is one tools/call. ProgressToken, when non-nil, rides as
+// `_meta.progressToken` so the upstream's progress notifications correlate.
+type Call struct {
+	Name          string
+	Arguments     map[string]any
+	ProgressToken any
+}
+
+// CallTool fires one tool with already-bound arguments and no progress token.
 func (s *Session) CallTool(ctx context.Context, name string, args map[string]any) (Result, error) {
-	res, err := s.cs.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
+	return s.Call(ctx, Call{Name: name, Arguments: args})
+}
+
+// Call fires one tool, carrying a progress token when the caller has one.
+func (s *Session) Call(ctx context.Context, c Call) (Result, error) {
+	name := c.Name
+	params := &mcp.CallToolParams{Name: name, Arguments: c.Arguments}
+	if c.ProgressToken != nil {
+		params.SetProgressToken(c.ProgressToken)
+	}
+	res, err := s.cs.CallTool(ctx, params)
 	if err != nil {
 		return Result{}, fmt.Errorf("mcpclient: call %s: %w", name, err)
 	}
@@ -363,6 +420,33 @@ func decodeText(text string) any {
 	}
 	// A bare number or bool that happens to parse stays the text it was.
 	return text
+}
+
+// Resource is one upstream resource as umbra records it, the fields a listing
+// shows. It is umbra's own type so the SDK's shape does not reach consumers.
+type Resource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+}
+
+// ListResources walks every page and returns the full listing sorted by URI,
+// because resources/list order is unspecified.
+func (s *Session) ListResources(ctx context.Context) ([]Resource, error) {
+	var out []Resource
+	for r, err := range s.cs.Resources(ctx, nil) {
+		if err != nil {
+			return nil, fmt.Errorf("mcpclient: list resources: %w", err)
+		}
+		out = append(out, Resource{
+			URI: r.URI, Name: r.Name, Title: r.Title,
+			Description: r.Description, MIMEType: r.MIMEType,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].URI < out[j].URI })
+	return out, nil
 }
 
 // ReadResource reads one resource URI. This serves a `ui://` MCP Apps resource,
