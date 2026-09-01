@@ -787,6 +787,10 @@ type Widget struct {
 	Reads []URIRule
 	Opens []URIRule
 	Saves []URIRule
+
+	// Connects feed connect-src: CSP source expressions rather than regexes,
+	// and allow-only. See docs/mcpapps.md.
+	Connects []string
 }
     Widget is the `widget { ... }` block inside a grant, taking the same `can
     call` sentence the outer block does.
@@ -800,6 +804,10 @@ type WidgetGate struct {
 func WidgetPolicy(cfg Config, tool string) (*WidgetGate, error)
     WidgetPolicy resolves the `widget` block of one granted tool into the policy
     the host consults, failing closed at build time. See docs/mcpapps.md.
+
+func (w *WidgetGate) CSPSources() mcpapps.CSPSources
+    CSPSources is what the page's policy is built from. Only connect-src has a
+    verb today, so every other family stays at the spec's floor.
 
 func (w *WidgetGate) CheckOpenLink(url string) error
     CheckOpenLink applies the `can open` rules. Opening a URL an untrusted view
@@ -2317,12 +2325,39 @@ const ProtocolVersion = "2026-01-26"
 
 FUNCTIONS
 
+func CSP(s CSPSources) string
+    CSP builds the policy for one view. An undeclared family falls back to the
+    spec's own default, so a missing declaration refuses rather than opens.
+
 func WidgetURI(t mcpclient.Tool) string
     WidgetURI returns the `ui://` resource a tool's view lives at, or "".
     It reads both `_meta` spellings a server may emit. See docs/mcpverb.md.
 
 
 TYPES
+
+type CSPSources struct {
+	// Resource feeds script-src, style-src, img-src, font-src, and media-src.
+	Resource []string
+
+	// Connect feeds connect-src and is what `can connect` declares. The other
+	// three families have no guardfile verb yet.
+	Connect []string
+
+	// Frame feeds frame-src, and BaseURI feeds base-uri.
+	Frame   []string
+	BaseURI []string
+
+	// Report names a collector path for violation reports. It is umbra's
+	// addition rather than the spec's, and it grants nothing.
+	Report string
+}
+    CSPSources are the domains a view declared, one field per directive family
+    the spec's `csp` object carries. See docs/mcpapps.md.
+
+func (s CSPSources) Declared() bool
+    Declared reports whether the view named any domain. None of them selects the
+    spec's omitted-`ui.csp` case, which is the tighter of the two.
 
 type DownloadItem struct {
 	URI      string

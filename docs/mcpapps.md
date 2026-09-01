@@ -15,13 +15,16 @@ wrap aosguard ops monitor {
             can open "^https://"
             never open "^https://evil\."
             can save "^ui://"
+            can connect "https://api.example.com"
         }
     }
     can call wipe_disk { destructive }
 }
 ```
 
-`get_system_info` returns a view. That view may call `poll_system_stats`, read a `ui://` resource, open an `https://` link, and hand a `ui://` resource to the viewer to save. Nothing else. `wipe_disk` is a CLI leaf in the same guardfile and the view still cannot reach it: a `widget` block is its own surface rather than an inherited one.
+`get_system_info` returns a view. That view may call `poll_system_stats`, read a `ui://` resource, open an `https://` link, save a `ui://` resource, and reach `api.example.com` from its own HTML. Nothing else. `wipe_disk` is a CLI leaf in the same guardfile and the view still cannot reach it: a `widget` block is its own surface rather than an inherited one.
+
+**`connect` takes a CSP source expression, not a regex, and has no deny form.** Its neighbours gate frames the view sends, and `connect-src` governs traffic it never announces. CSP is an allowlist, so `never connect` is refused at parse rather than accepted and ignored.
 
 Runnable: [`examples/mcpapps/`](../examples/mcpapps/main.go) replays a real widget's frame sequence against a server it starts itself.
 

@@ -28,6 +28,10 @@ type WidgetGate struct {
 	opens []compiledRule
 	saves []compiledRule
 
+	// connects are the CSP source expressions the view may reach. Not a
+	// compiledRule: CSP is an allowlist and takes no regex.
+	connects []string
+
 	// declared records whether the grant authored a `widget` block at all, so
 	// the refusal names the missing block rather than a missing grant.
 	declared bool
@@ -124,7 +128,14 @@ func buildGate(tool string, w *Widget, byName map[string]mcpclient.Tool) (*Widge
 		}
 		*set.dst = compiled
 	}
+	gate.connects = append(gate.connects, w.Connects...)
 	return gate, nil
+}
+
+// CSPSources is what the page's policy is built from. Only connect-src has a
+// verb today, so every other family stays at the spec's floor.
+func (w *WidgetGate) CSPSources() mcpapps.CSPSources {
+	return mcpapps.CSPSources{Connect: w.connects}
 }
 
 // compileRules builds the regexes for one verb's sentences. Parse compiled them

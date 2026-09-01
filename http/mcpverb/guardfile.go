@@ -96,6 +96,10 @@ type Widget struct {
 	Reads []URIRule
 	Opens []URIRule
 	Saves []URIRule
+
+	// Connects feed connect-src: CSP source expressions rather than regexes,
+	// and allow-only. See docs/mcpapps.md.
+	Connects []string
 }
 
 // URIRule is one `can read` / `open` / `save` sentence: an unanchored regex over
@@ -382,15 +386,17 @@ func applyWidgetChild(w *Widget, c *kdl.Node) error {
 	}
 	args := c.Arguments()
 	if len(args) < 1 {
-		return fmt.Errorf("`%s` needs `call <tool>` or `read \"<regex>\"` (fail-closed)", c.Name())
+		return fmt.Errorf("`%s` needs `call <tool>`, `read \"<regex>\"`, or `connect \"<source>\"` (fail-closed)", c.Name())
 	}
 	switch verb := args[0].String(); verb {
 	case "call":
 		return applyWidgetCall(w, c)
 	case "read", "open", "save":
 		return applyWidgetURI(w, c, verb)
+	case "connect":
+		return applyWidgetConnect(w, c)
 	default:
-		return fmt.Errorf("`%s %s` is not a widget sentence (want call | read | open | save; fail-closed)", c.Name(), verb)
+		return fmt.Errorf("`%s %s` is not a widget sentence (want call | read | open | save | connect; fail-closed)", c.Name(), verb)
 	}
 }
 
@@ -457,6 +463,46 @@ func applyWidgetURI(w *Widget, c *kdl.Node, verb string) error {
 		w.Opens = append(w.Opens, rule)
 	default:
 		w.Saves = append(w.Saves, rule)
+	}
+	return nil
+}
+
+// applyWidgetConnect reads one `can connect "<source>"` sentence. CSP is an
+// allowlist with no deny form, so a deny modal is refused rather than ignored.
+func applyWidgetConnect(w *Widget, c *kdl.Node) error {
+	if c.Name() != "can" {
+		return fmt.Errorf(
+			"`%s connect` cannot be honoured: CSP is an allowlist with no deny form, so there is no source expression meaning \"not this origin\". Drop the rule and declare only what the view may reach (fail-closed)",
+			c.Name(),
+		)
+	}
+	args := c.Arguments()
+	if len(args) != 2 {
+		return fmt.Errorf("`can connect` needs exactly one source expression (fail-closed)")
+	}
+	source := strings.TrimSpace(args[1].String())
+	if err := checkCSPSource(source); err != nil {
+		return err
+	}
+	if len(c.Children().Nodes) > 0 {
+		return fmt.Errorf("`can connect` takes no body (fail-closed)")
+	}
+	w.Connects = append(w.Connects, source)
+	return nil
+}
+
+// checkCSPSource refuses what a CSP source expression cannot be. A semicolon
+// would end the directive and start another one, which is the sharp case.
+func checkCSPSource(source string) error {
+	switch {
+	case source == "":
+		return fmt.Errorf("`can connect` needs a non-empty source expression (fail-closed)")
+	case strings.ContainsAny(source, ";,"):
+		return fmt.Errorf("`can connect %q` contains a directive separator, which would inject a second directive (fail-closed)", source)
+	case strings.ContainsAny(source, " \t\n"):
+		return fmt.Errorf("`can connect %q` has whitespace: declare one source per sentence (fail-closed)", source)
+	case strings.ContainsAny(source, `^$\\`):
+		return fmt.Errorf("`can connect %q` looks like a regex: this verb takes a CSP source expression such as https://api.example.com (fail-closed)", source)
 	}
 	return nil
 }
