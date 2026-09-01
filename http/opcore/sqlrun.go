@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 	"strings"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
@@ -204,18 +203,4 @@ func sqlUpstream(what string, err error) error {
 	return exitcode.New(exitcode.UpstreamFailed, "upstream_failed",
 		fmt.Errorf("%s: %w", what, err),
 		"check the statement against the database schema and the credential's grants")
-}
-
-// SQLParamNames lists a SQL grant's parameters in binding order, for a
-// consumer rendering the operation.
-func SQLParamNames(spec *SQL) []string {
-	if spec == nil {
-		return nil
-	}
-	names := make([]string, 0, len(spec.Params))
-	for _, p := range spec.Params {
-		names = append(names, p.Name)
-	}
-	sort.Strings(names)
-	return names
 }

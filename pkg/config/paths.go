@@ -19,14 +19,6 @@ import (
 // logs live. One JSONL file per repo slug.
 const AuditSubdir = "audit"
 
-// SessionsSubdir is the subdirectory under AuditSubdir where per-session
-// state lives. One directory per CLAUDE_CODE_SESSION_ID. Currently holds
-const SessionsSubdir = "sessions"
-
-// SessionProfileFile is the basename of the per-session sentinel file
-// containing the active lockdown profile name. Plain text, one line.
-const SessionProfileFile = "profile"
-
 // UnrootedAuditName is the slug used when the consumer is invoked outside any git
 // repo (or inside one with no origin remote). All such invocations land in
 const UnrootedAuditName = "_unrooted"
@@ -41,50 +33,8 @@ func GlobalDir() (string, error) {
 	return filepath.Join(home, AppDir()), nil
 }
 
-// GlobalConfigPath returns ~/<app-dir>/config.yaml.
-func GlobalConfigPath() (string, error) {
-	dir, err := GlobalDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.yaml"), nil
-}
-
-// LocalConfigPath returns ./<app-dir>/config.yaml relative to the current
-// working directory. The file may or may not exist.
-func LocalConfigPath() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("config: getwd: %w", err)
-	}
-	return filepath.Join(cwd, AppDir(), "config.yaml"), nil
-}
-
-// SessionDir returns ~/<app-dir>/audit/sessions/<sessionID>. Caller is
-// responsible for MkdirAll. Returns an error if sessionID is empty or
-func SessionDir(sessionID string) (string, error) {
-	if sessionID == "" {
-		return "", fmt.Errorf("config: session id is empty")
-	}
-	dir, err := GlobalDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, AuditSubdir, SessionsSubdir, sessionID), nil
-}
-
-// SessionProfilePath returns the per-session profile sentinel file path
-// for sessionID. Errors propagate from SessionDir.
-func SessionProfilePath(sessionID string) (string, error) {
-	d, err := SessionDir(sessionID)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(d, SessionProfileFile), nil
-}
-
-// DefaultAuditPath returns ~/<app-dir>/audit/<slug>.jsonl, where slug is
-// derived from the current git repo's origin remote. Falls back to
+// DefaultAuditPath returns ~/<app-dir>/audit/<slug>.jsonl, slug derived from the
+// origin remote. Called only by the generated main.go, so deadcode misreads it.
 func DefaultAuditPath() (string, error) {
 	dir, err := GlobalDir()
 	if err != nil {
@@ -93,26 +43,6 @@ func DefaultAuditPath() (string, error) {
 	return filepath.Join(dir, AuditSubdir, RepoAuditSlug()+".jsonl"), nil
 }
 
-// ExpandHome turns a leading "~/" or "~" into the user's home directory.
-// Returns the input unchanged if it doesn't start with "~" or if $HOME
-func ExpandHome(p string) string {
-	if p == "" || !strings.HasPrefix(p, "~") {
-		return p
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return p
-	}
-	if p == "~" {
-		return home
-	}
-	if strings.HasPrefix(p, "~/") {
-		return filepath.Join(home, p[2:])
-	}
-	return p
-}
-
-// repoSlugCache memoizes the result of RepoAuditSlug for a single process.
 // Audit append happens once per invocation, but the slug resolver shells out
 var (
 	repoSlugCache    string

@@ -931,10 +931,6 @@ func PathParamsInOrder(path string) []string
     the order the leaf takes them positionally. Shared with the CLI projection's
     binder.
 
-func SQLParamNames(spec *SQL) []string
-    SQLParamNames lists a SQL grant's parameters in binding order, for a
-    consumer rendering the operation.
-
 func ValidMethod(m string) bool
     ValidMethod reports whether m is an HTTP method the grammar accepts.
 
@@ -1877,10 +1873,6 @@ var ErrPathUnset = errors.New("audit: log path not configured")
 
 FUNCTIONS
 
-func NewUUIDv7() (string, error)
-    NewUUIDv7 returns a UUID v7 string (time-ordered) using crypto/rand.
-    Same generator that Append uses internally for unset Record.ID;
-
 func RedactArgv(argv []string, tier string, p RedactPolicy) []string
     RedactArgv applies the data-security tier to argv. Returns the argv to
     persist. At "low" the argv is returned unchanged. At
@@ -2076,9 +2068,6 @@ package config // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/co
 App-dir namespacing. The consumer-supplied directory name (e.g. ward ".ward")
 roots every per-user path; umbra hardcodes no consumer.
 
-Package config carries the layered-config primitives shared across umbra
-consumers: path helpers, repo-slug derivation, the Audit
-
 Path defaults and per-repo audit derivation, rooted at the consumer's app dir
 (see appdir.go) so umbra hardcodes no consumer's directory.
 
@@ -2094,14 +2083,6 @@ const CacheSubdir = "cache"
 const FallbackAppDir = ".umbra"
     FallbackAppDir is the app dir used when the consumer never calls SetAppDir.
     It is the framework's own name, so an unconfigured deployment owns nobody.
-
-const SessionProfileFile = "profile"
-    SessionProfileFile is the basename of the per-session sentinel file
-    containing the active lockdown profile name. Plain text, one line.
-
-const SessionsSubdir = "sessions"
-    SessionsSubdir is the subdirectory under AuditSubdir where per-session state
-    lives. One directory per CLAUDE_CODE_SESSION_ID. Currently holds
 
 const UnrootedAuditName = "_unrooted"
     UnrootedAuditName is the slug used when the consumer is invoked outside any
@@ -2127,31 +2108,17 @@ func CacheDirEnv() string
     consumer name is baked in: ".ward" -> "WARD_CACHE_DIR".
 
 func DefaultAuditPath() (string, error)
-    DefaultAuditPath returns ~/<app-dir>/audit/<slug>.jsonl, where slug is
-    derived from the current git repo's origin remote. Falls back to
+    DefaultAuditPath returns ~/<app-dir>/audit/<slug>.jsonl, slug derived
+    from the origin remote. Called only by the generated main.go, so deadcode
+    misreads it.
 
 func EnvName(suffix string) string
     EnvName derives a consumer-scoped env var from the app dir base (".ward" +
     "_CACHE_DIR" -> "WARD_CACHE_DIR"); unset falls back to the "UMBRA" token.
 
-func ExpandHome(p string) string
-    ExpandHome turns a leading "~/" or "~" into the user's home directory.
-    Returns the input unchanged if it doesn't start with "~" or if $HOME
-
-func GlobalConfigPath() (string, error)
-    GlobalConfigPath returns ~/<app-dir>/config.yaml.
-
 func GlobalDir() (string, error)
     GlobalDir returns ~/<app-dir> (e.g. ~/.ward), expanded against $HOME.
     Returns an error only if $HOME cannot be resolved.
-
-func LocalConfigPath() (string, error)
-    LocalConfigPath returns ./<app-dir>/config.yaml relative to the current
-    working directory. The file may or may not exist.
-
-func OverlayFile[T any](dst *T, path string) error
-    OverlayFile reads path (if it exists) and yaml-unmarshals onto dst. Missing
-    file is not an error: the consumer's prior layer keeps its
 
 func RepoAuditSlug() string
     RepoAuditSlug returns the audit slug for the current working directory.
@@ -2164,30 +2131,9 @@ func SanitizeSlug(s string) string
     SanitizeSlug normalizes input to lowercase, replaces every non-[a-z0-9-] run
     with a single dash, and trims leading and trailing dashes. Exported
 
-func SessionDir(sessionID string) (string, error)
-    SessionDir returns ~/<app-dir>/audit/sessions/<sessionID>. Caller is
-    responsible for MkdirAll. Returns an error if sessionID is empty or
-
-func SessionProfilePath(sessionID string) (string, error)
-    SessionProfilePath returns the per-session profile sentinel file path for
-    sessionID. Errors propagate from SessionDir.
-
 func SetAppDir(name string)
     SetAppDir registers the directory name rooting every per-user path.
     The consumer calls it once at startup - e.g. ward ".ward".
-
-
-TYPES
-
-type Audit struct {
-	LogPath    string `yaml:"log_path"`
-	MaxSizeMB  int    `yaml:"max_size_mb"`
-	MaxBackups int    `yaml:"max_backups"`
-	MaxAgeDays int    `yaml:"max_age_days"`
-	Compress   bool   `yaml:"compress"`
-}
-    Audit controls where the JSONL audit log lives and how lumberjack rotates
-    it. LogPath defaults to ~/<app-dir>/audit/<slug>.jsonl when left
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode

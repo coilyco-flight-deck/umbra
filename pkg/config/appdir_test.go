@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -95,17 +94,5 @@ func TestGlobalDir_UsesAppDir(t *testing.T) {
 	}
 	if want := filepath.Join(home, ".ward"); got != want {
 		t.Errorf("GlobalDir() = %q, want %q (routed through app dir)", got, want)
-	}
-}
-
-func TestLocalConfigPath_UsesAppDir(t *testing.T) {
-	withAppDir(t, ".ward")
-	got, err := config.LocalConfigPath()
-	if err != nil {
-		t.Fatalf("LocalConfigPath: %v", err)
-	}
-	cwd, _ := os.Getwd()
-	if want := filepath.Join(cwd, ".ward", "config.yaml"); got != want {
-		t.Errorf("LocalConfigPath() = %q, want %q", got, want)
 	}
 }

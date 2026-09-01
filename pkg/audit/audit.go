@@ -130,12 +130,6 @@ const (
 // even when a wrapped tool spews. 2 KiB is enough to carry the last few
 const MaxStderrTailBytes = 2048
 
-// NewUUIDv7 returns a UUID v7 string (time-ordered) using crypto/rand.
-// Same generator that Append uses internally for unset Record.ID;
-func NewUUIDv7() (string, error) {
-	return newUUIDv7(time.Now())
-}
-
 // newUUIDv7 returns a UUID v7 string (time-ordered) using crypto/rand.
 // 48-bit unix-millis prefix, version=7, variant=10, rest random.
 func newUUIDv7(now time.Time) (string, error) {

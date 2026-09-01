@@ -23,7 +23,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 - **valuesource** / **tokenmint** - Shared `value <provider>` resolution with
   fallback chains, plus OAuth `client_credentials` tokens minted rather than
   read. See [value providers](value-providers.md).
-- **config** / **stepflow** / **flock** / **skillgen** - Layered-config primitives with a generic `OverlayFile[T]`, a transport-agnostic ordered sequence engine, an advisory build lock, and the skill projection the driver emits.
+- **config** / **stepflow** / **flock** / **skillgen** - Cache and audit-path derivation rooted at the consumer's app dir, a transport-agnostic ordered sequence engine, an advisory build lock, and the skill projection the driver emits.
 - **mcpclient** - The Model Context Protocol client the mcp dialect speaks: one declared upstream over stdio or Streamable HTTP, the calls the dialect needs, and an optional progress sink. Policy-free, so it sits in the core.
 - **mcpapps** - The MCP Apps host bridge: the frames a rendered widget sends back, answered under the guardfile's `widget` block rather than forwarded. Tool calls, resource reads, link opens, and downloads each take their own grant, and progress rides back under the view's own token. Transport-free and policy-free, so a consumer supplies the presenter and `http/mcpverb` supplies the policy. See [mcpapps.md](mcpapps.md).
 
