@@ -18,8 +18,8 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [MCP-dialect verbs](mcpverb.md) - the same grammar aimed at upstream MCP servers.
 
 ## Guides
-- [The no-code driver](specgen.md) - author policy and locks, never Go.
-- [Materialization](specgen-materialization.md) - how `run` and `build` cache a generated binary.
+- [The no-code driver](umbra-cli.md) - author policy and locks, never Go.
+- [Materialization](umbra-materialization.md) - how `run` and `build` cache a generated binary.
 - [Fetch overlays](specverb-fetch.md) - mount fixed HTTP leaves straight from the guardfile.
 
 ## Reference

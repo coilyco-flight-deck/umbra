@@ -1,6 +1,6 @@
-// Package specgencli owns the shared command tree behind the canonical specgen
+// Package umbracli owns the shared command tree behind the canonical umbra
 // binary and its temporary kdl-specs compatibility entrypoint.
-package specgencli
+package umbracli
 
 import (
 	"context"
@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"io"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra"
 	"github.com/urfave/cli/v3"
 )
 
-// Run executes the specgen command tree and returns its process exit code.
+// Run executes the umbra command tree and returns its process exit code.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	cmd := app()
 	cmd.Writer = stdout
 	cmd.ErrWriter = stderr
 	if err := cmd.Run(ctx, args); err != nil {
-		_, _ = fmt.Fprintln(stderr, "specgen:", err)
+		_, _ = fmt.Fprintln(stderr, "umbra:", err)
 		return exitCode(err)
 	}
 	return 0
@@ -27,7 +27,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 // exitCode maps a driver error to a process exit code, so skew drift is
 // distinguishable from an offline fetch or any other failure.
 func exitCode(err error) int {
-	if errors.Is(err, specgen.ErrSkew) {
+	if errors.Is(err, umbra.ErrSkew) {
 		return 3
 	}
 	return 1
@@ -37,9 +37,9 @@ func exitCode(err error) int {
 // every verb reads the same project boundary and optional member selector.
 func app() *cli.Command {
 	return &cli.Command{
-		Name:    "specgen",
+		Name:    "umbra",
 		Usage:   "no-code driver for a spec-driven consumer CLI (gen / lock / skew / build / run)",
-		Version: fmt.Sprintf("%s (umbra ref %s)", specgen.DriverVersion(), specgen.DefaultCLIGuardRef()),
+		Version: fmt.Sprintf("%s (umbra ref %s)", umbra.DriverVersion(), umbra.DefaultCLIGuardRef()),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "guardfile",
@@ -71,7 +71,7 @@ func app() *cli.Command {
 			if c.String("out") == "" {
 				return cli.ShowAppHelp(c)
 			}
-			return specgen.Gen(options(c, c.String("out"), c.String("binary")))
+			return umbra.Gen(options(c, c.String("out"), c.String("binary")))
 		},
 	}
 }
@@ -89,7 +89,7 @@ func genCmd() *cli.Command {
 			binaryNameFlag(),
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
-			return specgen.Gen(options(c, c.String("out"), c.String("binary")))
+			return umbra.Gen(options(c, c.String("out"), c.String("binary")))
 		},
 	}
 }
@@ -103,7 +103,7 @@ func lockCmd() *cli.Command {
 			&cli.StringFlag{Name: "umbra-replace", Usage: "local umbra checkout to build against (dev locks only)"},
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
-			return specgen.Lock(specgen.Options{
+			return umbra.Lock(umbra.Options{
 				GuardfilePath:   resolveGuardfile(c),
 				ProjectRoot:     c.String("project-root"),
 				CLIGuardRef:     c.String("umbra-ref"),
@@ -119,7 +119,7 @@ func skewCmd() *cli.Command {
 		Name:  "skew",
 		Usage: "report drift between the committed spec lock and live upstream (exit 3 on drift)",
 		Action: func(_ context.Context, c *cli.Command) error {
-			return specgen.Skew(options(c, "", ""))
+			return umbra.Skew(options(c, "", ""))
 		},
 	}
 }
@@ -134,7 +134,7 @@ func buildCmd() *cli.Command {
 			&cli.StringFlag{Name: "set-version", Usage: "release version stamped into the binary's --version via -ldflags (default \"dev\")"},
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
-			return specgen.Build(specgen.Options{
+			return umbra.Build(umbra.Options{
 				GuardfilePath: resolveGuardfile(c),
 				ProjectRoot:   c.String("project-root"),
 				BinaryName:    c.String("binary"),
@@ -154,7 +154,7 @@ func runCmd() *cli.Command {
 			binaryNameFlag(),
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
-			return specgen.Run(specgen.Options{
+			return umbra.Run(umbra.Options{
 				GuardfilePath: resolveGuardfile(c),
 				ProjectRoot:   c.String("project-root"),
 				BinaryName:    c.String("binary"),
@@ -166,13 +166,13 @@ func runCmd() *cli.Command {
 }
 
 // resolveGuardfile returns the --guardfile value verbatim (empty when unset).
-// The driver (specgen.loadGroup) owns discovery and the merge-vs-error rules.
+// The driver (umbra.loadGroup) owns discovery and the merge-vs-error rules.
 func resolveGuardfile(c *cli.Command) string {
 	return c.String("guardfile")
 }
 
-func options(c *cli.Command, out, binary string) specgen.Options {
-	return specgen.Options{
+func options(c *cli.Command, out, binary string) umbra.Options {
+	return umbra.Options{
 		GuardfilePath: resolveGuardfile(c),
 		ProjectRoot:   c.String("project-root"),
 		BinaryName:    binary,

@@ -68,7 +68,7 @@ func (o Operation) executeMCP(ctx context.Context, a Args) (Response, error) {
 	res, err := sess.CallTool(ctx, call.Tool, args)
 	if err != nil {
 		return Response{}, exitcode.New(exitcode.UpstreamFailed, "upstream_failed", err,
-			"check the tool name against the committed lock, and rerun `specgen skew`")
+			"check the tool name against the committed lock, and rerun `umbra skew`")
 	}
 	if res.IsError {
 		return Response{}, exitcode.New(exitcode.UpstreamFailed, "upstream_failed",

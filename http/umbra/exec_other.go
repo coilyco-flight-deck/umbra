@@ -2,7 +2,7 @@
 
 // Process spawn, since Windows has no syscall.Exec: run spawns the binary as
 // a child, mirrors stdio, and propagates its exit code.
-package specgen
+package umbra
 
 import (
 	"errors"

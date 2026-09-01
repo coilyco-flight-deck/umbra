@@ -36,9 +36,9 @@ A general MCP client calls tools. It has no policy, no audit row, no postconditi
 
 ## The surface is the lock, not the live server
 
-`specgen lock` connects, runs `tools/list`, prunes to the granted tools, and writes `<binary>.tools.lock.json.gz`. Mounting reads that lock and never reaches the network, so a build is offline and a tool added upstream since the lock is **not** mounted.
+`umbra lock` connects, runs `tools/list`, prunes to the granted tools, and writes `<binary>.tools.lock.json.gz`. Mounting reads that lock and never reaches the network, so a build is offline and a tool added upstream since the lock is **not** mounted.
 
-`specgen skew` prunes live upstream the same way and diffs, exiting 3 on drift. It reports a tool that went away, one that appeared inside the granted surface, and one whose input schema, output schema, `_meta`, annotations, description, or title moved. **Nothing else locks MCP tool schemas**, so nothing else can tell you one changed rather than print what it is today.
+`umbra skew` prunes live upstream the same way and diffs, exiting 3 on drift. It reports a tool that went away, one that appeared inside the granted surface, and one whose input schema, output schema, `_meta`, annotations, description, or title moved. **Nothing else locks MCP tool schemas**, so nothing else can tell you one changed rather than print what it is today.
 
 `_meta` is preserved verbatim through the lock rather than parsed. MCP Apps addresses its widget at `_meta.ui`, and a lock that dropped unknown keys would lose that silently. It is part of the compared value, so a widget that repoints is drift. What it may call back: [mcpapps.md](mcpapps.md).
 
@@ -98,7 +98,7 @@ There is no OAuth browser flow, no editor config import, and no aggregating prox
 
 ## See also
 
-- [specgen.md](specgen.md) - the driver, its five verbs, and mixed transports.
+- [umbra-cli.md](umbra-cli.md) - the driver, its five verbs, and mixed transports.
 - [mcpverb-cost.md](mcpverb-cost.md) - what a call costs, and why there is no daemon.
 - [specverb-descriptors.md](specverb-descriptors.md) - the deny-by-absence rule this inherits.
 - [mcpverb-serving.md](mcpverb-serving.md) - projecting the same grants into a served surface.

@@ -2,7 +2,7 @@
 
 // Process replacement (syscall.Exec) on Unix. Cache locking lives in
 // pkg/flock, which is honest about the platforms it does not cover.
-package specgen
+package umbra
 
 import (
 	"os"

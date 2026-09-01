@@ -29,7 +29,7 @@ type Config struct {
 	// Guardfile is the parsed mcp-dialect policy.
 	Guardfile *Guardfile
 
-	// Tools is the committed lock: the upstream surface as `specgen lock` froze
+	// Tools is the committed lock: the upstream surface as `umbra lock` froze
 	// it. Mounting reads it and never reaches the network, so a build is offline.
 	Tools []mcpclient.Tool
 

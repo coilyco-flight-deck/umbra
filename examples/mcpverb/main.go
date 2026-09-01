@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	// Stands in for the committed lock `specgen lock` would write. A generated
+	// Stands in for the committed lock `umbra lock` would write. A generated
 	// binary reads its lock and never reaches the network to mount.
 	tools, err := listTools(url)
 	if err != nil {
@@ -77,7 +77,7 @@ func serve() string {
 	return httptest.NewServer(handler).URL
 }
 
-// listTools reads the upstream surface, the input `specgen lock` would freeze.
+// listTools reads the upstream surface, the input `umbra lock` would freeze.
 func listTools(url string) ([]mcpclient.Tool, error) {
 	ctx := context.Background()
 	sess, err := mcpclient.Connect(ctx, mcpclient.Server{Name: "demo", HTTP: &mcpclient.HTTPEndpoint{URL: url}})

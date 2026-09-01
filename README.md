@@ -23,8 +23,8 @@ job, and umbra is the gate in front of it.
 
 ## Two ways in
 
-**Generate the CLI.** `specgen` reads KDL policy plus committed locks out of a
-`.specgen/` directory and builds a standalone guarded CLI with no hand-written
+**Generate the CLI.** `umbra` reads KDL policy plus committed locks out of a
+`.umbra/` directory and builds a standalone guarded CLI with no hand-written
 Go, over three transports: an HTTP API from its OpenAPI contract, a wrapped
 binary, and an upstream MCP server. `--skills-out` also renders a native agent
 skill and a lazy command index.
@@ -37,20 +37,20 @@ Nothing consumer-shaped leaks into the API.
 GOPRIVATE=forgejo.coilysiren.me go get forgejo.coilysiren.me/coilyco-flight-deck/umbra
 ```
 
-## Install specgen
+## Install umbra
 
 ```sh
 brew tap coilyco-flight-deck/tap https://forgejo.coilysiren.me/coilyco-flight-deck/homebrew-tap
-brew install coilyco-flight-deck/tap/specgen
+brew install coilyco-flight-deck/tap/umbra
 ```
 
 ```powershell
 scoop bucket add coilyco-flight-deck https://forgejo.coilysiren.me/coilyco-flight-deck/scoop-bucket
-scoop install coilyco-flight-deck/specgen
+scoop install coilyco-flight-deck/umbra
 ```
 
 Tagged releases also publish raw binaries and `SHA256SUMS` for Linux, macOS, and
-Windows on amd64 and arm64. `specgen --version` reports both the driver and the
+Windows on amd64 and arm64. `umbra --version` reports both the driver and the
 umbra ref `lock` freezes by default. It shells out to the Go toolchain to resolve
 locks and build, so Go has to be present.
 

@@ -40,7 +40,7 @@ type Config struct {
 	Providers map[string]valuesource.Provider
 
 	// EmbeddedFiles maps each build-time `embed` source to the absolute runtime
-	// path materialized by specgen. Missing or relative entries fail closed.
+	// path materialized by umbra. Missing or relative entries fail closed.
 	EmbeddedFiles map[string]string
 
 	// Run fires the command. nil execs for real.

@@ -18,7 +18,7 @@ Inventory: [`docs/FEATURES.md`](docs/FEATURES.md). Per-feature demos: [`examples
 
 Every package here must be importable from a different binary without consumer-specific types or defaults leaking in. If a helper needs a consumer-shaped argument, define the type in umbra and have the consumer adapt to it, not the other way around.
 
-**Two front doors, and nothing else.** Every package must be reached through `specgen` (the driver and the binaries it generates) or through `beaver`. A package no front door reaches does not belong here, whoever else imports it. ward was a third door and is deprecated: what only ward needed was removed rather than kept.
+**Two front doors, and nothing else.** Every package must be reached through `umbra` (the driver and the binaries it generates) or through `beaver`. A package no front door reaches does not belong here, whoever else imports it. ward was a third door and is deprecated: what only ward needed was removed rather than kept.
 
 ## Commands
 
@@ -52,7 +52,7 @@ Automated and Forgejo-canonical, in two stages. A push to `main` runs
 publishes a commit-scoped draft tag, and fast-forwards `release`.
 [`release.yml`](.forgejo/workflows/release.yml) runs on that push and cuts the
 minor bump, tag, and Forgejo release. Major is hand-driven only, never inferred
-from commit messages. Releases attach the `specgen` binary matrix, `SHA256SUMS`,
+from commit messages. Releases attach the `umbra` binary matrix, `SHA256SUMS`,
 a Homebrew formula, and a Scoop manifest, then update the shared tap and bucket.
 Full flow in [docs/release-pipeline.md](docs/release-pipeline.md).
 

@@ -1,4 +1,4 @@
-package specgen
+package umbra
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 )
 
 func TestSpecLockEncodingIsDeterministicAndRoundTrips(t *testing.T) {

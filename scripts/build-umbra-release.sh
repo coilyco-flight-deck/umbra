@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version=${1:?usage: build-specgen-release.sh VERSION [DIST_DIR]}
+version=${1:?usage: build-umbra-release.sh VERSION [DIST_DIR]}
 dist_dir=${2:-dist}
 
 case "$version" in
@@ -31,19 +31,19 @@ for target in "${targets[@]}"; do
     extension=.exe
   fi
 
-  artifact="$dist_dir/specgen-${target_os}-${target_arch}${extension}"
+  artifact="$dist_dir/umbra-${target_os}-${target_arch}${extension}"
   echo "building $artifact"
   GOOS="$target_os" GOARCH="$target_arch" CGO_ENABLED=0 \
     go build -trimpath \
-      -ldflags "-s -w -X forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen.buildVersion=${version}" \
-      -o "$artifact" ./cmd/specgen
+      -ldflags "-s -w -X forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra.buildVersion=${version}" \
+      -o "$artifact" ./cmd/umbra
 done
 
 (
   cd "$dist_dir"
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum specgen-* > SHA256SUMS
+    sha256sum umbra-* > SHA256SUMS
   else
-    shasum -a 256 specgen-* > SHA256SUMS
+    shasum -a 256 umbra-* > SHA256SUMS
   fi
 )

@@ -35,7 +35,7 @@ The downward-only arrow now holds with no exceptions. The last cross-surface imp
 
 ## Two front doors, and what that removes
 
-Every package here is reached through **specgen** or through **beaver**. A package no front door reaches does not belong, which is what retired ward's surface: `cli/{gittree,passthrough,repocfg,shell}`, `http/egress`, and eight `pkg/` helpers went with the consumer that was their only caller.
+Every package here is reached through **umbra** or through **beaver**. A package no front door reaches does not belong, which is what retired ward's surface: `cli/{gittree,passthrough,repocfg,shell}`, `http/egress`, and eight `pkg/` helpers went with the consumer that was their only caller.
 
 ## What stays flat
 

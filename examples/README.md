@@ -11,7 +11,7 @@ Each subdirectory is a self-contained urfave/cli app that exercises one feature 
 | [`mcpverb-cli/`](mcpverb-cli/README.md) | The same dialect the product way: KDL policy plus a committed lock, no Go, over the published MCP reference server via stdio. |
 | [`mcpapps/`](mcpapps/main.go) | The MCP Apps host bridge: a widget's real frame sequence replayed against a live session, with the calls its `widget` block does not grant refused. |
 
-Every feature is built on top of `audit`. The other examples wire it in implicitly via `verb.Wrap`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal. `mcpverb-cli/` has no Go at all: it is a `.specgen` project built by the driver.
+Every feature is built on top of `audit`. The other examples wire it in implicitly via `verb.Wrap`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal. `mcpverb-cli/` has no Go at all: it is a `.umbra` project built by the driver.
 
 ## Running
 

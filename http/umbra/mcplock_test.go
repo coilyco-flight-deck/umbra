@@ -1,4 +1,4 @@
-package specgen
+package umbra
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/mcpclient"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -58,11 +58,11 @@ func newMovingUpstream(t *testing.T) *movingUpstream {
 	return up
 }
 
-// mcpProject writes a one-member .specgen project pointed at the upstream.
+// mcpProject writes a one-member .umbra project pointed at the upstream.
 func mcpProject(t *testing.T, url string) string {
 	t.Helper()
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".specgen")
+	root := filepath.Join(dir, ".umbra")
 	if err := os.MkdirAll(root, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -226,7 +226,7 @@ func toolsOf(fixtures []toolFixture) []mcpclient.Tool {
 // an HTTP API, a wrapped tool, and an MCP server mounted side by side.
 func TestRender_MergesAllThreeDialects(t *testing.T) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, ".specgen")
+	root := filepath.Join(dir, ".umbra")
 	if err := os.MkdirAll(root, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}

@@ -1,4 +1,4 @@
-package specgen
+package umbra
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 )
 
 func TestReadSpecSourceDecodesGzipAndKeepsPlainCompatible(t *testing.T) {

@@ -1,4 +1,4 @@
-// Package embedfile materializes specgen-embedded build inputs for one guarded
+// Package embedfile materializes umbra-embedded build inputs for one guarded
 // process lifetime.
 package embedfile
 
@@ -18,7 +18,7 @@ type Source struct {
 }
 
 // Materialize writes sources beneath one private temporary directory. Key
-// shape and resolution: docs/specgen-materialization.md.
+// shape and resolution: docs/umbra-materialization.md.
 func Materialize(prefix string, sources map[int]map[string]Source) (map[int]map[string]string, func() error, error) {
 	root, err := os.MkdirTemp("", prefix+"-embedded-*")
 	if err != nil {

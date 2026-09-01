@@ -11,7 +11,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 - **specverb / guardfile** - Spec-driven verbs: [resolution](specverb-resolution.md), [policy](specverb-policy.md), [requests](specverb-request.md), [actions](specverb-actions.md), [describe](specverb-describe.md), [fetch](specverb-fetch.md), [descriptors](specverb-descriptors.md) for a consumer that mounts operations onto something other than a cli tree.
 - **mcpverb** - MCP-shaped verbs: one `can call` grant per guarded leaf against an upstream MCP server, flags typed from the committed tool lock, deny by absence. `ServedTools` projects the same grants back into tool definitions for a consumer that serves them, and a grant's `widget` block declares what that tool's MCP Apps view may call back. See [mcpverb.md](mcpverb.md).
-- **specgen / codegen** - The no-code driver: discovery, locks, generation, over three transports (spec, exec, mcp). See [specgen.md](specgen.md) and [materialization](specgen-materialization.md).
+- **umbra / codegen** - The no-code driver: discovery, locks, generation, over three transports (spec, exec, mcp). See [umbra-cli.md](umbra-cli.md) and [materialization](umbra-materialization.md).
 - **opcore** - The frozen inline grammar: typed query, body projection, GraphQL and SQL grants, JMESPath postconditions, MCP proxy grants, and a named client. See [opcore-inline.md](opcore-inline.md) and [opcore-body.md](opcore-body.md).
 - **respfmt** - JSON renderer with optional JMESPath projection and five output formats, mirroring the aws CLI `--query` / `--output` surface.
 
@@ -29,7 +29,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 ## Two front doors
 
-Every package above is reached through **specgen** (the driver and the binaries it generates) or through **beaver** (`mcp-beaver`, which imports `guardfile`, `opcore`, `specverb`, `tokenmint`, and `valuesource`). A package no front door reaches does not belong here.
+Every package above is reached through **umbra** (the driver and the binaries it generates) or through **beaver** (`mcp-beaver`, which imports `guardfile`, `opcore`, `specverb`, `tokenmint`, and `valuesource`). A package no front door reaches does not belong here.
 
 ward was a third door and is deprecated. What only ward needed - `cli/{gittree,passthrough,repocfg,shell}`, `http/egress`, and `pkg/{attribution,broker,credseed,issueref,ownertrust,provenance,scan,version}` - was removed rather than kept for a consumer that is going away.
 

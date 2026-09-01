@@ -734,7 +734,7 @@ func (g *Grant) applyEmbed(c *kdl.Node) error {
 	return nil
 }
 
-// validateEmbedSource keeps file references portable and confined. Specgen
+// validateEmbedSource keeps file references portable and confined. umbra
 // owns filesystem resolution relative to the declaring guardfile.
 func validateEmbedSource(source string) error {
 	switch {

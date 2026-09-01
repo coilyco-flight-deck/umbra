@@ -1,6 +1,6 @@
-// Package specgen is the no-code driver behind cmd/specgen: the uv-style
+// Package umbra is the no-code driver behind cmd/umbra: the uv-style
 // verb surface (gen / lock / skew / run) over a Guardfile. See docs/specverb.md.
-package specgen
+package umbra
 
 import (
 	"encoding/json"
@@ -18,8 +18,8 @@ import (
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/execverb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/mcpverb"
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specverb"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/flock"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/skillgen"
 	kdl "github.com/calico32/kdl-go"
@@ -29,7 +29,7 @@ import (
 // Options are the inputs shared by every driver verb.
 type Options struct {
 	GuardfilePath   string   // path to the consumer's KDL Guardfile
-	ProjectRoot     string   // explicit recursive KDL project boundary (empty discovers .specgen, then keeps legacy discovery)
+	ProjectRoot     string   // explicit recursive KDL project boundary (empty discovers .umbra, then keeps legacy discovery)
 	BinaryName      string   // gen/build/run: generated CLI/binary name (empty = Guardfile wrap binary)
 	Out             string   // gen: main.go output path (debug; cache when empty). build: binary output dir or path
 	Args            []string // run: arguments passed through to the materialized binary
@@ -40,8 +40,8 @@ type Options struct {
 }
 
 // ErrNoLock is returned by run and skew when a required committed lock is
-// absent, so the caller can point the user at `specgen lock`.
-var ErrNoLock = errors.New("missing committed lock; run 'specgen lock' first")
+// absent, so the caller can point the user at `umbra lock`.
+var ErrNoLock = errors.New("missing committed lock; run 'umbra lock' first")
 
 // ErrSkew is returned by skew when the committed spec lock drifts from upstream.
 var ErrSkew = errors.New("spec skew detected")
@@ -120,10 +120,10 @@ func normalizeBinaryName(name string) (string, error) {
 		return "", nil
 	}
 	if strings.TrimSpace(name) != name {
-		return "", fmt.Errorf("specgen: --binary must not have leading or trailing whitespace")
+		return "", fmt.Errorf("umbra: --binary must not have leading or trailing whitespace")
 	}
 	if name == "." || name == ".." || strings.ContainsAny(name, `/\`) || strings.ContainsRune(name, 0) {
-		return "", fmt.Errorf("specgen: --binary must be a binary name, not a path")
+		return "", fmt.Errorf("umbra: --binary must be a binary name, not a path")
 	}
 	return name, nil
 }
@@ -144,11 +144,11 @@ func newGroup(dir, selector string, members []member, binaryName string) (*group
 func sniffTransport(src []byte) (string, error) {
 	doc, err := kdl.ParseString(string(src))
 	if err != nil {
-		return "", fmt.Errorf("specgen: parse KDL: %w", err)
+		return "", fmt.Errorf("umbra: parse KDL: %w", err)
 	}
 	wrap := doc.GetNode("wrap")
 	if wrap == nil {
-		return "", fmt.Errorf("specgen: missing top-level `wrap` node")
+		return "", fmt.Errorf("umbra: missing top-level `wrap` node")
 	}
 	for _, n := range wrap.Children().Nodes {
 		switch n.Name() {
@@ -166,11 +166,11 @@ func sniffTransport(src []byte) (string, error) {
 func readMember(path, identity string) (member, error) {
 	b, err := os.ReadFile(path) //nolint:gosec // operator-supplied policy input
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: read guardfile: %w", err)
+		return member{}, fmt.Errorf("umbra: read guardfile: %w", err)
 	}
 	transport, err := sniffTransport(b)
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: sniff %s: %w", path, err)
+		return member{}, fmt.Errorf("umbra: sniff %s: %w", path, err)
 	}
 	switch transport {
 	case codegen.TransportMCP:
@@ -186,7 +186,7 @@ func readMember(path, identity string) (member, error) {
 func readMCPMember(path, identity string, src []byte) (member, error) {
 	gf, err := mcpverb.Parse(src)
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: parse mcp guardfile %s: %w", path, err)
+		return member{}, fmt.Errorf("umbra: parse mcp guardfile %s: %w", path, err)
 	}
 	p, err := codegen.PlanMCP(gf.Group, gf.Providers(), identity, gf.ProviderDecls)
 	if err != nil {
@@ -202,7 +202,7 @@ func readMCPMember(path, identity string, src []byte) (member, error) {
 func readExecMember(path, identity string, src []byte) (member, error) {
 	egf, err := execverb.Parse(src)
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: parse exec guardfile %s: %w", path, err)
+		return member{}, fmt.Errorf("umbra: parse exec guardfile %s: %w", path, err)
 	}
 	p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity, egf.ProviderDecls)
 	if err != nil {
@@ -224,11 +224,11 @@ func readSpecMember(path, identity string) (member, error) {
 	// so every downstream stage sees the merged grant set (docs/specverb-policy.md).
 	flat, err := guardfile.Flatten(path)
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: resolve guardfile %s: %w", path, err)
+		return member{}, fmt.Errorf("umbra: resolve guardfile %s: %w", path, err)
 	}
 	gf, err := guardfile.Parse(flat)
 	if err != nil {
-		return member{}, fmt.Errorf("specgen: parse guardfile %s: %w", path, err)
+		return member{}, fmt.Errorf("umbra: parse guardfile %s: %w", path, err)
 	}
 	p, err := codegen.Plan(gf, identity)
 	if err != nil {
@@ -245,32 +245,32 @@ func readSpecMember(path, identity string) (member, error) {
 func readEmbeddedFiles(guardfilePath, identity string, sources []string) ([]embeddedFile, error) {
 	base, err := filepath.EvalSymlinks(filepath.Dir(guardfilePath))
 	if err != nil {
-		return nil, fmt.Errorf("specgen: resolve embedded-file base: %w", err)
+		return nil, fmt.Errorf("umbra: resolve embedded-file base: %w", err)
 	}
 	var out []embeddedFile
 	for _, source := range sources {
 		candidate := filepath.Join(base, filepath.FromSlash(source))
 		resolved, err := filepath.EvalSymlinks(candidate)
 		if err != nil {
-			return nil, fmt.Errorf("specgen: resolve embedded file %s: %w", source, err)
+			return nil, fmt.Errorf("umbra: resolve embedded file %s: %w", source, err)
 		}
 		rel, err := filepath.Rel(base, resolved)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return nil, fmt.Errorf("specgen: embedded file %s escapes guardfile directory %s", source, filepath.Dir(guardfilePath))
+			return nil, fmt.Errorf("umbra: embedded file %s escapes guardfile directory %s", source, filepath.Dir(guardfilePath))
 		}
 		info, err := os.Stat(resolved) //nolint:gosec // EvalSymlinks result is confined to the guardfile directory above
 		if err != nil {
-			return nil, fmt.Errorf("specgen: stat embedded file %s: %w", source, err)
+			return nil, fmt.Errorf("umbra: stat embedded file %s: %w", source, err)
 		}
 		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("specgen: embedded file %s is not a regular file", source)
+			return nil, fmt.Errorf("umbra: embedded file %s is not a regular file", source)
 		}
 		if info.Size() > maxEmbeddedFileBytes {
-			return nil, fmt.Errorf("specgen: embedded file %s is %d bytes, above the %d-byte limit", source, info.Size(), maxEmbeddedFileBytes)
+			return nil, fmt.Errorf("umbra: embedded file %s is %d bytes, above the %d-byte limit", source, info.Size(), maxEmbeddedFileBytes)
 		}
 		data, err := os.ReadFile(resolved) //nolint:gosec // validated build-time source confined beside the guardfile
 		if err != nil {
-			return nil, fmt.Errorf("specgen: read embedded file %s: %w", source, err)
+			return nil, fmt.Errorf("umbra: read embedded file %s: %w", source, err)
 		}
 		name := filepath.ToSlash(filepath.Join(filepath.Dir(identity), filepath.FromSlash(source)))
 		out = append(out, embeddedFile{Source: source, Name: name, Bytes: data})
@@ -293,18 +293,18 @@ func operationIntent(src []byte) bool {
 func projectRoot(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("specgen: resolve project root: %w", err)
+		return "", fmt.Errorf("umbra: resolve project root: %w", err)
 	}
 	root, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		return "", fmt.Errorf("specgen: resolve project root: %w", err)
+		return "", fmt.Errorf("umbra: resolve project root: %w", err)
 	}
 	info, err := os.Stat(root)
 	if err != nil {
-		return "", fmt.Errorf("specgen: stat project root: %w", err)
+		return "", fmt.Errorf("umbra: stat project root: %w", err)
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("specgen: project root %s is not a directory", path)
+		return "", fmt.Errorf("umbra: project root %s is not a directory", path)
 	}
 	return root, nil
 }
@@ -312,11 +312,11 @@ func projectRoot(path string) (string, error) {
 func memberIdentity(root, path string) (string, error) {
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return "", fmt.Errorf("specgen: resolve member %s: %w", path, err)
+		return "", fmt.Errorf("umbra: resolve member %s: %w", path, err)
 	}
 	rel, err := filepath.Rel(root, resolved)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("specgen: member %s escapes project root %s", path, root)
+		return "", fmt.Errorf("umbra: member %s escapes project root %s", path, root)
 	}
 	return filepath.ToSlash(rel), nil
 }
@@ -327,7 +327,7 @@ func discoverProjectMembers(root string) ([]member, error) {
 	var paths []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return fmt.Errorf("specgen: walk project: %w", err)
+			return fmt.Errorf("umbra: walk project: %w", err)
 		}
 		if d.Type()&os.ModeSymlink != 0 {
 			if _, err := memberIdentity(root, path); err != nil {
@@ -365,17 +365,17 @@ func projectMember(root, path string, seenSource map[string]string) (member, boo
 		return member{}, false, err
 	}
 	if prior, ok := seenSource[identity]; ok {
-		return member{}, false, fmt.Errorf("specgen: duplicate logical member %s (%s and %s)", identity, prior, path)
+		return member{}, false, fmt.Errorf("umbra: duplicate logical member %s (%s and %s)", identity, prior, path)
 	}
 	seenSource[identity] = path
 	src, err := os.ReadFile(path) //nolint:gosec // operator-supplied policy input
 	if err != nil {
-		return member{}, false, fmt.Errorf("specgen: read member %s: %w", identity, err)
+		return member{}, false, fmt.Errorf("umbra: read member %s: %w", identity, err)
 	}
 	doc, err := kdl.ParseString(string(src))
 	if err != nil {
 		if operationIntent(src) {
-			return member{}, false, fmt.Errorf("specgen: parse intended operation member %s: %w", identity, err)
+			return member{}, false, fmt.Errorf("umbra: parse intended operation member %s: %w", identity, err)
 		}
 		return member{}, false, nil
 	}
@@ -389,7 +389,7 @@ func projectMember(root, path string, seenSource map[string]string) (member, boo
 func legacyMembers(dir, selected string) ([]member, error) {
 	matches, err := filepath.Glob(filepath.Join(dir, "*.guardfile.kdl"))
 	if err != nil {
-		return nil, fmt.Errorf("specgen: discover guardfiles: %w", err)
+		return nil, fmt.Errorf("umbra: discover guardfiles: %w", err)
 	}
 	if selected != "" {
 		found := false
@@ -419,22 +419,22 @@ func validateArtifacts(members []member) error {
 	seenArtifacts := map[string]string{}
 	for _, m := range members {
 		if prior, ok := seenArtifacts[m.Params.GuardfileName]; ok {
-			return fmt.Errorf("specgen: conflicting guardfile artifact %s for %s and %s", m.Params.GuardfileName, prior, m.Path)
+			return fmt.Errorf("umbra: conflicting guardfile artifact %s for %s and %s", m.Params.GuardfileName, prior, m.Path)
 		}
 		seenArtifacts[m.Params.GuardfileName] = m.Path
 		if !m.isExec() {
 			if prior, ok := seenLocks[m.Params.SpecLockName]; ok {
-				return fmt.Errorf("specgen: conflicting spec lock %s for %s and %s", m.Params.SpecLockName, prior, m.Path)
+				return fmt.Errorf("umbra: conflicting spec lock %s for %s and %s", m.Params.SpecLockName, prior, m.Path)
 			}
 			if prior, ok := seenArtifacts[m.Params.SpecLockName]; ok {
-				return fmt.Errorf("specgen: spec lock artifact %s for %s conflicts with %s", m.Params.SpecLockName, m.Path, prior)
+				return fmt.Errorf("umbra: spec lock artifact %s for %s conflicts with %s", m.Params.SpecLockName, m.Path, prior)
 			}
 			seenLocks[m.Params.SpecLockName] = m.Path
 			seenArtifacts[m.Params.SpecLockName] = m.Path
 		}
 		for _, embedded := range m.Embeds {
 			if prior, ok := seenArtifacts[embedded.Name]; ok {
-				return fmt.Errorf("specgen: embedded artifact %s for %s conflicts with %s", embedded.Name, m.Path, prior)
+				return fmt.Errorf("umbra: embedded artifact %s for %s conflicts with %s", embedded.Name, m.Path, prior)
 			}
 			seenArtifacts[embedded.Name] = m.Path
 		}
@@ -451,9 +451,9 @@ func loadGroup(opts Options) (*group, error) {
 	}
 	if len(members) == 0 {
 		if opts.ProjectRoot != "" {
-			return nil, fmt.Errorf("specgen: no operation KDL members in project root %s", dir)
+			return nil, fmt.Errorf("umbra: no operation KDL members in project root %s", dir)
 		}
-		return nil, errors.New("specgen: no *.guardfile.kdl in cwd (set --guardfile or --project-root)")
+		return nil, errors.New("umbra: no *.guardfile.kdl in cwd (set --guardfile or --project-root)")
 	}
 	byBinary := map[string][]member{}
 	order := []string{}
@@ -466,13 +466,13 @@ func loadGroup(opts Options) (*group, error) {
 	if selector == "" {
 		if len(byBinary) != 1 {
 			sort.Strings(order)
-			return nil, fmt.Errorf("specgen: %d binaries in %s (%s); pass --guardfile to pick one", len(byBinary), dir, strings.Join(order, ", "))
+			return nil, fmt.Errorf("umbra: %d binaries in %s (%s); pass --guardfile to pick one", len(byBinary), dir, strings.Join(order, ", "))
 		}
 		selector = order[0]
 	}
 	members, ok := byBinary[selector]
 	if !ok {
-		return nil, fmt.Errorf("specgen: no guardfile for binary %q in %s", selector, dir)
+		return nil, fmt.Errorf("umbra: no guardfile for binary %q in %s", selector, dir)
 	}
 	if err := validateArtifacts(members); err != nil {
 		return nil, err
@@ -482,16 +482,28 @@ func loadGroup(opts Options) (*group, error) {
 
 func discover(opts Options) (string, string, []member, error) {
 	if opts.ProjectRoot == "" && opts.GuardfilePath == "" {
-		if _, err := os.Stat(".specgen"); err == nil {
-			return discoverRoot(".specgen", "")
+		if _, err := os.Stat(".umbra"); err == nil {
+			return discoverRoot(".umbra", "")
 		} else if !os.IsNotExist(err) {
-			return "", "", nil, fmt.Errorf("specgen: inspect conventional project root .specgen: %w", err)
+			return "", "", nil, fmt.Errorf("umbra: inspect conventional project root .umbra: %w", err)
+		}
+		if err := refusePriorRoot(); err != nil {
+			return "", "", nil, err
 		}
 	}
 	if opts.ProjectRoot == "" {
 		return discoverLegacy(opts.GuardfilePath)
 	}
 	return discoverRoot(opts.ProjectRoot, opts.GuardfilePath)
+}
+
+// refusePriorRoot names the rename rather than reporting the project as absent.
+// The driver was `specgen` and its root `.specgen/` until this rename.
+func refusePriorRoot() error {
+	if _, err := os.Stat(".specgen"); err == nil {
+		return fmt.Errorf("umbra: found .specgen/ but no .umbra/; specgen is now umbra, so rename the directory (`git mv .specgen .umbra`)")
+	}
+	return nil
 }
 
 func discoverLegacy(selected string) (string, string, []member, error) {
@@ -582,14 +594,14 @@ func Gen(opts Options) error {
 	if out == "" {
 		dir := cacheDirForGroup(g)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return fmt.Errorf("specgen: create cache dir: %w", err)
+			return fmt.Errorf("umbra: create cache dir: %w", err)
 		}
 		out = filepath.Join(dir, "main.go")
 	}
 	if err := os.WriteFile(out, main, 0o600); err != nil {
-		return fmt.Errorf("specgen: write %s: %w", out, err)
+		return fmt.Errorf("umbra: write %s: %w", out, err)
 	}
-	fmt.Fprintf(os.Stderr, "specgen: wrote %s\n", out)
+	fmt.Fprintf(os.Stderr, "umbra: wrote %s\n", out)
 	return emitSkill(g, opts.SkillsOut)
 }
 
@@ -605,53 +617,53 @@ func emitSkill(g *group, out string) error {
 	}
 	bundle, err := skillgen.RenderSkill(app.Commands, app.Name)
 	if err != nil {
-		return fmt.Errorf("specgen: render skill: %w", err)
+		return fmt.Errorf("umbra: render skill: %w", err)
 	}
 	skillDir := filepath.Join(out, bundle.Name)
 	referencesDir := filepath.Join(skillDir, "references")
 	if err := os.MkdirAll(referencesDir, 0o750); err != nil {
-		return fmt.Errorf("specgen: create skill output: %w", err)
+		return fmt.Errorf("umbra: create skill output: %w", err)
 	}
 	skillPath := filepath.Join(skillDir, "SKILL.md")
 	if err := os.WriteFile(skillPath, []byte(bundle.Skill), 0o644); err != nil { //nolint:gosec // generated skill is intentionally readable
-		return fmt.Errorf("specgen: write skill: %w", err)
+		return fmt.Errorf("umbra: write skill: %w", err)
 	}
 	indexPath := filepath.Join(referencesDir, "commands.yaml")
 	if err := os.WriteFile(indexPath, []byte(bundle.CommandsYAML), 0o644); err != nil { //nolint:gosec // generated skill index is intentionally readable
-		return fmt.Errorf("specgen: write skill command index: %w", err)
+		return fmt.Errorf("umbra: write skill command index: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "specgen: wrote skill %s\n", skillDir)
+	fmt.Fprintf(os.Stderr, "umbra: wrote skill %s\n", skillDir)
 	return nil
 }
 
 // commandTree reconstructs the same merged urfave tree the generated binary
 // mounts, without executing a command or resolving credentials.
 func (g *group) commandTree() (*cli.Command, error) {
-	app := &cli.Command{Name: g.runtimeBinary(), Usage: "guarded verbs generated by specgen"}
+	app := &cli.Command{Name: g.runtimeBinary(), Usage: "guarded verbs generated by umbra"}
 	for _, m := range g.Members {
 		if m.isExec() {
 			embeddedFiles := map[string]string{}
 			for _, embedded := range m.Embeds {
 				placeholder, err := filepath.Abs(filepath.Join("embedded", filepath.FromSlash(embedded.Source)))
 				if err != nil {
-					return nil, fmt.Errorf("specgen: resolve embedded-file placeholder %s: %w", embedded.Source, err)
+					return nil, fmt.Errorf("umbra: resolve embedded-file placeholder %s: %w", embedded.Source, err)
 				}
 				embeddedFiles[embedded.Source] = placeholder
 			}
 			if err := execverb.Mount(app, execverb.Config{Guardfile: m.ExecGF, EmbeddedFiles: embeddedFiles}); err != nil {
-				return nil, fmt.Errorf("specgen: build exec skill surface %s: %w", m.Path, err)
+				return nil, fmt.Errorf("umbra: build exec skill surface %s: %w", m.Path, err)
 			}
 			continue
 		}
 		specBytes, err := readSpecLock(g.Dir, m)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return nil, fmt.Errorf("specgen: no spec lock %s for skill output: %w", m.Params.SpecLockName, ErrNoLock)
+				return nil, fmt.Errorf("umbra: no spec lock %s for skill output: %w", m.Params.SpecLockName, ErrNoLock)
 			}
-			return nil, fmt.Errorf("specgen: read spec lock for skill output: %w", err)
+			return nil, fmt.Errorf("umbra: read spec lock for skill output: %w", err)
 		}
 		if err := specverb.Mount(app, specverb.Config{Guardfile: m.GF, Spec: specBytes}); err != nil {
-			return nil, fmt.Errorf("specgen: build spec skill surface %s: %w", m.Path, err)
+			return nil, fmt.Errorf("umbra: build spec skill surface %s: %w", m.Path, err)
 		}
 	}
 	return app, nil
@@ -673,24 +685,24 @@ func lockSpecs(g *group) (map[string][]byte, error) {
 		}
 		full, err := loadFullSpec(m)
 		if err != nil {
-			return nil, fmt.Errorf("specgen: load spec %s: %w", m.Params.GuardfileName, err)
+			return nil, fmt.Errorf("umbra: load spec %s: %w", m.Params.GuardfileName, err)
 		}
 		// Commit only the granted slice, not the full upstream dump: the lock
-		// becomes the consumer's own contract. See docs/specgen.md.
+		// becomes the consumer's own contract. See docs/umbra-cli.md.
 		specBytes, err := specverb.Prune(full, m.GF)
 		if err != nil {
-			return nil, fmt.Errorf("specgen: prune spec %s: %w", m.Params.GuardfileName, err)
+			return nil, fmt.Errorf("umbra: prune spec %s: %w", m.Params.GuardfileName, err)
 		}
 		specLockPath := filepath.Join(g.Dir, m.Params.SpecLockName)
 		if err := os.MkdirAll(filepath.Dir(specLockPath), 0o750); err != nil {
-			return nil, fmt.Errorf("specgen: create spec lock dir: %w", err)
+			return nil, fmt.Errorf("umbra: create spec lock dir: %w", err)
 		}
 		encodedSize, err := writeSpecLock(specLockPath, specBytes)
 		if err != nil {
-			return nil, fmt.Errorf("specgen: write spec lock: %w", err)
+			return nil, fmt.Errorf("umbra: write spec lock: %w", err)
 		}
 		specs[m.Path] = specBytes
-		fmt.Fprintf(os.Stderr, "specgen: locked %s (%d encoded bytes, %d decoded, pruned from %d)\n", m.Params.SpecLockName, encodedSize, len(specBytes), len(full))
+		fmt.Fprintf(os.Stderr, "umbra: locked %s (%d encoded bytes, %d decoded, pruned from %d)\n", m.Params.SpecLockName, encodedSize, len(specBytes), len(full))
 	}
 	return specs, nil
 }
@@ -700,26 +712,26 @@ func lockSpecs(g *group) (map[string][]byte, error) {
 func lockTools(g *group, m member, specs map[string][]byte) error {
 	live, err := fetchTools(m)
 	if err != nil {
-		return fmt.Errorf("specgen: list tools %s: %w", m.Params.GuardfileName, err)
+		return fmt.Errorf("umbra: list tools %s: %w", m.Params.GuardfileName, err)
 	}
 	pruned, err := pruneTools(m.MCPGF, live)
 	if err != nil {
-		return fmt.Errorf("specgen: prune tools %s: %w", m.Params.GuardfileName, err)
+		return fmt.Errorf("umbra: prune tools %s: %w", m.Params.GuardfileName, err)
 	}
 	encoded, err := encodeTools(pruned)
 	if err != nil {
-		return fmt.Errorf("specgen: %s: %w", m.Params.GuardfileName, err)
+		return fmt.Errorf("umbra: %s: %w", m.Params.GuardfileName, err)
 	}
 	lockPath := filepath.Join(g.Dir, m.Params.SpecLockName)
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o750); err != nil {
-		return fmt.Errorf("specgen: create tool lock dir: %w", err)
+		return fmt.Errorf("umbra: create tool lock dir: %w", err)
 	}
 	size, err := writeSpecLock(lockPath, encoded)
 	if err != nil {
-		return fmt.Errorf("specgen: write tool lock: %w", err)
+		return fmt.Errorf("umbra: write tool lock: %w", err)
 	}
 	specs[m.Path] = encoded
-	fmt.Fprintf(os.Stderr, "specgen: locked %s (%d encoded bytes, %d tools of %d upstream)\n",
+	fmt.Fprintf(os.Stderr, "umbra: locked %s (%d encoded bytes, %d tools of %d upstream)\n",
 		m.Params.SpecLockName, size, len(pruned), len(live))
 	return nil
 }
@@ -730,23 +742,23 @@ func skewTools(g *group, m member) ([]string, error) {
 	committedBytes, err := readSpecLock(g.Dir, m)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("specgen: no tool lock %s: %w", m.Params.SpecLockName, ErrNoLock)
+			return nil, fmt.Errorf("umbra: no tool lock %s: %w", m.Params.SpecLockName, ErrNoLock)
 		}
-		return nil, fmt.Errorf("specgen: read tool lock: %w", err)
+		return nil, fmt.Errorf("umbra: read tool lock: %w", err)
 	}
 	committed, err := decodeTools(committedBytes)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: %s: %w", m.Params.SpecLockName, err)
+		return nil, fmt.Errorf("umbra: %s: %w", m.Params.SpecLockName, err)
 	}
 	live, err := fetchTools(m)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: list tools %s: %w", m.Params.GuardfileName, err)
+		return nil, fmt.Errorf("umbra: list tools %s: %w", m.Params.GuardfileName, err)
 	}
 	// Pruning live to the same granted surface keeps drift attributable to what
 	// this consumer actually mounts, matching the spec dialect.
 	livePruned, err := pruneTools(m.MCPGF, live)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: prune tools %s: %w", m.Params.GuardfileName, err)
+		return nil, fmt.Errorf("umbra: prune tools %s: %w", m.Params.GuardfileName, err)
 	}
 	return diffTools(committed, livePruned)
 }
@@ -758,7 +770,7 @@ func loadFullSpec(m member) ([]byte, error) {
 		local := filepath.Join(filepath.Dir(m.SourcePath), m.GF.Spec)
 		b, readErr := readSpecSource(local)
 		if readErr == nil {
-			fmt.Fprintf(os.Stderr, "specgen: read vendored spec %s\n", m.GF.Spec)
+			fmt.Fprintf(os.Stderr, "umbra: read vendored spec %s\n", m.GF.Spec)
 			return b, nil
 		}
 		if !os.IsNotExist(readErr) {
@@ -786,7 +798,7 @@ func Lock(opts Options) error {
 	}
 	tmp, err := os.MkdirTemp("", "specverb-lock-")
 	if err != nil {
-		return fmt.Errorf("specgen: temp build dir: %w", err)
+		return fmt.Errorf("umbra: temp build dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	if err := materializeModuleDir(tmp, main, g.Members, specs); err != nil {
@@ -799,7 +811,7 @@ func Lock(opts Options) error {
 	if err := writeDepLock(filepath.Join(g.Dir, LockName), dl); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "specgen: locked %s (umbra %s)\n", LockName, dl.CLIGuard)
+	fmt.Fprintf(os.Stderr, "umbra: locked %s (umbra %s)\n", LockName, dl.CLIGuard)
 	return emitSkill(g, opts.SkillsOut)
 }
 
@@ -831,13 +843,13 @@ func Skew(opts Options) error {
 		}
 	}
 	if len(drift) > 0 {
-		fmt.Fprintf(os.Stderr, "specgen: %d change(s) since lock:\n", len(drift))
+		fmt.Fprintf(os.Stderr, "umbra: %d change(s) since lock:\n", len(drift))
 		for _, d := range drift {
 			fmt.Fprintf(os.Stderr, "  %s\n", d)
 		}
 		return ErrSkew
 	}
-	fmt.Fprintln(os.Stderr, "specgen: no skew; committed locks match upstream")
+	fmt.Fprintln(os.Stderr, "umbra: no skew; committed locks match upstream")
 	return nil
 }
 
@@ -846,19 +858,19 @@ func skewSpec(g *group, m member) ([]string, error) {
 	committed, err := readSpecLock(g.Dir, m)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("specgen: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
+			return nil, fmt.Errorf("umbra: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
 		}
-		return nil, fmt.Errorf("specgen: read spec lock: %w", err)
+		return nil, fmt.Errorf("umbra: read spec lock: %w", err)
 	}
 	live, err := fetchSpec(m.Params.SpecURL)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: fetch spec %s: %w", m.Params.GuardfileName, err)
+		return nil, fmt.Errorf("umbra: fetch spec %s: %w", m.Params.GuardfileName, err)
 	}
 	// Prune live to the same granted slice the committed lock holds, so drift is
 	// reported only for operations this consumer exposes.
 	livePruned, err := specverb.Prune(live, m.GF)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: prune live spec %s: %w", m.Params.GuardfileName, err)
+		return nil, fmt.Errorf("umbra: prune live spec %s: %w", m.Params.GuardfileName, err)
 	}
 	return diffSpecs(committed, livePruned)
 }
@@ -877,7 +889,7 @@ func Run(opts Options) error {
 }
 
 // Build materializes the consumer binary out-of-band (same cache + staleness
-// path as Run) and copies it to opts.Out instead of execing it. See specgen.md.
+// path as Run) and copies it to opts.Out instead of execing it. See umbra-cli.md.
 func Build(opts Options) error {
 	binPath, g, err := materialize(opts)
 	if err != nil {
@@ -893,7 +905,7 @@ func Build(opts Options) error {
 	if err := emitSkill(g, opts.SkillsOut); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "specgen: built %s\n", dest)
+	fmt.Fprintf(os.Stderr, "umbra: built %s\n", dest)
 	return nil
 }
 
@@ -912,9 +924,9 @@ func materialize(opts Options) (string, *group, error) {
 		specBytes, err := readSpecLock(g.Dir, m)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return "", g, fmt.Errorf("specgen: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
+				return "", g, fmt.Errorf("umbra: no spec lock %s: %w", m.Params.SpecLockName, ErrNoLock)
 			}
-			return "", g, fmt.Errorf("specgen: read spec lock: %w", err)
+			return "", g, fmt.Errorf("umbra: read spec lock: %w", err)
 		}
 		specByPath[m.Path] = specBytes
 	}
@@ -922,9 +934,9 @@ func materialize(opts Options) (string, *group, error) {
 	depRaw, err := os.ReadFile(depLockPath) //nolint:gosec // committed dep lock
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", g, fmt.Errorf("specgen: no %s: %w", LockName, ErrNoLock)
+			return "", g, fmt.Errorf("umbra: no %s: %w", LockName, ErrNoLock)
 		}
-		return "", g, fmt.Errorf("specgen: read %s: %w", LockName, err)
+		return "", g, fmt.Errorf("umbra: read %s: %w", LockName, err)
 	}
 	dl, err := readDepLock(depLockPath)
 	if err != nil {
@@ -971,7 +983,7 @@ func resolveBuildDest(out, binary string) (string, error) {
 
 func resolveBuildDestForOS(goos, out, binary string) (string, error) {
 	if out == "" {
-		return "", fmt.Errorf("specgen: build needs an output path (--out)")
+		return "", fmt.Errorf("umbra: build needs an output path (--out)")
 	}
 	dest := out
 	if strings.HasSuffix(out, string(os.PathSeparator)) {
@@ -981,7 +993,7 @@ func resolveBuildDestForOS(goos, out, binary string) (string, error) {
 	}
 	dest = executablePathForOS(goos, dest)
 	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
-		return "", fmt.Errorf("specgen: create output dir: %w", err)
+		return "", fmt.Errorf("umbra: create output dir: %w", err)
 	}
 	return dest, nil
 }
@@ -991,41 +1003,41 @@ func resolveBuildDestForOS(goos, out, binary string) (string, error) {
 func copyExecutable(src, dest string) error {
 	in, err := os.Open(src) //nolint:gosec // driver-built cache binary
 	if err != nil {
-		return fmt.Errorf("specgen: open built binary: %w", err)
+		return fmt.Errorf("umbra: open built binary: %w", err)
 	}
 	defer func() { _ = in.Close() }()
 	tmp, err := os.CreateTemp(filepath.Dir(dest), ".specverb-build-*")
 	if err != nil {
-		return fmt.Errorf("specgen: create temp binary: %w", err)
+		return fmt.Errorf("umbra: create temp binary: %w", err)
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 	if _, err := io.Copy(tmp, in); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("specgen: copy binary: %w", err)
+		return fmt.Errorf("umbra: copy binary: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("specgen: close temp binary: %w", err)
+		return fmt.Errorf("umbra: close temp binary: %w", err)
 	}
 	if err := os.Chmod(tmpName, 0o755); err != nil { //nolint:gosec // executable output
-		return fmt.Errorf("specgen: chmod binary: %w", err)
+		return fmt.Errorf("umbra: chmod binary: %w", err)
 	}
 	if err := os.Rename(tmpName, dest); err != nil {
-		return fmt.Errorf("specgen: install binary: %w", err)
+		return fmt.Errorf("umbra: install binary: %w", err)
 	}
 	return nil
 }
 
 // lockCache serialises materialize+build against cdir. Where the platform has
-// no advisory lock it says so and continues. See docs/specgen-materialization.md.
+// no advisory lock it says so and continues. See docs/umbra-materialization.md.
 func lockCache(lf *os.File, cdir string) error {
 	err := flock.Exclusive(lf)
 	if errors.Is(err, flock.ErrUnsupported) {
-		fmt.Fprintf(os.Stderr, "specgen: no cache lock on %s, building %s unserialised (a concurrent run may race)\n", runtime.GOOS, cdir)
+		fmt.Fprintf(os.Stderr, "umbra: no cache lock on %s, building %s unserialised (a concurrent run may race)\n", runtime.GOOS, cdir)
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("specgen: lock cache: %w", err)
+		return fmt.Errorf("umbra: lock cache: %w", err)
 	}
 	return nil
 }
@@ -1034,11 +1046,11 @@ func lockCache(lf *os.File, cdir string) error {
 // changed, releasing the lock before return so Run can exec the fresh image.
 func materializeIfStale(cdir, binPath string, main []byte, mems []member, specByPath map[string][]byte, dl *DepLock, want stamp) error {
 	if err := os.MkdirAll(cdir, 0o750); err != nil {
-		return fmt.Errorf("specgen: create cache dir: %w", err)
+		return fmt.Errorf("umbra: create cache dir: %w", err)
 	}
 	lf, err := os.OpenFile(filepath.Join(cdir, ".lock"), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // driver-owned cache dir
 	if err != nil {
-		return fmt.Errorf("specgen: open cache lock: %w", err)
+		return fmt.Errorf("umbra: open cache lock: %w", err)
 	}
 	defer func() { _ = lf.Close() }()
 	if err := lockCache(lf, cdir); err != nil {
@@ -1056,7 +1068,7 @@ func materializeIfStale(cdir, binPath string, main []byte, mems []member, specBy
 		return err
 	}
 	if err := os.MkdirAll(filepath.Join(cdir, "bin"), 0o750); err != nil {
-		return fmt.Errorf("specgen: create bin dir: %w", err)
+		return fmt.Errorf("umbra: create bin dir: %w", err)
 	}
 	args := []string{"build", "-mod=readonly"}
 	// Stamp the consumer's release version into main.Version, mirroring the way
@@ -1075,7 +1087,7 @@ func materializeIfStale(cdir, binPath string, main []byte, mems []member, specBy
 // plus each member's embeds (guardfile always, spec lock for spec members).
 func materializeModuleDir(dir string, main []byte, mems []member, specByPath map[string][]byte) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("specgen: create module dir: %w", err)
+		return fmt.Errorf("umbra: create module dir: %w", err)
 	}
 	files := map[string][]byte{"main.go": main}
 	for _, m := range mems {
@@ -1090,10 +1102,10 @@ func materializeModuleDir(dir string, main []byte, mems []member, specByPath map
 	for name, b := range files {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-			return fmt.Errorf("specgen: create embed dir: %w", err)
+			return fmt.Errorf("umbra: create embed dir: %w", err)
 		}
 		if err := os.WriteFile(path, b, 0o600); err != nil {
-			return fmt.Errorf("specgen: write %s: %w", name, err)
+			return fmt.Errorf("umbra: write %s: %w", name, err)
 		}
 	}
 	return nil
@@ -1119,11 +1131,11 @@ func fetchSpec(specURL string) ([]byte, error) {
 func diffSpecs(committed, live []byte) ([]string, error) {
 	c, err := normalizeSpec(committed)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: parse committed spec lock: %w", err)
+		return nil, fmt.Errorf("umbra: parse committed spec lock: %w", err)
 	}
 	l, err := normalizeSpec(live)
 	if err != nil {
-		return nil, fmt.Errorf("specgen: parse live spec: %w", err)
+		return nil, fmt.Errorf("umbra: parse live spec: %w", err)
 	}
 	var drift []string
 	for _, section := range []string{"paths", "definitions"} {

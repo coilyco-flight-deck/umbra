@@ -1,12 +1,12 @@
-# the no-code driver (specgen / cmd/specgen)
+# the no-code driver (umbra / cmd/umbra)
 
-`ward` is a **no-code** CLI: the consumer authors policy plus committed locks, never Go or build glue. `specgen` is its driver.
+A generated CLI is **no-code**: the consumer authors policy plus committed locks, never Go or build glue. `umbra` is the driver that turns one into the other.
 
 Homebrew and Scoop track the coilyco tap and bucket, and each tag publishes raw binaries for six platforms. See the [README](../README.md).
 
 ## Discovery
 
-A `--guardfile` selects a **binary**, not the whole build: members compose only when their `wrap <binary>` name (`Group[0]`) agrees, and a different name is a separate binary never merged in. With no flags a `.specgen/` directory in the cwd is the recursive project boundary. Every `.kdl` below it is inspected, a member recognized by a top-level `wrap` rather than its filename. With no selector exactly one binary group must be present.
+A `--guardfile` selects a **binary**, not the whole build: members compose only when their `wrap <binary>` name (`Group[0]`) agrees, and a different name is a separate binary never merged in. With no flags a `.umbra/` directory in the cwd is the recursive project boundary. Every `.kdl` below it is inspected, a member recognized by a top-level `wrap` rather than its filename. With no selector exactly one binary group must be present.
 
 Member paths are normalized relative to the root and sorted lexically before rendering, hashing, locking, or building, so re-rooting an unchanged project preserves generated order and cache identity. Per-member locks retain those directories, so identically named members cannot overwrite one another. KDL without a top-level `wrap` is ignored, but a malformed file declaring one is not.
 
@@ -16,7 +16,7 @@ A merged binary can hold all three dialects: spec members (HTTP APIs), exec memb
 
 The `mcp` in a command path like `wrap ward mcp forgejo` is a positional argument rather than a child, so it never sniffs as an mcp transport.
 
-An exec member skips every lock-bearing seam: no lock, no fetch or skew, no token. Exec grants may add [embedded fixed files](specgen-materialization.md). An mcp member has a lock like a spec member, holding its pruned tool surface rather than a pruned Swagger document.
+An exec member skips every lock-bearing seam: no lock, no fetch or skew, no token. Exec grants may add [embedded fixed files](umbra-materialization.md). An mcp member has a lock like a spec member, holding its pruned tool surface rather than a pruned Swagger document.
 
 ## The five verbs
 

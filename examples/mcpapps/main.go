@@ -59,7 +59,7 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	// Stands in for the committed lock `specgen lock` would write.
+	// Stands in for the committed lock `umbra lock` would write.
 	// Built first, so its progress sink is wired into the session below.
 	host := &mcpapps.Host{
 		Info:    mcpapps.Implementation{Name: "umbra-example-host", Version: "v0"},

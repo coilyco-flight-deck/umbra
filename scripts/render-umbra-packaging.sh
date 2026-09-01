@@ -1,14 +1,14 @@
 #!/bin/sh
-# Render Homebrew and Scoop metadata from version-stamped specgen binaries.
+# Render Homebrew and Scoop metadata from version-stamped umbra binaries.
 set -eu
 
-version=${1:?usage: render-specgen-packaging.sh VERSION [DIST_DIR]}
+version=${1:?usage: render-umbra-packaging.sh VERSION [DIST_DIR]}
 dist=${2:-dist}
 
 case "$version" in
   v[0-9]*.[0-9]*.[0-9]*) ;;
   *)
-    echo "specgen release version must be a v-prefixed semantic version, got: $version" >&2
+    echo "umbra release version must be a v-prefixed semantic version, got: $version" >&2
     exit 2
     ;;
 esac
@@ -24,15 +24,15 @@ sha() {
   fi
 }
 
-darwin_amd64=$(sha "$dist/specgen-darwin-amd64")
-darwin_arm64=$(sha "$dist/specgen-darwin-arm64")
-linux_amd64=$(sha "$dist/specgen-linux-amd64")
-linux_arm64=$(sha "$dist/specgen-linux-arm64")
-windows_amd64=$(sha "$dist/specgen-windows-amd64.exe")
-windows_arm64=$(sha "$dist/specgen-windows-arm64.exe")
+darwin_amd64=$(sha "$dist/umbra-darwin-amd64")
+darwin_arm64=$(sha "$dist/umbra-darwin-arm64")
+linux_amd64=$(sha "$dist/umbra-linux-amd64")
+linux_arm64=$(sha "$dist/umbra-linux-arm64")
+windows_amd64=$(sha "$dist/umbra-windows-amd64.exe")
+windows_arm64=$(sha "$dist/umbra-windows-arm64.exe")
 
-cat > "$dist/specgen.rb" <<EOF
-class Specgen < Formula
+cat > "$dist/umbra.rb" <<EOF
+class Umbra < Formula
   desc "Generate guarded CLIs from KDL policy and committed API locks"
   homepage "https://forgejo.coilysiren.me/coilyco-flight-deck/umbra"
   version "${bare}"
@@ -40,36 +40,36 @@ class Specgen < Formula
 
   on_macos do
     on_intel do
-      url "${base}/specgen-darwin-amd64"
+      url "${base}/umbra-darwin-amd64"
       sha256 "${darwin_amd64}"
     end
     on_arm do
-      url "${base}/specgen-darwin-arm64"
+      url "${base}/umbra-darwin-arm64"
       sha256 "${darwin_arm64}"
     end
   end
   on_linux do
     on_intel do
-      url "${base}/specgen-linux-amd64"
+      url "${base}/umbra-linux-amd64"
       sha256 "${linux_amd64}"
     end
     on_arm do
-      url "${base}/specgen-linux-arm64"
+      url "${base}/umbra-linux-arm64"
       sha256 "${linux_arm64}"
     end
   end
 
   def install
-    bin.install Dir["specgen-*"].first => "specgen"
+    bin.install Dir["umbra-*"].first => "umbra"
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/specgen --version")
+    assert_match version.to_s, shell_output("#{bin}/umbra --version")
   end
 end
 EOF
 
-cat > "$dist/specgen.json" <<EOF
+cat > "$dist/umbra.json" <<EOF
 {
     "version": "${bare}",
     "description": "Generate guarded CLIs from KDL policy and committed API locks",
@@ -77,18 +77,18 @@ cat > "$dist/specgen.json" <<EOF
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "${base}/specgen-windows-amd64.exe",
+            "url": "${base}/umbra-windows-amd64.exe",
             "hash": "${windows_amd64}",
-            "bin": [["specgen-windows-amd64.exe", "specgen"]]
+            "bin": [["umbra-windows-amd64.exe", "umbra"]]
         },
         "arm64": {
-            "url": "${base}/specgen-windows-arm64.exe",
+            "url": "${base}/umbra-windows-arm64.exe",
             "hash": "${windows_arm64}",
-            "bin": [["specgen-windows-arm64.exe", "specgen"]]
+            "bin": [["umbra-windows-arm64.exe", "umbra"]]
         }
     }
 }
 EOF
 
-echo "$dist/specgen.rb"
-echo "$dist/specgen.json"
+echo "$dist/umbra.rb"
+echo "$dist/umbra.json"

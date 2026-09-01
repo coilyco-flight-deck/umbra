@@ -1,4 +1,4 @@
-package specgen
+package umbra
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/specgen/codegen"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 	"gopkg.in/yaml.v3"
 )
 
@@ -230,9 +230,9 @@ func TestProjectRootDiscoversArbitraryNestedMembersInStableOrder(t *testing.T) {
 	}
 }
 
-func TestConventionalProjectRootDiscoversDotSpecgenRecursively(t *testing.T) {
+func TestConventionalProjectRootDiscoversDotUmbraRecursively(t *testing.T) {
 	dir := t.TempDir()
-	project := filepath.Join(dir, ".specgen")
+	project := filepath.Join(dir, ".umbra")
 	writeMember(t, project, "aguard/ops.kdl", guardfileFixture)
 	t.Chdir(dir)
 
@@ -252,9 +252,9 @@ func TestConventionalProjectRootDiscoversDotSpecgenRecursively(t *testing.T) {
 	}
 }
 
-func TestExplicitGuardfileKeepsLegacyDiscoveryBesideDotSpecgen(t *testing.T) {
+func TestExplicitGuardfileKeepsLegacyDiscoveryBesideDotUmbra(t *testing.T) {
 	dir := t.TempDir()
-	writeMember(t, filepath.Join(dir, ".specgen"), "aguard/ops.kdl", guardfileFixture)
+	writeMember(t, filepath.Join(dir, ".umbra"), "aguard/ops.kdl", guardfileFixture)
 	selected := writeMember(t, dir, "legacy.guardfile.kdl", strings.Replace(guardfileFixture, "wrap ward-kdl", "wrap legacy", 1))
 	t.Chdir(dir)
 
@@ -761,5 +761,30 @@ func TestCopyExecutable(t *testing.T) {
 	b, err := os.ReadFile(dest)
 	if err != nil || string(b) != "#!/bin/true\n" {
 		t.Errorf("dest content mismatch: %q (err %v)", b, err)
+	}
+}
+
+func TestDiscover_NamesTheRenameRatherThanReportingNoProject(t *testing.T) {
+	// A project authored before the rename still has .specgen/ on disk. Saying
+	// "no project" would read as a broken checkout rather than a renamed tool.
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".specgen"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	_, _, _, err = discover(Options{})
+	if err == nil {
+		t.Fatal("discover accepted a .specgen/ project with no .umbra/")
+	}
+	if !strings.Contains(err.Error(), ".specgen") || !strings.Contains(err.Error(), ".umbra") {
+		t.Errorf("error = %q, want both directory names so the fix is obvious", err)
 	}
 }

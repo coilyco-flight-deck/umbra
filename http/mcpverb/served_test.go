@@ -8,7 +8,7 @@ import (
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/mcpclient"
 )
 
-// lockedTool is an upstream tool as `specgen lock` froze it, carrying the
+// lockedTool is an upstream tool as `umbra lock` froze it, carrying the
 // shapes a served surface has to preserve.
 func lockedTool() mcpclient.Tool {
 	return mcpclient.Tool{

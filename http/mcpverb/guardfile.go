@@ -571,7 +571,7 @@ func (gf *Guardfile) explicitGrants(tools []string) ([]Grant, map[string]bool, e
 			continue
 		}
 		if !known[g.Tool] {
-			return nil, nil, fmt.Errorf("mcpverb: granted tool %q is not in the lock; run `specgen lock` or fix the name (fail-closed)", g.Tool)
+			return nil, nil, fmt.Errorf("mcpverb: granted tool %q is not in the lock; run `umbra lock` or fix the name (fail-closed)", g.Tool)
 		}
 		explicit[g.Tool] = true
 		out = append(out, g)

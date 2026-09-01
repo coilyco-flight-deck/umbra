@@ -105,7 +105,7 @@ func buildGate(tool string, w *Widget, byName map[string]mcpclient.Tool) (*Widge
 		seen[g.Tool] = true
 		called, held := byName[g.Tool]
 		if !held {
-			return nil, fmt.Errorf("mcpverb: widget of %s: view call %q is not in the lock; run `specgen lock` or fix the name (fail-closed)", tool, g.Tool)
+			return nil, fmt.Errorf("mcpverb: widget of %s: view call %q is not in the lock; run `umbra lock` or fix the name (fail-closed)", tool, g.Tool)
 		}
 		if err := checkWidgetSelectors(tool, g, called); err != nil {
 			return nil, err

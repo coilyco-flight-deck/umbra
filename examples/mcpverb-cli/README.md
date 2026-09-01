@@ -8,8 +8,8 @@ The upstream is [`@modelcontextprotocol/server-everything`](https://www.npmjs.co
 
 ```sh
 cd examples/mcpverb-cli
-specgen lock          # the online step: start the server, read tools/list, freeze it
-specgen build --out ./mcpdemo
+umbra lock          # the online step: start the server, read tools/list, freeze it
+umbra build --out ./mcpdemo
 ./mcpdemo ops everything --help
 ```
 
@@ -35,7 +35,7 @@ $ ./mcpdemo ops everything get-sum -a 20 -b 22
 The sum of 20 and 22 is 42.
 ```
 
-`-a` and `-b` are typed floats because the server's own JSON Schema says so. The guardfile never mentions them, and `specgen skew` fails if that schema moves.
+`-a` and `-b` are typed floats because the server's own JSON Schema says so. The guardfile never mentions them, and `umbra skew` fails if that schema moves.
 
 ```sh
 $ ./mcpdemo ops everything get-env          # never call get-env
@@ -51,10 +51,10 @@ mcpdemo: unknown verb "get-tiny-image" ...  (exit 5)
 
 - `./mcpdemo ops everything get-sum -a 1 -b 2 --dry-run` prints the resolved tool and arguments without firing.
 - `./mcpdemo ops everything get-structured-content --location Chicago --query 'temperature'` projects the result with JMESPath. Its `--help` reads `Choose city (one of: New York, Chicago, Los Angeles)`, because an enum is the one constraint a caller cannot infer from the type, so it is carried into the flag.
-- `specgen skew` diffs the committed tool lock against the live server, exit 3 on drift, including a moved `_meta`.
-- Add `can call get-env` beside the `never` and `specgen lock` fails closed rather than resolving the contradiction for you.
+- `umbra skew` diffs the committed tool lock against the live server, exit 3 on drift, including a moved `_meta`.
+- Add `can call get-env` beside the `never` and `umbra lock` fails closed rather than resolving the contradiction for you.
 
 ## See also
 
 - [docs/mcpverb.md](../../docs/mcpverb.md) - the dialect, its guards, and the lock.
-- [docs/specgen.md](../../docs/specgen.md) - the driver and its five verbs.
+- [docs/umbra-cli.md](../../docs/umbra-cli.md) - the driver and its five verbs.
