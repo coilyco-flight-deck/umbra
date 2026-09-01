@@ -18,6 +18,8 @@ Inventory: [`docs/FEATURES.md`](docs/FEATURES.md). Per-feature demos: [`examples
 
 Every package here must be importable from a different binary without consumer-specific types or defaults leaking in. If a helper needs a consumer-shaped argument, define the type in umbra and have the consumer adapt to it, not the other way around.
 
+**Two front doors, and nothing else.** Every package must be reached through `specgen` (the driver and the binaries it generates) or through `beaver`. A package no front door reaches does not belong here, whoever else imports it. ward was a third door and is deprecated: what only ward needed was removed rather than kept.
+
 ## Commands
 
 Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: it is the framework, not a consumer of it, so it routes every dev verb through the Makefile.
@@ -29,7 +31,7 @@ Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: 
 - `make tidy` - `go mod tidy`.
 - `make cover` - tests with a coverage profile.
 
-The repocfg primitive lets a consumer pick its config filename. umbra declares no dev verbs: its Makefile is the dev surface, [`.ward/ward.yaml`](.ward/ward.yaml) the catalog.
+umbra declares no dev verbs: its Makefile is the dev surface, [`.ward/ward.yaml`](.ward/ward.yaml) the catalog.
 
 ## Validation
 
@@ -37,7 +39,7 @@ Pre-commit runs the Go checks (vet, golangci-lint, go-mod-tidy, godoc-current) p
 
 ## Safety
 
-umbra ships no embedded denylist. It is a policy-free engine: policy lives in the consumer's KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`passthrough`, `execverb`, `verb`) and `http/` around outbound requests (`egress`, `guardfile`, `opcore`, `mcpverb`). See [architecture.md](docs/architecture.md).
+umbra ships no embedded denylist. It is a policy-free engine: policy lives in the consumer's KDL guardfiles, which the two guarded surfaces enforce - `cli/` around subprocess exec (`execverb`, `verb`) and `http/` around outbound requests (`guardfile`, `opcore`, `specverb`, `mcpverb`). See [architecture.md](docs/architecture.md).
 
 ## Cross-repo contracts
 

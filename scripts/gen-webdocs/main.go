@@ -23,12 +23,8 @@ type entry struct {
 func main() {
 	entries := []entry{
 		{"audit", "umbra examples/audit", func() *cli.Command { return treebuilders.Audit(nil) }},
-		{"egress", "umbra examples/egress", treebuilders.Egress},
 		{"exitcode", "umbra examples/exitcode", treebuilders.Exitcode},
-		{"gittree", "umbra examples/gittree", treebuilders.Gittree},
-		{"passthrough", "umbra examples/passthrough", func() *cli.Command { return treebuilders.Passthrough(nil, nil) }},
 		{"policy", "umbra examples/policy", treebuilders.Policy},
-		{"repocfg", "umbra examples/repocfg", func() *cli.Command { return treebuilders.Repocfg(nil) }},
 	}
 
 	outRoot := "../../site/cli"

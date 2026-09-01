@@ -10,13 +10,13 @@ wrap ward git {
 }
 ```
 
+- **`passthrough <bin>`** - funnel sugar: `exec` plus an implicit open funnel, for a tool whose verbs are impractical to name one by one. Mutually exclusive with `exec`.
 - **`exec <bin>`** - the binary, fixed at parse. `argv-prefix` pins an unoverridable leading argv, the remote-exec transport. `env <NAME> { value <provider> "<addr>" }` resolves at exec time, so a secret comes from SSM rather than the guardfile.
 - **`can run <sub>`** - deny-by-default; only named subcommands mount. A quoted multi-word sentence is a nested path. `can run "*"` is an open funnel and must be the only grant.
 - **`argv <tokens...>`** - fixed fragments replacing the subcommand. **`embed`** compiles a file in and inserts its runtime path. **`sealed`** forbids trailing caller args. **`bin`** overrides the wrap binary for one leaf and does **not** inherit `argv-prefix`.
 - **Flag policy** - `deny-flag` (default-allow minus denials) or `allow-flag` (strict allowlist).
 - **`when` / `deny-when <sel> matches <glob...>`** - argv guards. The selector is a flag name (`secret-id` reads `--secret-id`), `any-arg`, or `argN`.
 - **`gate <name>`** - a registered preflight gate. The registry ships empty, so every name fails closed until a consumer registers one.
-- **`passthrough <bin>`** - funnel sugar. See [passthrough.md](passthrough.md).
 
 Unknown nodes fail closed. `execverb.Mount` mirrors `specverb.Mount`: one leaf per grant under `verb.Wrap`, `SkipFlagParsing` so caller args pass through after the check. The invocation is `bin + argv-prefix + (subcommand or argv) + caller args`.
 

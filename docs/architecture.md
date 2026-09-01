@@ -4,7 +4,7 @@ umbra guards two surfaces an agent uses to cause chaos, plus a shared core. The 
 
 ## The two surfaces
 
-- **CLI passthrough** (`cli/`) - the original reason umbra exists: sit between an agent and an existing binary, audit and validate every argv before `execve`.
+- **CLI exec** (`cli/`) - the original reason umbra exists: sit between an agent and an existing binary, audit and validate every argv before `execve`.
 - **Outbound requests** (`http/`) - the extension for load-bearing platforms with no first-class CLI (Forgejo), and for upstream MCP servers ([mcpverb](mcpverb.md)). Guard the request, not the subprocess.
 
 ### The mcp dialect does not make a third surface
@@ -31,7 +31,11 @@ http/ ─┴─►  pkg/
 
 The two surfaces express **permissions**; **config validation does not**, so it lives in the core (`pkg/`), never as a third guarded surface. `pkg/config` supplies the layered-config primitives - loading, overlay, and typing - and its vocabulary structurally cannot express a grant: no `mount`, no `exec`, no `can run`. That package boundary **is** the config/permission partition. Keeping config in core is what keeps the two-surface least-privilege identity legible: `cli/` and `http/` stay the whole permission story, and a reader never has to wonder whether a config file is also a policy file. This is the config-placement doctrine's landing in umbra, generalizing the downward-only arrow above.
 
-Some legacy cross-surface imports still exist (for example `cli/passthrough` reaches into `http/egress` to wire a single guarded command end-to-end). Those predate the split and are being unwound; the directory layout makes them visible so they can be removed rather than multiplied. New code must respect the downward-only arrow.
+The downward-only arrow now holds with no exceptions. The last cross-surface import was `cli/passthrough` reaching into `http/egress`, and both left with ward's surface.
+
+## Two front doors, and what that removes
+
+Every package here is reached through **specgen** or through **beaver**. A package no front door reaches does not belong, which is what retired ward's surface: `cli/{gittree,passthrough,repocfg,shell}`, `http/egress`, and eight `pkg/` helpers went with the consumer that was their only caller.
 
 ## What stays flat
 

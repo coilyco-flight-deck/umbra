@@ -8,7 +8,7 @@
 // the lock's lifetime.
 //
 // Locking is unix-only. A non-unix caller is refused with [ErrUnsupported]
-// rather than handed a no-op that reports success. See docs/ward-helpers.md.
+// rather than handed a no-op that reports success.
 package flock
 
 import (

@@ -158,7 +158,7 @@ func (gf *Guardfile) EmbedPaths() []string {
 }
 
 // WhenClause is a `when`/`deny-when` argv guard, or a wrap-level `never pass`/
-// `only pass` passthrough guard. Grammar and selectors: docs/passthrough.md.
+// `only pass` passthrough guard. Grammar and selectors: docs/execverb.md.
 type WhenClause struct {
 	// Selector names the argv slot: flag name, `any-arg`, or `argN`. Empty when
 	// SourceCmd is set (the value comes from a shell fact, not argv).
@@ -368,7 +368,7 @@ func (gf *Guardfile) applyNever(n *kdl.Node) error {
 }
 
 // parsePassthrough reads `passthrough <bin> [prefix...]`: sets Bin + ArgvPrefix
-// and synthesizes the wildcard funnel grant. See docs/passthrough.md.
+// and synthesizes the wildcard funnel grant. See docs/execverb.md.
 func (gf *Guardfile) parsePassthrough(n *kdl.Node) error {
 	if gf.Bin != "" {
 		return fmt.Errorf("execverb: `passthrough` and `exec` are mutually exclusive (fail-closed)")
@@ -400,7 +400,7 @@ func (gf *Guardfile) parsePassthrough(n *kdl.Node) error {
 }
 
 // parsePassClause reads a wrap-level `never pass` / `only pass` guard; deny is
-// true for `never pass` (refuse on match). Grammar: docs/passthrough.md.
+// true for `never pass` (refuse on match). Grammar: docs/execverb.md.
 func parsePassClause(n *kdl.Node, deny bool) (WhenClause, error) {
 	args := stringArgs(n)
 	if len(args) < 1 || args[0] != "pass" {

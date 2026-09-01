@@ -5,17 +5,13 @@ Each subdirectory is a self-contained urfave/cli app that exercises one feature 
 | Example | Demonstrates |
 | ------- | ------------ |
 | [`audit/`](audit/main.go) | The foundation. `audit.NewWriter` + `verb.Wrap` produce one JSONL row per invocation. |
-| [`passthrough/`](passthrough/main.go) | Wrap an existing binary (`echo`) as an audited urfave subcommand via `passthrough.Command`. |
 | [`policy/`](policy/main.go) | `policy.ValidateArgSlice` rejecting argv with shell metacharacters. |
-| [`gittree/`](gittree/main.go) | `gittree.CheckClean` refusing a verb on a dirty tree. |
-| [`repocfg/`](repocfg/main.go) | Per-repo verb allowlist loaded from `.ward/ward.yaml`. |
 | [`exitcode/`](exitcode/main.go) | The public exit-code taxonomy for orchestrators. |
-| [`egress/`](egress/main.go) | Per-invocation CONNECT proxy with an allowlist (used by `passthrough.WithEgress`). |
 | [`mcpverb/`](mcpverb/main.go) | The mcp dialect against an MCP server the example starts itself: a granted tool, a guarded argument, and two absent ones. |
 | [`mcpverb-cli/`](mcpverb-cli/README.md) | The same dialect the product way: KDL policy plus a committed lock, no Go, over the published MCP reference server via stdio. |
 | [`mcpapps/`](mcpapps/main.go) | The MCP Apps host bridge: a widget's real frame sequence replayed against a live session, with the calls its `widget` block does not grant refused. |
 
-Every feature is built on top of `audit`. The other examples wire `audit` in implicitly via `verb.Wrap` or `passthrough.Command`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal. `mcpverb-cli/` has no Go at all: it is a `.specgen` project built by the driver.
+Every feature is built on top of `audit`. The other examples wire it in implicitly via `verb.Wrap`; the `audit/` example is the bare-minimum case. `treebuilders/` is not a runnable example: it is a support package exporting each example's command tree for `scripts/gen-webdocs`. `mcpverb/` stays out of it, because its tree is built from a live server's tool surface rather than from a literal. `mcpverb-cli/` has no Go at all: it is a `.specgen` project built by the driver.
 
 ## Running
 
@@ -23,12 +19,8 @@ From the umbra root:
 
 ```
 go run ./examples/audit hello world
-go run ./examples/passthrough -- echo hello
 go run ./examples/policy unsafe 'foo; rm -rf /'
-go run ./examples/gittree build
-cd examples/repocfg && go run . list && cd -
 go run ./examples/exitcode policy ; echo "exit: $?"
-go run ./examples/egress allowed
 go run ./examples/mcpverb ops demo list-issue --owner coilyco
 go run ./examples/mcpverb ops demo list-issue --owner admin  # refused by the deny guard
 go run ./examples/mcpapps                                   # the frame log, granted calls and refusals
@@ -43,7 +35,6 @@ If you are new to umbra, read in this order:
 
 1. `audit/` - the minimum useful program
 2. `policy/` - what umbra refuses by default
-3. `passthrough/` - the most common production usage
-4. `exitcode/` - the contract with orchestrators
-5. `gittree/` and `repocfg/` - the repo-verb pattern
-6. `egress/` - the network-layer gate (advanced)
+3. `exitcode/` - the contract with orchestrators
+4. `mcpverb/` then `mcpverb-cli/` - the same dialect in Go and then with no Go at all
+5. `mcpapps/` - the MCP Apps host under a widget grant (advanced)

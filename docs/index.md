@@ -20,7 +20,6 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 ## Guides
 - [The no-code driver](specgen.md) - author policy and locks, never Go.
 - [Materialization](specgen-materialization.md) - how `run` and `build` cache a generated binary.
-- [Passthrough](passthrough.md) - wrap a tool whole when naming every verb is impractical.
 - [Fetch overlays](specverb-fetch.md) - mount fixed HTTP leaves straight from the guardfile.
 
 ## Reference
@@ -32,8 +31,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Inline operations](opcore-inline.md) - descriptors stated directly in KDL.
 - [Body projection](opcore-body.md) - `map`, `set`, and pinned values.
 - [Value providers](value-providers.md) - `env`, `file`, `literal`, and minted tokens.
-- [Broker](broker.md) - the root credential broker protocol.
-- [ward helpers](ward-helpers.md) - reusable packages lifted out of ward.
+- [MCP Apps host](mcpapps.md) - the frames a rendered widget sends back, under the guardfile.
 
 ## Contributing
 - [Contributing](CONTRIBUTING.md) - how to propose a change.

@@ -11,16 +11,15 @@ sitting. umbra ships no denylist and knows nothing about your tools: policy is
 yours, and umbra enforces it across two surfaces, `cli/` around subprocess exec
 and `http/` around outbound requests.
 
-It validates argv before `execve`, checks a scope token per verb, refuses
-repo-shaped verbs on a dirty tree, gates egress through a per-invocation CONNECT
-proxy, and appends every call to a rotating JSONL audit log. A public exit-code
-taxonomy separates a policy refusal from a tool failure. Full documentation in
-[docs/index.md](docs/index.md).
+It validates argv before `execve`, checks a scope token per verb, prunes every
+upstream surface to what was granted, and appends every call to a rotating JSONL
+audit log. A public exit-code taxonomy separates a policy refusal from a tool
+failure. Full documentation in [docs/index.md](docs/index.md).
 
 **umbra is not a sandbox.** It performs no execution isolation, and that is
-deliberate rather than unfinished. Validating argv, gating egress, and auditing
-every call does nothing to contain a process that is already running. Isolation
-is a container's job, and umbra is the gate in front of it.
+deliberate rather than unfinished. Validating argv and auditing every call does
+nothing to contain a process that is already running. Isolation is a container's
+job, and umbra is the gate in front of it.
 
 ## Two ways in
 
