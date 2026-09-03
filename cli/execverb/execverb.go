@@ -67,6 +67,37 @@ func Build(cfg Config) (*cli.Command, error) {
 	if err != nil {
 		return nil, err
 	}
+	wrap, run, host := cfg.defaults()
+	providers := valuesource.Merge(cfg.Providers)
+	root := &cli.Command{
+		Name:  gf.Group[len(gf.Group)-1],
+		Usage: fmt.Sprintf("guarded %s verbs (exec dialect)", strings.Join(gf.Group, " ")),
+	}
+	if err := validateWithheld(gf); err != nil {
+		return nil, err
+	}
+	if len(gf.Allow) > 0 {
+		return buildAllow(root, gf, wrap, run, host, providers)
+	}
+	if done, out, err := mountGrants(root, gf, wrap, run, host, providers); done || err != nil {
+		return out, err
+	}
+	if err := mountWithheld(root, gf); err != nil {
+		return nil, err
+	}
+	capture := cfg.RunCapture
+	if capture == nil {
+		capture = realCapture
+	}
+	if err := mountActions(root, gf, wrap, capture, host, providers); err != nil {
+		return nil, err
+	}
+	return root, nil
+}
+
+// defaults fills the three injectable seams a caller may leave nil: the verb
+// wrapper, the process runner, and the host resolver.
+func (cfg Config) defaults() (func(verb.Spec) cli.ActionFunc, Runner, HostResolver) {
 	wrap := cfg.Wrap
 	if wrap == nil {
 		wrap = func(s verb.Spec) cli.ActionFunc { return s.Action }
@@ -79,25 +110,7 @@ func Build(cfg Config) (*cli.Command, error) {
 	if host == nil {
 		host = realHost
 	}
-	providers := valuesource.Merge(cfg.Providers)
-	root := &cli.Command{
-		Name:  gf.Group[len(gf.Group)-1],
-		Usage: fmt.Sprintf("guarded %s verbs (exec dialect)", strings.Join(gf.Group, " ")),
-	}
-	if len(gf.Allow) > 0 {
-		return buildAllow(root, gf, wrap, run, host, providers)
-	}
-	if done, out, err := mountGrants(root, gf, wrap, run, host, providers); done || err != nil {
-		return out, err
-	}
-	capture := cfg.RunCapture
-	if capture == nil {
-		capture = realCapture
-	}
-	if err := mountActions(root, gf, wrap, capture, host, providers); err != nil {
-		return nil, err
-	}
-	return root, nil
+	return wrap, run, host
 }
 
 // resolveEmbeddedFiles clones only the grant layer and resolves symbolic embed

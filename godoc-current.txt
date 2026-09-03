@@ -164,6 +164,10 @@ type Guardfile struct {
 	// funnel - the read-only floor over the whole inspect list (allow only).
 	WrapWhens []WhenClause
 
+	// Withheld are `withhold` stubs: verbs stated as refused so a caller can
+	// tell policy from an unimplemented feature. See docs/execverb.md.
+	Withheld []WithheldStub
+
 	// Actions are declared ordered call sequences over granted exec leaves. See
 	// docs/execverb.md.
 	Actions []guardfile.Action
@@ -238,6 +242,17 @@ type WhenClause struct {
 }
     WhenClause is a `when`/`deny-when` argv guard, or a wrap-level `never pass`/
     `only pass` passthrough guard. Grammar and selectors: docs/execverb.md.
+
+type WithheldStub struct {
+	Subcommand  []string
+	Reason      string
+	Alternative []string
+}
+    WithheldStub is one deliberately-omitted verb, stated so it can be seen.
+    See docs/execverb.md.
+
+func (w WithheldStub) Label() string
+    Label renders the withheld verb's path for help and error text.
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb

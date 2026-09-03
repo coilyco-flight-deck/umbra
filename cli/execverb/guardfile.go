@@ -33,6 +33,10 @@ type Guardfile struct {
 	// funnel - the read-only floor over the whole inspect list (allow only).
 	WrapWhens []WhenClause
 
+	// Withheld are `withhold` stubs: verbs stated as refused so a caller can
+	// tell policy from an unimplemented feature. See docs/execverb.md.
+	Withheld []WithheldStub
+
 	// Actions are declared ordered call sequences over granted exec leaves. See
 	// docs/execverb.md.
 	Actions []guardfile.Action
@@ -301,6 +305,13 @@ func (gf *Guardfile) applyNode(n *kdl.Node) error {
 // unknown fallback, split off to hold the cyclo cap.
 func (gf *Guardfile) applyTailNode(n *kdl.Node) error {
 	switch n.Name() {
+	case "withhold":
+		w, err := parseWithhold(n)
+		if err != nil {
+			return err
+		}
+		gf.Withheld = append(gf.Withheld, w)
+		return nil
 	case "action":
 		return gf.appendAction(n)
 	case "provider":

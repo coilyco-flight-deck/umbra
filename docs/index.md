@@ -15,6 +15,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Architecture](architecture.md) - the two guarded surfaces and the shared core.
 - [Spec-driven verbs](specverb.md) - the three-layer engine behind the HTTP surface.
 - [Exec-dialect verbs](execverb.md) - the same grammar aimed at wrapped binaries.
+- [Occlusion primitives](execverb-occlusion.md) - `withhold`, `pin`, and `resolve-flag` in the exec dialect.
 - [MCP-dialect verbs](mcpverb.md) - the same grammar aimed at upstream MCP servers.
 
 ## Guides
