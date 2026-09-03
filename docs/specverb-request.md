@@ -30,7 +30,29 @@ An unsupported type, an `items` outside an array, and an unknown property all fa
 
 ## The shell-metachar gate is location-aware
 
-`verb.Wrap` → `policy.ValidateArg` refuses shell metacharacters, but only on inputs composing into the request **URL**, the injection surface. Path params and query flags stay gated, each element of a repeated parameter independently. Body and form fields and `--body-file` are encoded into the body and never reach a shell or the URL, so they are exempt: gating them mangled legitimate free text.
+`verb.Wrap` → `policy.ValidateArg` refuses shell metacharacters, but only on the input that reaches the URL **unescaped**. That is the path, and only the path: `opcore.FillPath` substitutes each positional into the path template verbatim, so a metacharacter there composes into the request.
+
+Query values are not gated. Every query string in umbra is built as `neturl.Values` and emitted through `Encode`, at all six assembly sites, and `Encode` percent-encodes the whole `ShellMeta` set along with `&` and `=`, the only two bytes that are structural in a query string. A brace in a query value therefore cannot alter the request, and the client fires HTTP directly rather than through a shell. Gating them bought nothing and made whole parameter classes unreachable: a JSON `filter`, a JSON `orderBy`, and a TQL expression all open with a brace, so an API that takes its sort or filter as a JSON value had no reachable sort or filter at all (umbra#6827).
+
+Body and form fields and `--body-file` are exempt for the older reason: they are encoded into the body and never reach a shell or the URL. Gating them mangled legitimate free text.
+
+`TestEveryShellMetaByteIsEncodedInAQueryValue` holds the encoding claim one byte at a time, so widening `ShellMeta` cannot quietly outrun the encoder.
+
+## Opting a path param out
+
+A path param that legitimately carries a metacharacter names itself in the wrap:
+
+```kdl
+wrap "teable" {
+    spec "teable.swagger.json"
+    can get record
+    allow-metacharacters "recordId"
+}
+```
+
+The gate then skips that param and no other. It is per-param rather than per-verb on purpose: a verb-wide switch would exempt every positional beside the one that needed it, which is the wrong shape for the reason the gate exists. There is no wrap-wide form, and there is no query form, since query needs none.
+
+Until umbra#6827 the two refusal messages named `allow_metacharacters` as the remedy and no grammar implemented it, so the gate had no exit at all. The messages now name the node the grammar parses.
 
 ## Firing
 

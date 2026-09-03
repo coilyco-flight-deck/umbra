@@ -37,6 +37,10 @@ type Runtime struct {
 	Client    *http.Client
 	Restrict  []guardfile.Restriction
 
+	// AllowMeta names the path params the wrap's `allow-metacharacters` exempts.
+	// Query is exempt by construction, never by this list; specverb-request.md.
+	AllowMeta []string
+
 	// Headers are wrap-declared request headers, applied before the default
 	// User-Agent. See docs/specverb-request.md.
 	Headers map[string]string
@@ -68,6 +72,7 @@ type RuntimeConfig struct {
 	Providers    map[string]Provider
 	Client       *http.Client
 	Restrict     []guardfile.Restriction
+	AllowMeta    []string
 	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
 	Database     Database
@@ -87,6 +92,7 @@ func NewRuntime(c RuntimeConfig) *Runtime {
 		Providers:    c.Providers,
 		Client:       client,
 		Restrict:     c.Restrict,
+		AllowMeta:    c.AllowMeta,
 		Headers:      c.Headers,
 		BaseURLValue: c.BaseURLValue,
 		Database:     c.Database,

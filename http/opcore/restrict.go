@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 )
 
 // CheckRestrictions enforces every wrap-level restriction against a leaf's bound
@@ -23,6 +24,31 @@ func (rt *Runtime) CheckRestrictions(pathParams, values []string) error {
 		}
 	}
 	return nil
+}
+
+// gatePathValues gates a leaf's bound path values, skipping any param the wrap
+// named in `allow-metacharacters`. See docs/specverb-request.md.
+func (rt *Runtime) gatePathValues(pathParams, values []string) error {
+	for i, v := range values {
+		if i < len(pathParams) && rt.MetaAllowed(pathParams[i]) {
+			continue
+		}
+		if err := policy.ValidateArg(fmt.Sprintf("positional[%d]", i), v); err != nil {
+			return gateDenied(err)
+		}
+	}
+	return nil
+}
+
+// MetaAllowed reports whether the wrap opted this path param out of the gate.
+// Exported so the CLI layer's pre-gate agrees with opcore's rather than diverging.
+func (rt *Runtime) MetaAllowed(param string) bool {
+	for _, p := range rt.AllowMeta {
+		if p == param {
+			return true
+		}
+	}
+	return false
 }
 
 // MatchesAnyGlob reports whether val matches at least one filepath.Match glob.

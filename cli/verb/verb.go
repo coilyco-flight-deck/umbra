@@ -20,8 +20,8 @@ const shellMetaReason = "the shell-metacharacter gate refuses argv a downstream 
 	"some wrapped verbs forward argv into a remote shell (ssh, ssm send-command) and the gate cannot tell them " +
 	"apart from the safe ones, so it refuses metacharacters for all. Pass shell-bearing values through a file " +
 	"instead of inline (a --body-file rather than an inline --body, a file:// URL rather than an inline JSON " +
-	"batch, an external pipe rather than an inline --jq), or opt a known-safe verb out with allow_metacharacters " +
-	"in its declaring config (the audit row stamps policy_skipped so forensics still see it)"
+	"batch, an external pipe rather than an inline --jq), or name a known-safe param in the wrap's " +
+	"`allow-metacharacters` in its declaring config (the audit row stamps policy_skipped so forensics still see it)"
 
 // lockdownAxisReason is the Reasoner why-line for a policy_denied raised
 // when the active lockdown profile refuses a verb on its axis.
@@ -92,7 +92,7 @@ func Wrap(spec Spec, writer *audit.Writer) cli.ActionFunc {
 			if err := policy.ValidateArgs(args); err != nil {
 				coded := exitcode.New(exitcode.PolicyDenied, "policy_denied", err,
 					"move the flag value with the metacharacter into a file and pass it by path "+
-						"(a --<flag>-file or a file:// URL), or set allow_metacharacters on the verb if it is known-safe").
+						"(a --<flag>-file or a file:// URL), or name the param in the wrap's `allow-metacharacters` if it is known-safe").
 					WithReason(shellMetaReason)
 				logReject(writer, spec.Name, argv, coded)
 				return coded
@@ -100,7 +100,7 @@ func Wrap(spec Spec, writer *audit.Writer) cli.ActionFunc {
 			if err := policy.ValidateArgSlice("positional", positional); err != nil {
 				coded := exitcode.New(exitcode.PolicyDenied, "policy_denied", err,
 					"move the positional argument with the metacharacter into a file and pass it by path, "+
-						"or set allow_metacharacters on the verb if it is known-safe").
+						"or name the param in the wrap's `allow-metacharacters` if it is known-safe").
 					WithReason(shellMetaReason)
 				logReject(writer, spec.Name, argv, coded)
 				return coded

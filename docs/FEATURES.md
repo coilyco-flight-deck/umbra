@@ -19,7 +19,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 ## Shared core (`pkg/`)
 
 - **audit** - Append-only JSONL invocation log with rotation and optional typed CI attribution, which it preserves but does not establish trust in.
-- **policy** - Argv validation rejecting shell metacharacters before `execve`.
+- **policy** - Argv validation rejecting shell metacharacters before `execve`. On the HTTP surfaces the gate is location-scoped to path values, the only inputs `FillPath` substitutes unescaped, and a wrap opts a named path param out with `allow-metacharacters`. See [the gate section](specverb-request.md#the-shell-metachar-gate-is-location-aware).
 - **scope** / **exitcode** - Resolve cwd to its git toplevel for each audit row's RepoRoot, and a public exit-code taxonomy for orchestrators. A generated binary exits with the code its error declares (2 for a policy refusal, 5 for a user error), and the audit row records the same code plus a `reject` decision.
 - **valuesource** / **tokenmint** - Shared `value <provider>` resolution with
   fallback chains, plus OAuth `client_credentials` tokens minted rather than

@@ -309,6 +309,10 @@ func Flatten(path string) ([]byte, error)
     self-contained KDL document's bytes (no `inherit` => source verbatim).
     docs/specverb-policy.md.
 
+func ParseAllowMetaNode(n *kdl.Node) ([]string, error)
+    ParseAllowMetaNode parses one `allow-metacharacters` KDL node into its param
+    names, the entry the inline dialect shares with the guardfile dialect.
+
 
 TYPES
 
@@ -473,6 +477,10 @@ type Guardfile struct {
 	Restrict     []Restriction
 	Actions      []Action
 	Fetches      []Fetch
+
+	// AllowMeta names the path params opted out of the shell-metacharacter
+	// gate by `allow-metacharacters <param>...`. See docs/specverb-request.md.
+	AllowMeta []string
 
 	// Providers are consumer-declared value resolvers: `provider <name> { exec ... }`.
 	// umbra ships no store SDK, so a store-backed source is an exec contract.
@@ -1211,8 +1219,8 @@ func (o Operation) Resolve(ctx context.Context, a Args, dry bool) (Request, erro
     Consumers use it when they need the resolved request shape.
 
 func (o Operation) ResolveQuery(a Args) (neturl.Values, error)
-    ResolveQuery validates, gates, aliases, and serializes query inputs without
-    assembling or firing the rest of the request.
+    ResolveQuery validates, aliases, and serializes query inputs without
+    assembling or firing. Encode makes them unable to alter the URL, so no gate.
 
 type Property struct {
 	Type         string // string|boolean|integer|number|array
@@ -1281,6 +1289,10 @@ type Runtime struct {
 	Client    *http.Client
 	Restrict  []guardfile.Restriction
 
+	// AllowMeta names the path params the wrap's `allow-metacharacters` exempts.
+	// Query is exempt by construction, never by this list; specverb-request.md.
+	AllowMeta []string
+
 	// Headers are wrap-declared request headers, applied before the default
 	// User-Agent. See docs/specverb-request.md.
 	Headers map[string]string
@@ -1330,12 +1342,18 @@ func (rt *Runtime) FireCaptureRaw(ctx context.Context, method, url string, body 
     FireCaptureRaw sends one request and returns the body undecoded, for an op
     declaring a non-JSON media type. See docs/specverb-request.md.
 
+func (rt *Runtime) MetaAllowed(param string) bool
+    MetaAllowed reports whether the wrap opted this path param out of the gate.
+    Exported so the CLI layer's pre-gate agrees with opcore's rather than
+    diverging.
+
 type RuntimeConfig struct {
 	BaseURL      string
 	Auth         guardfile.Auth
 	Providers    map[string]Provider
 	Client       *http.Client
 	Restrict     []guardfile.Restriction
+	AllowMeta    []string
 	Headers      map[string]string
 	BaseURLValue guardfile.ValueChain
 	Database     Database

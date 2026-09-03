@@ -87,6 +87,19 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 		return p.parseHeader(n)
 	case "database":
 		return p.parseDatabase(n)
+	case "can":
+		return p.parseGrant(n)
+	case "proxy":
+		return p.parseProxy(n)
+	default:
+		return p.applyGateNode(n)
+	}
+}
+
+// applyGateNode handles the wrap-body nodes that shape the gates, split off
+// from applyNode to hold the cyclo cap.
+func (p *inlineParser) applyGateNode(n *kdl.Node) error {
+	switch n.Name() {
 	case "restrict":
 		r, err := guardfile.ParseRestrictNode(n)
 		if err != nil {
@@ -94,12 +107,15 @@ func (p *inlineParser) applyNode(n *kdl.Node) error {
 		}
 		p.cfg.Restrict = append(p.cfg.Restrict, r)
 		return nil
-	case "can":
-		return p.parseGrant(n)
-	case "proxy":
-		return p.parseProxy(n)
+	case "allow-metacharacters":
+		params, err := guardfile.ParseAllowMetaNode(n)
+		if err != nil {
+			return err
+		}
+		p.cfg.AllowMeta = append(p.cfg.AllowMeta, params...)
+		return nil
 	default:
-		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | header | database | restrict | can | proxy; fail-closed)", n.Name())
+		return fmt.Errorf("opcore: unknown node %q in wrap body (want base-url | auth | header | database | restrict | allow-metacharacters | can | proxy; fail-closed)", n.Name())
 	}
 }
 

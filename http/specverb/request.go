@@ -78,7 +78,7 @@ func (rt *runtime) buildLeaf(desc opDescriptor) *cli.Command {
 		Flags:       flags,
 		Action: rt.wrap(verb.Spec{
 			Name:     desc.VerbName,
-			ArgsFunc: argsFuncFor(desc),
+			ArgsFunc: rt.argsFuncFor(desc),
 			Action:   rt.actionFor(desc),
 		}),
 	}
@@ -129,24 +129,19 @@ func argsUsage(params []string) string {
 	return strings.Join(parts, " ")
 }
 
-// argsFuncFor extracts the user strings for the shell-metachar gate, location-aware:
-// only path/query reach the URL (the injection surface); body/form are exempt.
-func argsFuncFor(desc opDescriptor) func(*cli.Command) (map[string]string, []string) {
+// argsFuncFor hands the gate only the positionals: they alone reach the URL
+// unescaped. opcore re-gates them in resolve; docs/specverb-request.md.
+func (rt *runtime) argsFuncFor(desc opDescriptor) func(*cli.Command) (map[string]string, []string) {
 	return func(c *cli.Command) (map[string]string, []string) {
-		named := map[string]string{}
-		for _, f := range desc.QueryFlags {
-			if c.IsSet(f.Name) {
-				values := stringifyFlagValues(c, f)
-				if len(values) == 1 {
-					named[f.Name] = values[0]
-					continue
-				}
-				for i, value := range values {
-					named[fmt.Sprintf("%s[%d]", f.Name, i)] = value
-				}
+		positional := c.Args().Slice()
+		gated := make([]string, 0, len(positional))
+		for i, v := range positional {
+			if i < len(desc.PathParams) && rt.MetaAllowed(desc.PathParams[i]) {
+				continue
 			}
+			gated = append(gated, v)
 		}
-		return named, c.Args().Slice()
+		return map[string]string{}, gated
 	}
 }
 
@@ -525,47 +520,4 @@ func writeRawResponse(body []byte, query, method, url, status string) error {
 		return exitcode.New(exitcode.Internal, "internal", err, "")
 	}
 	return nil
-}
-
-// stringifyFlagValues renders one set query flag for the policy gate and URL
-// encoder. Arrays keep one string per input value in input order.
-func stringifyFlagValues(c *cli.Command, f fieldFlag) []string {
-	switch f.Type {
-	case "boolean":
-		return []string{fmt.Sprintf("%t", c.Bool(f.Name))}
-	case "integer":
-		return []string{fmt.Sprintf("%d", c.Int(f.Name))}
-	case "number":
-		return []string{fmt.Sprintf("%g", c.Float(f.Name))}
-	case "array":
-		var parts []string
-		for _, v := range anySlice(c, f) {
-			parts = append(parts, fmt.Sprintf("%v", v))
-		}
-		return parts
-	default:
-		return []string{c.String(f.Name)}
-	}
-}
-
-// anySlice reads an array flag's elements as []any for stringification.
-func anySlice(c *cli.Command, f fieldFlag) []any {
-	var out []any
-	switch f.Items {
-	case "integer":
-		for _, v := range c.IntSlice(f.Name) {
-			out = append(out, v)
-		}
-	case "number":
-		for _, v := range c.FloatSlice(f.Name) {
-			out = append(out, v)
-		}
-	case itemsAny:
-		out = append(out, anyValues(c.StringSlice(f.Name))...)
-	default:
-		for _, v := range c.StringSlice(f.Name) {
-			out = append(out, v)
-		}
-	}
-	return out
 }

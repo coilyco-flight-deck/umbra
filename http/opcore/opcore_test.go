@@ -14,6 +14,7 @@ import (
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/opcore"
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
 )
 
@@ -256,9 +257,14 @@ func TestTypedQueryMutualExclusionFailsBeforeUpstream(t *testing.T) {
 	}
 }
 
-func TestTypedQueryPolicyChecksEveryRepeatedValue(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Error("policy-denied query must not reach upstream")
+// The negative control for the dropped query gate: the safety property is the
+// encoding, so assert the encoding rather than the refusal it replaced.
+func TestTypedQueryRepeatedValueEncodesMetacharacters(t *testing.T) {
+	var gotRaw string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotRaw = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 	op := newTestOp(srv, tokenAuth("s3cret"), nil)
@@ -268,8 +274,37 @@ func TestTypedQueryPolicyChecksEveryRepeatedValue(t *testing.T) {
 		QueryValues: map[string]any{"author_id": []string{"safe", "bad;value"}},
 		Body:        map[string]any{"title": "search"},
 	})
-	if kindOf(err) != "policy_denied" {
-		t.Fatalf("kind = %q, want policy_denied (err=%v)", kindOf(err), err)
+	if err != nil {
+		t.Fatalf("query metachar must no longer be refused: %v", err)
+	}
+	// Check each value segment, not the whole string: & separates the repeated
+	// keys and is the encoder's own structure rather than a leaked value byte.
+	for _, pair := range strings.Split(gotRaw, "&") {
+		_, value, _ := strings.Cut(pair, "=")
+		if strings.ContainsAny(value, policy.ShellMeta) {
+			t.Fatalf("query value %q in %q leaked a byte from ShellMeta; every one must be percent-encoded", value, gotRaw)
+		}
+	}
+	if !strings.Contains(gotRaw, "bad%3Bvalue") {
+		t.Fatalf("raw query = %q, want the metacharacter percent-encoded as bad%%3Bvalue", gotRaw)
+	}
+}
+
+// Checked one byte at a time so a later widening of ShellMeta cannot quietly
+// outrun the encoder that query values rely on instead of the gate.
+func TestEveryShellMetaByteIsEncodedInAQueryValue(t *testing.T) {
+	for _, b := range []byte(policy.ShellMeta) {
+		raw := neturl.Values{"q": []string{string(b)}}.Encode()
+		if strings.ContainsRune(raw, rune(b)) {
+			t.Errorf("ShellMeta byte %q survives Encode as %q; the query gate could not be dropped for it", string(b), raw)
+		}
+	}
+	// & and = carry the only structural meaning in a query string.
+	for _, b := range []string{"&", "="} {
+		raw := neturl.Values{"q": []string{b}}.Encode()
+		if strings.Contains(strings.TrimPrefix(raw, "q="), b) {
+			t.Errorf("structural byte %q survives Encode as %q", b, raw)
+		}
 	}
 }
 
@@ -295,19 +330,9 @@ func TestExecuteSelfGuardsShellMeta(t *testing.T) {
 	defer srv.Close()
 	op := newTestOp(srv, tokenAuth("s3cret"), nil)
 
-	// A shell metacharacter in a URL-bound query value is rejected before firing,
-	// with no verb.Wrap around the call - the whole point for a non-CLI consumer.
+	// Gated with no verb.Wrap around the call, the whole point for a non-CLI
+	// consumer. Path is gated because FillPath substitutes it unescaped.
 	_, err := op.Execute(context.Background(), opcore.Args{
-		Path:  map[string]string{"owner": "kai", "repo": "aos"},
-		Query: map[string]string{"state": "open;rm -rf"},
-		Body:  map[string]any{"title": "x"},
-	})
-	if kindOf(err) != "policy_denied" {
-		t.Fatalf("query metachar: kind = %q, want policy_denied (err=%v)", kindOf(err), err)
-	}
-
-	// A metachar in a positional path value is gated too.
-	_, err = op.Execute(context.Background(), opcore.Args{
 		Path:  map[string]string{"owner": "kai", "repo": "aos`whoami`"},
 		Query: map[string]string{"state": "open"},
 		Body:  map[string]any{"title": "x"},

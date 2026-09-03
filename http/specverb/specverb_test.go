@@ -303,14 +303,14 @@ func TestPathParamStillGated(t *testing.T) {
 	}
 }
 
-// TestQueryParamStillGated proves a query flag — which composes into the URL —
-// is still gated, while sitting beside the now-exempt body params.
-func TestQueryParamStillGated(t *testing.T) {
+// listIssuesGate builds the query-bearing proving slice: issueListIssues has
+// ?state&labels&..., so a query metacharacter has somewhere to land.
+func listIssuesGate(t *testing.T) Config {
+	t.Helper()
 	kdl, err := os.ReadFile(filepath.Join("testdata", "forgejo.kdl"))
 	if err != nil {
 		t.Fatalf("read guardfile: %v", err)
 	}
-	// Grant a query-bearing leaf (issueListIssues has ?state&labels&...).
 	kdl = append(kdl[:len(kdl)-2], []byte("\n    can list issues\n}\n")...)
 	gf, err := guardfile.Parse(kdl)
 	if err != nil {
@@ -320,13 +320,54 @@ func TestQueryParamStillGated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read spec: %v", err)
 	}
+	return withGate(t, gf, spec)
+}
+
+// TestQueryParamNotGated replaces TestQueryParamStillGated: a query metachar
+// now reaches the request, and must arrive percent-encoded.
+func TestQueryParamNotGated(t *testing.T) {
+	out, err := runTree(t, listIssuesGate(t), "forgejo", "issues", "list", "kai", "demo", "--labels", "a|b", "--dry-run")
+	if err != nil {
+		t.Fatalf("a metacharacter in a query flag must no longer be rejected: %v", err)
+	}
+	if strings.Contains(out, "a|b") {
+		t.Errorf("query value reached the URL unencoded:\n%s", out)
+	}
+	if !strings.Contains(out, "a%7Cb") {
+		t.Errorf("dry-run output missing the percent-encoded query value a%%7Cb:\n%s", out)
+	}
+}
+
+// Proves the opt-out exists, is per-param, and reaches no further: `owner` is
+// exempt and `repo` beside it is not.
+func TestAllowMetacharactersExemptsNamedPathParam(t *testing.T) {
+	kdl, err := os.ReadFile(filepath.Join("testdata", "forgejo.kdl"))
+	if err != nil {
+		t.Fatalf("read guardfile: %v", err)
+	}
+	kdl = append(kdl[:len(kdl)-2], []byte("\n    can list issues\n    allow-metacharacters \"owner\"\n}\n")...)
+	gf, err := guardfile.Parse(kdl)
+	if err != nil {
+		t.Fatalf("parse guardfile: %v", err)
+	}
+	if len(gf.AllowMeta) != 1 || gf.AllowMeta[0] != "owner" {
+		t.Fatalf("AllowMeta = %v, want [owner]", gf.AllowMeta)
+	}
+	spec, err := os.ReadFile(filepath.Join("testdata", "forgejo.swagger.v1.json"))
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
 	cfg := withGate(t, gf, spec)
-	_, err = runTree(t, cfg, "forgejo", "issues", "list", "kai", "demo", "--labels", "a|b")
+
+	if _, err := runTree(t, cfg, "forgejo", "issues", "list", "kai{x}", "demo", "--dry-run"); err != nil {
+		t.Fatalf("owner is named in allow-metacharacters and must pass the gate: %v", err)
+	}
+	_, err = runTree(t, cfg, "forgejo", "issues", "list", "kai", "demo{x}", "--dry-run")
 	if err == nil {
-		t.Fatal("a metacharacter in a query flag must still be rejected")
+		t.Fatal("repo is not named in allow-metacharacters and must still be refused")
 	}
 	if !strings.Contains(err.Error(), "shell metacharacter") {
-		t.Errorf("want a shell-metacharacter rejection, got: %v", err)
+		t.Errorf("want a shell-metacharacter rejection for repo, got: %v", err)
 	}
 }
 

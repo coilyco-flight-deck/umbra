@@ -243,6 +243,10 @@ type Guardfile struct {
 	Actions      []Action
 	Fetches      []Fetch
 
+	// AllowMeta names the path params opted out of the shell-metacharacter
+	// gate by `allow-metacharacters <param>...`. See docs/specverb-request.md.
+	AllowMeta []string
+
 	// Providers are consumer-declared value resolvers: `provider <name> { exec ... }`.
 	// umbra ships no store SDK, so a store-backed source is an exec contract.
 	ProviderDecls []ProviderDecl
@@ -354,6 +358,13 @@ func (gf *Guardfile) applyListNode(n *kdl.Node, name string) error {
 			return err
 		}
 		gf.Restrict = append(gf.Restrict, r)
+		return nil
+	case "allow-metacharacters":
+		params, err := parseAllowMeta(n)
+		if err != nil {
+			return err
+		}
+		gf.AllowMeta = append(gf.AllowMeta, params...)
 		return nil
 	case "action":
 		act, err := parseAction(n)
@@ -603,6 +614,10 @@ func ParseAuthNode(n *kdl.Node) (Auth, error) { return parseAuth(n) }
 // with the opcore inline source so both sources speak one restrict grammar.
 func ParseRestrictNode(n *kdl.Node) (Restriction, error) { return parseRestrict(n) }
 
+// ParseAllowMetaNode parses one `allow-metacharacters` KDL node into its param
+// names, the entry the inline dialect shares with the guardfile dialect.
+func ParseAllowMetaNode(n *kdl.Node) ([]string, error) { return parseAllowMeta(n) }
+
 // parseAuth reads the auth block, dispatching on the named scheme. Four are
 // supported: header-token, bearer, query-param, none. See docs/specverb.md.
 func parseAuth(n *kdl.Node) (Auth, error) {
@@ -820,6 +835,24 @@ func applyGrantChild(g *Grant, modal string, c *kdl.Node) error {
 		return fmt.Errorf("guardfile: grant body: unknown node %q (want op | body | message | describe; fail-closed)", c.Name())
 	}
 	return nil
+}
+
+// parseAllowMeta reads an `allow-metacharacters <param>...` clause: the named
+// path params skip the gate. Per-param, never global; docs/specverb-request.md.
+func parseAllowMeta(n *kdl.Node) ([]string, error) {
+	args := n.Arguments()
+	if len(args) == 0 {
+		return nil, fmt.Errorf("guardfile: allow-metacharacters needs at least one param name: `allow-metacharacters \"<param>\"...`")
+	}
+	params := make([]string, 0, len(args))
+	for _, a := range args {
+		name := a.String()
+		if name == "" {
+			return nil, fmt.Errorf("guardfile: allow-metacharacters: empty param name")
+		}
+		params = append(params, name)
+	}
+	return params, nil
 }
 
 // parseRestrict reads a `restrict <param> matches "<glob>"...` allowlist clause.

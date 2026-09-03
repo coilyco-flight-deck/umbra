@@ -11,7 +11,6 @@ import (
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/respfmt"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
-	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy"
 )
 
 // Operation is one resolved leaf plus the runtime that fires it: the unit a
@@ -154,27 +153,18 @@ func (o Operation) Preview(a Args) (Request, error) {
 	return o.Resolve(context.Background(), a, true)
 }
 
-// ResolveQuery validates, gates, aliases, and serializes query inputs without
-// assembling or firing the rest of the request.
+// ResolveQuery validates, aliases, and serializes query inputs without
+// assembling or firing. Encode makes them unable to alter the URL, so no gate.
 func (o Operation) ResolveQuery(a Args) (neturl.Values, error) {
-	query, err := o.outgoingQuery(a)
-	if err != nil {
-		return nil, err
-	}
-	for name, values := range query {
-		if err := policy.ValidateArgSlice("query."+name, values); err != nil {
-			return nil, gateDenied(err)
-		}
-	}
-	return query, nil
+	return o.outgoingQuery(a)
 }
 
 // resolve runs the gate, restrictions, and assembly shared by Execute and
 // Preview, returning the resolved request. dry keeps base-url resolution offline.
 func (o Operation) resolve(ctx context.Context, a Args, dry bool) (Request, error) {
 	d := o.Desc
-	// Gate the URL-bound surface (query params, positional path values); body is
-	// exempt. Re-runs verb.Wrap's gate for a CLI leaf, idempotent when stacked.
+	// Gate the unescaped surface only: FillPath substitutes path values verbatim.
+	// Re-runs verb.Wrap's gate for a CLI leaf, idempotent when stacked.
 	query, err := o.ResolveQuery(a)
 	if err != nil {
 		return Request{}, err
@@ -183,8 +173,8 @@ func (o Operation) resolve(ctx context.Context, a Args, dry bool) (Request, erro
 	if err != nil {
 		return Request{}, err
 	}
-	if err := policy.ValidateArgSlice("positional", pathVals); err != nil {
-		return Request{}, gateDenied(err)
+	if err := o.RT.gatePathValues(d.PathParams, pathVals); err != nil {
+		return Request{}, err
 	}
 	if err := o.RT.CheckRestrictions(d.PathParams, pathVals); err != nil {
 		return Request{}, err
@@ -761,5 +751,5 @@ func validateArrayBodyValue(v any, f Field, path string) error {
 func gateDenied(err error) error {
 	return exitcode.New(exitcode.PolicyDenied, "policy_denied", err,
 		"move the argument with the metacharacter into a file and pass it by path, "+
-			"or set allow_metacharacters on the verb if it is known-safe")
+			"or name the param in the wrap's `allow-metacharacters` if it is known-safe")
 }

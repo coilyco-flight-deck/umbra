@@ -144,6 +144,7 @@ func newRuntime(cfg Config, gf *guardfile.Guardfile, baseURL string) *runtime {
 			Providers:    mergeProviders(cfg.Providers),
 			Client:       cfg.HTTPClient,
 			Restrict:     gf.Restrict,
+			AllowMeta:    gf.AllowMeta,
 			BaseURLValue: gf.BaseURLValue,
 		}),
 		wrap:    cfg.Wrap,
