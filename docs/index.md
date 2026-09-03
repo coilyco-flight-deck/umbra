@@ -31,6 +31,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Inline operations](opcore-inline.md) - descriptors stated directly in KDL.
 - [Body projection](opcore-body.md) - `map`, `set`, and pinned values.
 - [Value providers](value-providers.md) - `env`, `file`, `literal`, and minted tokens.
+- [Upstream guardfiles](mcpverb-upstream.md) - `mcp-upstream`, the proxied-server shape.
 - [MCP Apps host](mcpapps.md) - the frames a rendered widget sends back, under the guardfile.
 
 ## Contributing

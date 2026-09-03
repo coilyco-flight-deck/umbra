@@ -255,7 +255,7 @@ func TestHTTPTransport_CarriesNoTerminateWait(t *testing.T) {
 func TestCall_ProgressTokenRidesAndTheNotificationComesBack(t *testing.T) {
 	// The token is what correlates a notification to its call, so assert the
 	// server saw the one sent and the handler received it back.
-	var seen []Progress
+	got := make(chan Progress, 4)
 	srv := mcp.NewServer(&mcp.Implementation{Name: "fixture", Version: "v0"}, nil)
 	srv.AddTool(&mcp.Tool{Name: "slow", InputSchema: map[string]any{"type": "object"}},
 		func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -278,7 +278,7 @@ func TestCall_ProgressTokenRidesAndTheNotificationComesBack(t *testing.T) {
 	if _, err := srv.Connect(ctx, serverT, nil); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
-	sess, err := connect(ctx, clientT, Options{OnProgress: func(p Progress) { seen = append(seen, p) }})
+	sess, err := connect(ctx, clientT, Options{OnProgress: func(p Progress) { got <- p }})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -287,11 +287,16 @@ func TestCall_ProgressTokenRidesAndTheNotificationComesBack(t *testing.T) {
 	if _, err := sess.Call(ctx, Call{Name: "slow", ProgressToken: "umbra-1"}); err != nil {
 		t.Fatalf("Call: %v", err)
 	}
-	if len(seen) != 1 {
-		t.Fatalf("received %d progress notifications, want 1", len(seen))
+	// The handler runs on the SDK's receive goroutine, which is not ordered
+	// against Call returning, so the notification is waited for rather than read.
+	var p Progress
+	select {
+	case p = <-got:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no progress notification arrived within 5s")
 	}
-	if seen[0].Token != "umbra-1" || seen[0].Progress != 3 || seen[0].Total != 10 || seen[0].Message != "reading" {
-		t.Errorf("progress = %#v, want the values the server sent under umbra-1", seen[0])
+	if p.Token != "umbra-1" || p.Progress != 3 || p.Total != 10 || p.Message != "reading" {
+		t.Errorf("progress = %#v, want the values the server sent under umbra-1", p)
 	}
 }
 

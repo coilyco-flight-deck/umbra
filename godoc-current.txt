@@ -612,6 +612,14 @@ const TransportNode = "mcp"
     TransportNode is the `wrap` child that marks a guardfile as the mcp dialect,
     the way `exec` marks the exec one. The driver sniffs on this name.
 
+const UpstreamNode = "mcp-upstream"
+    UpstreamNode is the top-level node of an upstream guardfile, a sibling of
+    `wrap` rather than a form of it. See docs/mcpverb-upstream.md.
+
+const UpstreamTransport = "streamable-http"
+    UpstreamTransport is the one transport a proxied upstream speaks,
+    so `transport` is a statement rather than a choice.
+
 const WildcardTool = "*"
     WildcardTool is the `can call *` sentinel: grant every tool the lock holds.
 
@@ -640,6 +648,17 @@ func Mount(root *cli.Command, cfg Config) error
 
 
 TYPES
+
+type AnnotationCoverage struct {
+	// Kind is declared, partial, or undeclared.
+	Kind string
+	// Annotated counts tools carrying a readOnlyHint either way.
+	Annotated int
+	// Silent counts tools declaring nothing.
+	Silent int
+}
+    AnnotationCoverage records whether the upstream declares `readOnlyHint` on
+    every tool, some, or none: the fact deciding what may safely be allowed.
 
 type Config struct {
 	// Guardfile is the parsed mcp-dialect policy.
@@ -768,6 +787,20 @@ type Server struct {
     Server is the declared upstream: exactly one transport, its credential
     material named as value chains that resolve at call time rather than parse.
 
+type Shape string
+    Shape is which top-level node a guardfile opens with, so a consumer picks a
+    parser rather than handing a file to one that reads it as something else.
+
+const (
+	ShapeCommand  Shape = "command"
+	ShapeUpstream Shape = "upstream"
+)
+    The two guardfile shapes: a wrapped command path, or a fronted MCP upstream.
+
+func Classify(src []byte) (Shape, error)
+    Classify reports which shape guardfile source carries, without parsing
+    either body. Both nodes, or neither, is an error: there is no safe default.
+
 type URIRule struct {
 	Modal   string // can | cannot | never
 	Verb    string // read | open | save
@@ -778,6 +811,42 @@ type URIRule struct {
 
 func (r URIRule) IsDeny() bool
     IsDeny reports whether the rule closes a URI rather than opening it.
+
+type Upstream struct {
+	// Name is the node argument, the registry name by convention.
+	Name string
+
+	// Description is the optional sibling `description "..."` prose, the same
+	// node the other dialects take.
+	Description string
+
+	// URL is the streamable-HTTP endpoint.
+	URL string
+
+	// Transport is UpstreamTransport, stated or defaulted.
+	Transport string
+
+	// Coverage is nil when the guardfile states no annotation-coverage marker.
+	Coverage *AnnotationCoverage
+
+	// Auth is the credential this upstream presents, in the guardfile-wide auth
+	// grammar. Zero when the file names none.
+	Auth guardfile.Auth
+
+	// Tools is the allowlist in stated order. Empty is a valid statement: a
+	// guardfile that exposes nothing still says where the upstream is.
+	Tools []string
+}
+    Upstream is a parsed `mcp-upstream` guardfile: policy about a network
+    upstream, and never its tool schemas. See docs/mcpverb-upstream.md.
+
+func ParseUpstream(src []byte) (*Upstream, error)
+    ParseUpstream reads an `mcp-upstream` guardfile. Nodes beside it and
+    `description` are the consumer's. See docs/mcpverb-upstream.md.
+
+func (u *Upstream) Providers() []string
+    Providers returns the distinct value-source provider names the upstream's
+    credential names, so a driver wires exactly the resolvers in play.
 
 type Widget struct {
 	Grants []Grant
