@@ -1430,6 +1430,36 @@ type UpstreamTool struct {
     UpstreamTool names the proxied MCP server and upstream tool exactly.
 
 
+## forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/openapigen
+
+package openapigen // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/openapigen"
+
+
+CONSTANTS
+
+const Version = "3.1.0"
+    Version is the emitted document's OpenAPI version. 3.1 rather than 3.0
+    because a pinned body value needs JSON Schema `const`.
+
+
+FUNCTIONS
+
+func Emit(descs []opcore.Descriptor, cfg Config) ([]byte, []string, error)
+    Emit renders descs as an OpenAPI 3.1 document. Descriptors reaching
+    something other than a URL are skipped; Skipped names them.
+
+
+TYPES
+
+type Config struct {
+	Title   string
+	Descr   string
+	Version string
+	BaseURL string
+}
+    Config carries what the descriptors do not: the document's own identity.
+
+
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/respfmt
 
 package respfmt // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/respfmt"
@@ -1783,6 +1813,10 @@ func Gen(opts Options) error
 func Lock(opts Options) error
     Lock refreshes both committed locks: each member's pruned spec lock and the
     one specverb.lock (the frozen build module). Skill output remains opt-in.
+
+func OpenAPI(opts Options, docVersion string) error
+    OpenAPI writes an OpenAPI document describing the group's granted HTTP
+    surface to opts.Out, or to stdout when Out is empty.
 
 func Run(opts Options) error
     Run materializes the consumer binary out-of-band (building only when

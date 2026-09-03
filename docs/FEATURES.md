@@ -15,6 +15,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 - **umbra / codegen** - The no-code driver: discovery, locks, generation, over three transports (spec, exec, mcp). See [umbra-cli.md](umbra-cli.md) and [materialization](umbra-materialization.md).
 - **opcore** - The frozen inline grammar: typed query, body projection, GraphQL and SQL grants, JMESPath postconditions, MCP proxy grants, and a named client. See [opcore-inline.md](opcore-inline.md) and [opcore-body.md](opcore-body.md).
 - **respfmt** - JSON renderer with optional JMESPath projection and five output formats, mirroring the aws CLI `--query` / `--output` surface.
+- **openapigen** - `umbra openapi` renders the granted subset of an upstream as an OpenAPI 3.1 document, so a KDL-defined policy is consumable by spec-driven tooling. Pinned body values emit as `const`, withheld verbs are absent, and a leaf reaching no URL is skipped and named. See [openapigen.md](openapigen.md).
 
 ## Shared core (`pkg/`)
 

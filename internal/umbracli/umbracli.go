@@ -64,6 +64,7 @@ func app() *cli.Command {
 			skewCmd(),
 			buildCmd(),
 			runCmd(),
+			openapiCmd(),
 		},
 		// Root action keeps the legacy `--guardfile X --out Y` one-shot working:
 		// with --out set and no subcommand, behave as `gen --out Y`.
@@ -90,6 +91,22 @@ func genCmd() *cli.Command {
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
 			return umbra.Gen(options(c, c.String("out"), c.String("binary")))
+		},
+	}
+}
+
+// openapiCmd emits a spec describing what the guardfile grants, which is a
+// narrowing of the upstream rather than a new contract.
+func openapiCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "openapi",
+		Usage: "emit an OpenAPI 3.1 document for the granted surface (stdout, or --out)",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "out", Usage: "write the document here instead of stdout"},
+			&cli.StringFlag{Name: "doc-version", Usage: "info.version for the emitted document", Value: "0.0.0"},
+		},
+		Action: func(_ context.Context, c *cli.Command) error {
+			return umbra.OpenAPI(options(c, c.String("out"), ""), c.String("doc-version"))
 		},
 	}
 }

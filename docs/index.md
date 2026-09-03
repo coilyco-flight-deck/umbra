@@ -39,6 +39,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Serving the granted surface](mcpverb-serving.md) - projecting the same grants into advertised tools.
 - [What an MCP call costs](mcpverb-cost.md) - session lifetime, and why no daemon keeps one warm.
 - [MCP Apps host](mcpapps.md) - the frames a rendered widget sends back, under the guardfile.
+- [Emitting OpenAPI](openapigen.md) - rendering the granted subset as a spec other tools can read.
 
 ## Contributing
 - [Contributing](CONTRIBUTING.md) - how to propose a change.
