@@ -33,3 +33,24 @@ A wrap may declare `action` nodes: ordered `call run <grant>` sequences over gra
 `valueFlags` in `cli/execverb/argv.go` names the long flags whose value arrives as a separate token. Without it `--region us-east-1` leaves `us-east-1` looking positional, slipping past an `argN` guard. The table is one vendor's shape, so a grant declares its own with `value-flag <name>`, merged over the built-ins. umbra#282.
 
 A grant that guards `argN` or `any-arg` while allowing a long flag neither the table nor its own `value-flag` list names is **refused when the guardfile parses**, not at runtime. The arity is unknowable from the flag alone, and guessing it wrong binds the guard to the wrong token with no signal. Declare the flag either way: as a value-taker so the value is consumed, or to state that it is a boolean. agentic-os#1351.
+
+## Resolving a flag's value instead of passing it through
+
+`resolve-flag <name>` declares that umbra reads the flag's value rather than forwarding it. umbra resolves the caller's token through `pkg/valuesource`, writes the result to a mode-0600 file it owns, and hands the subprocess `file://<that path>`, unlinking it once the command exits. It implies `value-flag`, since a resolved flag necessarily takes a separate token.
+
+```kdl
+can run ssm put-parameter {
+    resolve-flag "--value"
+}
+```
+
+The caller's token selects the source: a `<provider>://` prefix naming a registered provider (`file://`, `env://`, or a consumer-declared one) resolves through it, and anything else is a `literal`. So `--value file:///path/to/token` is read and **trimmed**, and `--value s3cret` is spilled untrimmed but still leaves argv.
+
+Two properties follow, and both were the point (umbra#6830):
+
+- **The value goes through the trim policy the read path already uses.** `valuesource` trims a `file` or `env` source because a machine put the newline there, and leaves a `literal` intact because a reviewer can see it. Before this, `--value file:///path` was an opaque argv token the wrapped CLI opened itself, so umbra never saw the bytes and the provider that would have trimmed them was never called. A secret arriving 72 bytes stored at 72, and failed days later as a credential that reads correctly at a glance.
+- **The value never sits in argv**, whichever form the caller used, so it stays out of `ps`, `/proc/*/cmdline`, and any argv-capturing audit row.
+
+Resolution runs **after** every gate, guard, and flag-policy check, so a guard always reads what the caller actually typed rather than a path umbra just invented. It runs on the passthrough verb and on an action step, because a declared flag that bound on only one of the two paths would be a hole rather than a guard. A `--dry-run` plan resolves nothing and writes no file: it stays symbolic.
+
+A source that cannot be read fails closed before any exec, and the error names the provider and address, never the value.

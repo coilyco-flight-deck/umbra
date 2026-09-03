@@ -68,7 +68,12 @@ func (r *execStepRunner) fire(ctx context.Context, c *cli.Command, leaf stepflow
 	if err != nil {
 		return nil, nil, exitcode.New(exitcode.Internal, "internal", err, "check the env value provider address and credentials")
 	}
-	argv := append(append(append([]string{}, r.gf.argvPrefixFor(l.grant)...), l.grant.executionArgv()...), tokens...)
+	resolvedTokens, written, err := resolveFlagValues(ctx, tokens, l.grant, r.providers)
+	if err != nil {
+		return nil, nil, exitcode.New(exitcode.Internal, "internal", err, "check the resolve-flag value source and its permissions")
+	}
+	defer unlinkAll(written)
+	argv := append(append(append([]string{}, r.gf.argvPrefixFor(l.grant)...), l.grant.executionArgv()...), resolvedTokens...)
 	var decoded map[string]any
 	var raw []byte
 	inner := verb.Spec{

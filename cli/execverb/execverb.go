@@ -314,7 +314,13 @@ func actionFor(gf *Guardfile, g Grant, gates []gateFunc, run Runner, host HostRe
 		if err != nil {
 			return exitcode.New(exitcode.Internal, "internal", err, "check the env value provider address and credentials")
 		}
-		argv := append(append(append([]string{}, gf.argvPrefixFor(g)...), g.executionArgv()...), args...)
+		// After every gate: a resolved value must not be what the guards read.
+		resolved, written, err := resolveFlagValues(ctx, args, g, providers)
+		if err != nil {
+			return exitcode.New(exitcode.Internal, "internal", err, "check the resolve-flag value source and its permissions")
+		}
+		defer unlinkAll(written)
+		argv := append(append(append([]string{}, gf.argvPrefixFor(g)...), g.executionArgv()...), resolved...)
 		if err := run(ctx, g.ExecBin(gf.Bin), argv, env); err != nil {
 			return exitcode.New(exitcode.UpstreamFailed, "upstream_failed", err, "the wrapped command failed")
 		}

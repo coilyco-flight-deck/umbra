@@ -75,9 +75,13 @@ type Grant struct {
 	AllowFlags []string // non-empty -> strict flag allowlist
 	DenyFlags  []string // default-allow minus these
 	ValueFlags []string // long flags whose value is a separate argv token
-	Gates      []GateSpec
-	Whens      []WhenClause
-	Describe   string
+
+	// ResolveFlags are long flags whose caller value umbra resolves through
+	// pkg/valuesource and spills to a file. See docs/execverb.md.
+	ResolveFlags []string
+	Gates        []GateSpec
+	Whens        []WhenClause
+	Describe     string
 
 	// Argv is the per-grant `argv` override: tokens appended after argv-prefix
 	// in place of Subcommand. ArgvSet marks an explicit (maybe empty) override.
@@ -822,6 +826,9 @@ func (g *Grant) applyPolicyNode(c *kdl.Node) error {
 		g.AllowFlags = append(g.AllowFlags, v)
 	case "value-flag":
 		g.ValueFlags = append(g.ValueFlags, v)
+	case "resolve-flag":
+		g.ValueFlags = append(g.ValueFlags, v)
+		g.ResolveFlags = append(g.ResolveFlags, v)
 	case "describe":
 		g.Describe = v
 	default:
