@@ -1058,7 +1058,7 @@ func materializeIfStale(cdir, binPath string, main []byte, mems []member, specBy
 	}
 	defer func() { _ = flock.Unlock(lf) }()
 
-	if !stale(cdir, binPath, want) {
+	if !stale(cdir, binPath, dl, want) {
 		return nil
 	}
 	if err := materializeModuleDir(cdir, main, mems, specByPath); err != nil {

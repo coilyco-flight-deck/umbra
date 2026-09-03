@@ -111,9 +111,12 @@ func writeStamp(dir string, s stamp) error {
 	return nil
 }
 
-// stale reports whether the cache at dir must be rebuilt: true when the binary
-// is absent, the stamp is missing, or any input hash differs from the last build.
-func stale(dir, binaryPath string, want stamp) bool {
+// stale reports whether the cache at dir must be rebuilt. A local-replace dep
+// lock is always stale; see docs/umbra-materialization.md.
+func stale(dir, binaryPath string, dl *DepLock, want stamp) bool {
+	if dl.hasLocalReplace() {
+		return true
+	}
 	if _, err := os.Stat(binaryPath); err != nil {
 		return true
 	}

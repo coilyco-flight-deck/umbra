@@ -158,9 +158,19 @@ func resolveDepLock(dir, ref, replace string) (*DepLock, error) {
 	}
 	cg := cgVersion
 	if replace != "" {
-		cg = "replace=" + replace
+		cg = replaceMarker + replace
 	}
 	return &DepLock{Go: buildGoDirective, CLIGuard: cg, GoMod: splitLines(goMod), GoSum: splitSortedLines(goSum)}, nil
+}
+
+// replaceMarker prefixes DepLock.CLIGuard when the lock points umbra at a local
+// checkout rather than a released version.
+const replaceMarker = "replace="
+
+// hasLocalReplace reports whether this lock replaces umbra with a local path,
+// which is mutable in a way no staleness input can observe.
+func (dl *DepLock) hasLocalReplace() bool {
+	return dl != nil && strings.HasPrefix(dl.CLIGuard, replaceMarker)
 }
 
 // splitLines splits go.mod bytes into lines with order preserved (go.mod block
