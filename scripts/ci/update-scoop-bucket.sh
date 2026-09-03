@@ -8,10 +8,12 @@ if [ -z "${SCOOP_WRITE_TOKEN:-}" ]; then
   exit 0
 fi
 
+# Clone dir is named for the repo, not "bucket": the manifest lives in the
+# repo's own bucket/ dir, and two nested "bucket" paths read as a typo.
 git clone --depth 1 \
-  https://forgejo.coilysiren.me/coilyco-flight-deck/scoop-bucket.git bucket
-cp dist/umbra.json bucket/bucket/umbra.json
-cd bucket
+  https://forgejo.coilysiren.me/coilyco-flight-deck/scoop-bucket.git scoop-bucket
+cp dist/umbra.json scoop-bucket/bucket/umbra.json
+cd scoop-bucket
 git add bucket/umbra.json
 if git diff --cached --quiet; then
   exit 0
