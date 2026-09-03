@@ -29,10 +29,13 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Complex actions](specverb-actions.md) - composite verbs and their five invariants.
 - [Action limits](specverb-action-limits.md) - what an action deliberately cannot express, and what to reach for instead.
 - [Describe model](specverb-describe.md) - generated visibility for a generated surface.
+- [Descriptors](specverb-descriptors.md) - the spec-driven source resolved without a cli tree.
 - [Inline operations](opcore-inline.md) - descriptors stated directly in KDL.
 - [Body projection](opcore-body.md) - `map`, `set`, and pinned values.
 - [Value providers](value-providers.md) - `env`, `file`, `literal`, and minted tokens.
 - [Upstream guardfiles](mcpverb-upstream.md) - `mcp-upstream`, the proxied-server shape.
+- [Serving the granted surface](mcpverb-serving.md) - projecting the same grants into advertised tools.
+- [What an MCP call costs](mcpverb-cost.md) - session lifetime, and why no daemon keeps one warm.
 - [MCP Apps host](mcpapps.md) - the frames a rendered widget sends back, under the guardfile.
 
 ## Contributing
