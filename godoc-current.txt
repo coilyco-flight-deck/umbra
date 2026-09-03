@@ -355,6 +355,10 @@ type Action struct {
 	Collect  *Collect
 	FailWhen string // JMESPath over the bindings; truthy => non-zero exit
 
+	// RejectEmpty refuses an action that answered with nothing. Exec dialect
+	// only, refused at build time over http. See docs/execverb-occlusion.md.
+	RejectEmpty bool
+
 	// MountVerb/MountResource: the two-arg `action <verb> <resource>` mount form
 	// shadows that leaf path. Empty for `action <name>`. See specverb-actions.md.
 	MountVerb     string

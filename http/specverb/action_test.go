@@ -726,3 +726,21 @@ func TestActionScalarArgRefusesTheWrongType(t *testing.T) {
 		t.Errorf("want a type refusal, got: %v", err)
 	}
 }
+
+// TestActionRejectEmptyIsRefusedOverHTTP: the shared parser accepts the node, so
+// without this refusal an http author gets a control that does nothing.
+func TestActionRejectEmptyIsRefusedOverHTTP(t *testing.T) {
+	gf := ciWatchGuardfile(t)
+	if _, err := Build(Config{Guardfile: gf, Spec: actionSpec(t)}); err != nil {
+		t.Fatalf("baseline build failed, so the assertion below would pass for the wrong reason: %v", err)
+	}
+
+	gf.Actions[0].RejectEmpty = true
+	_, err := Build(Config{Guardfile: gf, Spec: actionSpec(t)})
+	if err == nil {
+		t.Fatal("`reject-empty` built over http, so it would have been silently ignored")
+	}
+	if !strings.Contains(err.Error(), "reject-empty") {
+		t.Errorf("error = %v, want it to name `reject-empty`", err)
+	}
+}

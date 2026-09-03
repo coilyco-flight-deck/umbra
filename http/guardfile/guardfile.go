@@ -189,6 +189,10 @@ type Action struct {
 	Collect  *Collect
 	FailWhen string // JMESPath over the bindings; truthy => non-zero exit
 
+	// RejectEmpty refuses an action that answered with nothing. Exec dialect
+	// only, refused at build time over http. See docs/execverb-occlusion.md.
+	RejectEmpty bool
+
 	// MountVerb/MountResource: the two-arg `action <verb> <resource>` mount form
 	// shadows that leaf path. Empty for `action <name>`. See specverb-actions.md.
 	MountVerb     string
@@ -984,9 +988,25 @@ func applyActionChild(act *Action, c *kdl.Node) error {
 		}
 		act.FailWhen = v
 		return nil
+	case "reject-empty":
+		return applyRejectEmpty(act, c)
 	default:
 		return applyActionStep(act, c)
 	}
+}
+
+// applyRejectEmpty reads the bare `reject-empty` marker: no argument, because
+// the action it sits in names itself. See docs/execverb-occlusion.md.
+func applyRejectEmpty(act *Action, c *kdl.Node) error {
+	if len(c.Arguments()) != 0 || len(c.Properties()) != 0 {
+		return fmt.Errorf(
+			"guardfile: action %q: `reject-empty` takes no argument or property (fail-closed)", act.Name)
+	}
+	if act.RejectEmpty {
+		return fmt.Errorf("guardfile: action %q: duplicate `reject-empty`", act.Name)
+	}
+	act.RejectEmpty = true
+	return nil
 }
 
 // applyActionStep dispatches the step-kind children of an action body: the

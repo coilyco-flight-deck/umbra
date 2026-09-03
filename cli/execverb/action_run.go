@@ -302,6 +302,9 @@ func runExecAction(ea execAction, runner *execStepRunner) cli.ActionFunc {
 		if err := renderRaw(lastRaw, c.String(flagOutput)); err != nil {
 			return err
 		}
+		if err := applyRejectEmpty(ea, lastRaw); err != nil {
+			return err
+		}
 		return applyExecFailWhen(ea, lastRaw, stepflow.CondScope(jmesVars, bindings))
 	}
 }

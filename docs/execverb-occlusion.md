@@ -1,6 +1,6 @@
 # occlusion primitives in the exec dialect
 
-Three grant-level primitives in [the exec dialect](execverb.md) that state more than presence or absence. All three came down from mcp-beaver, where they were first needed, because none of them is MCP-shaped: they are about occlusion, and the rendering is the only part that differs between a tool listing and `--help` (umbra#6821).
+Primitives in [the exec dialect](execverb.md) that state more than presence or absence. They came down from mcp-beaver, where they were first needed, because none of them is MCP-shaped: they are about occlusion, and the rendering is the only part that differs between a tool listing and `--help` (umbra#6821). Three are grant-level. `reject-empty` is action-level, for the reason its section gives.
 
 ## Stating an absence: `withhold`
 
@@ -63,3 +63,36 @@ Two properties follow, and both were the point (umbra#6830):
 Resolution runs **after** every gate, guard, and flag-policy check, so a guard always reads what the caller actually typed rather than a path umbra just invented. It runs on the passthrough verb and on an action step, because a declared flag that bound on only one of the two paths would be a hole rather than a guard. A `--dry-run` plan resolves nothing and writes no file: it stays symbolic.
 
 A source that cannot be read fails closed before any exec, and the error names the provider and address, never the value.
+
+## Refusing an empty answer: `reject-empty`
+
+A command that succeeds and prints nothing hands its caller a blank that reads exactly like a real answer, and a model reading one writes as though it had a result. `reject-empty` says so instead, and a refusal is something the caller can act on.
+
+Opt-in and off by default, because emptiness is a legitimate answer for some commands: a search with no hits returns an empty list correctly, and refusing that would turn a right result into an error.
+
+```kdl
+action list-holds {
+    reject-empty
+    call list holds { }
+}
+```
+
+It takes no argument, unlike the mcp-beaver control it came from, where a top-level node had to name which projected tool it governed. Here the action it sits in names itself.
+
+### Why it is not `fail-when`
+
+`fail-when` already turns a result into a non-zero exit, so a reasonable reading is that this is sugar over a predicate an author could have written. It is not, and the difference is one value.
+
+`fail-when` reduces the answer through **JMESPath truthiness**, where `null`, `false`, `""`, `[]` and `{}` are all false. `reject-empty` calls the same set empty **except `false`**. A command answering "no" has answered, and refusing that is the failure this control exists to prevent rather than to cause. `0` is an answer on both readings.
+
+The second difference is shape. `fail-when` decodes the output as JSON and fails the run as an internal error when it will not parse, so a command that prints prose cannot be gated by it at all. `reject-empty` reads bytes: blank or whitespace-only is empty, and anything else that is not JSON is prose with something in it, so it is an answer.
+
+`reject-empty` runs first when both are declared, so the precise reason wins over a predicate that merely happened to match nothing.
+
+### Why it is action-level
+
+The grant-level primitives above attach to a `can run` grant. This one cannot, because the plain exec path wires the child's stdout straight to umbra's own and never holds the bytes. Only an action captures output, so only an action can judge it.
+
+Giving a plain grant this control means capturing its output, which ends streaming for every long-running command that has it. That is a real trade rather than an oversight, and it is not made here.
+
+The shared parser accepts `reject-empty` on any action, so an http guardfile can state it. The http surface **refuses it at build time** rather than ignoring it: a control that silently does nothing is worse than one that is absent.

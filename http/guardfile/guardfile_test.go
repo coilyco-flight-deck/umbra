@@ -507,16 +507,19 @@ func TestParseBaseURLForms(t *testing.T) {
 func TestParseActionFailsClosed(t *testing.T) {
 	hdr := "wrap w {\n spec s\n auth header-token { header H; value ssm S }\n"
 	cases := map[string]string{
-		"no poll":            hdr + `action a { describe "x" } }`,
-		"poll missing every": hdr + `action a { poll list tasks { until "x"; timeout "1m"; as r } } }`,
-		"poll missing until": hdr + `action a { poll list tasks { every "1s"; timeout "1m"; as r } } }`,
-		"poll missing as":    hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m" } } }`,
-		"two polls":          hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r }; poll list tasks { until "y"; every "1s"; timeout "1m"; as q } } }`,
-		"input no kind":      hdr + `action a { input repo { required }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
-		"required+default":   hdr + `action a { input run { flag; required; default "x" }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
-		"reserved each":      hdr + `action a { each "x" { }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
-		"reserved emit":      hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r; emit "x" } } }`,
-		"unknown poll node":  hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r; bogus "x" } } }`,
+		"no poll":                hdr + `action a { describe "x" } }`,
+		"poll missing every":     hdr + `action a { poll list tasks { until "x"; timeout "1m"; as r } } }`,
+		"poll missing until":     hdr + `action a { poll list tasks { every "1s"; timeout "1m"; as r } } }`,
+		"poll missing as":        hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m" } } }`,
+		"two polls":              hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r }; poll list tasks { until "y"; every "1s"; timeout "1m"; as q } } }`,
+		"input no kind":          hdr + `action a { input repo { required }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
+		"required+default":       hdr + `action a { input run { flag; required; default "x" }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
+		"reserved each":          hdr + `action a { each "x" { }; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
+		"reserved emit":          hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r; emit "x" } } }`,
+		"unknown poll node":      hdr + `action a { poll list tasks { until "x"; every "1s"; timeout "1m"; as r; bogus "x" } } }`,
+		"reject-empty with arg":  hdr + `action a { reject-empty "x"; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
+		"reject-empty with prop": hdr + `action a { reject-empty k="v"; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
+		"duplicate reject-empty": hdr + `action a { reject-empty; reject-empty; poll list tasks { until "x"; every "1s"; timeout "1m"; as r } } }`,
 	}
 	for name, src := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -897,5 +900,28 @@ func TestParseInputMatches(t *testing.T) {
 		if _, err := Parse(action(block)); err == nil {
 			t.Errorf("%s: expected a fail-closed parse error", name)
 		}
+	}
+}
+
+// TestParseRejectEmpty pins the marker and that it is off unless written: a
+// parser setting it unconditionally would pass the first half alone.
+func TestParseRejectEmpty(t *testing.T) {
+	hdr := "wrap w {\n spec s\n auth header-token { header H; value ssm S }\n"
+	step := `poll list tasks { until "x"; every "1s"; timeout "1m"; as r }`
+
+	gf, err := Parse([]byte(hdr + `action a { reject-empty; ` + step + ` } }`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !gf.Actions[0].RejectEmpty {
+		t.Fatal("`reject-empty` was written and did not survive the parse")
+	}
+
+	gf, err = Parse([]byte(hdr + `action a { ` + step + ` } }`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if gf.Actions[0].RejectEmpty {
+		t.Fatal("RejectEmpty set on an action that never declared it")
 	}
 }

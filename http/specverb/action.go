@@ -113,6 +113,12 @@ func resolveAction(spec *spec, gf *guardfile.Guardfile, granted map[grantKey]gua
 	if err := validateArrayInputs(a); err != nil {
 		return actionDescriptor{}, err
 	}
+	// Refused rather than ignored: a control that silently does nothing is worse
+	// than one that is absent. See docs/execverb-occlusion.md.
+	if a.RejectEmpty {
+		return actionDescriptor{}, fmt.Errorf(
+			"specverb: action %q: `reject-empty` is an exec-dialect control and this guardfile is served over http", a.Name)
+	}
 	// Parser guarantees exactly one of Poll/Calls/Collect is set.
 	if len(a.Calls) > 0 {
 		return resolveCallAction(spec, gf, granted, a)

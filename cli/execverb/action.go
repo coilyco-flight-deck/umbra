@@ -72,6 +72,8 @@ type execAction struct {
 	Inputs   []guardfile.Input
 	Calls    []stepflow.Step
 	FailWhen string
+	// RejectEmpty refuses an answer carrying nothing; see rejectempty.go.
+	RejectEmpty bool
 }
 
 // resolveExecActions resolves every declared action against the named grants,
@@ -98,6 +100,7 @@ func resolveExecAction(gf *Guardfile, a guardfile.Action) (execAction, error) {
 		Name:     a.Name,
 		VerbName: strings.Join(gf.Group, ".") + ".action." + a.Name,
 		Describe: a.Describe, Inputs: a.Inputs, FailWhen: a.FailWhen,
+		RejectEmpty: a.RejectEmpty,
 	}
 	bound := map[string]bool{}
 	for i, call := range a.Calls {
