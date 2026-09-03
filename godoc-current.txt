@@ -1959,6 +1959,9 @@ package audit // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/aud
 Package audit writes one JSONL record per CLI invocation to an append-only log
 outside the working tree. Per SECURITY.md, the
 
+Span projection of an audit record. umbra ships no OTel SDK, the way it ships no
+store SDK: see docs/audit-spans.md.
+
 CONSTANTS
 
 const (
@@ -1982,6 +1985,32 @@ const (
     Tier values for ProfileDecision.Coordinate.DataSecurity. Mirrored here so
     the redactor does not import the profile package and can
 
+const (
+	AttrVerb        = "umbra.verb"
+	AttrDecision    = "umbra.decision"
+	AttrOutcome     = "umbra.outcome"
+	AttrExitCode    = "umbra.exit_code"
+	AttrKind        = "umbra.kind"
+	AttrRefused     = "umbra.refused"
+	AttrSessionID   = "umbra.session_id"
+	AttrRepoRoot    = "umbra.repo_root"
+	AttrPolicySkip  = "umbra.policy_skipped"
+	AttrCacheStatus = "umbra.cache"
+	AttrEgressHosts = "umbra.egress_host_count"
+)
+    Span attribute keys, namespaced so a collector can select umbra's rows
+    without matching on a verb name. Stable: a consumer's dashboard queries
+    them.
+
+const (
+	OutcomeOK       = "ok"
+	OutcomeRefused  = "refused"
+	OutcomeFailed   = "failed"
+	OutcomeInternal = "internal"
+)
+    Outcome classes, the distinction the exit-code taxonomy already draws and a
+    log line does not: a refusal is not a failure.
+
 const MaxStderrTailBytes = 2048
     MaxStderrTailBytes caps Record.StderrTail so the audit row stays small even
     when a wrapped tool spews. 2 KiB is enough to carry the last few
@@ -2002,6 +2031,10 @@ var ErrPathUnset = errors.New("audit: log path not configured")
 
 
 FUNCTIONS
+
+func OutcomeFor(code int) string
+    OutcomeFor classifies an exit code into the four span outcomes. This is the
+    whole point of the projection: refused and failed are different populations.
 
 func RedactArgv(argv []string, tier string, p RedactPolicy) []string
     RedactArgv applies the data-security tier to argv. Returns the argv to
@@ -2131,6 +2164,10 @@ func ReadAll(r io.Reader) ([]Record, error)
     ReadAll decodes every record from r. Useful for tests and for `audit
     tail`-style verbs.
 
+func (r Record) SpanOf() Span
+    SpanOf projects a Record onto a Span. It reads the record as written,
+    after redaction, so a sink can never see a value the JSONL would not carry.
+
 type RedactPolicy struct {
 	// SecretFlagPatterns is a list of flag-name prefixes (with leading
 	// dashes). Matching is "argv token starts with this prefix" so
@@ -2142,6 +2179,28 @@ type RedactPolicy struct {
 }
     RedactPolicy carries the patterns the consumer wants applied. umbra supplies
     the mechanism; the consumer supplies the patterns.
+
+type Sink interface {
+	Emit(Span)
+}
+    Sink receives every appended record, for a consumer exporting spans.
+    It runs after the JSONL write, so the durable log never depends on it.
+
+type SinkFunc func(Span)
+    SinkFunc adapts a func to Sink.
+
+func (f SinkFunc) Emit(s Span)
+    Emit calls f.
+
+type Span struct {
+	Name       string
+	StartUnix  int64
+	DurationMS int64
+	Error      bool
+	Attributes map[string]any
+}
+    Span is one audit record projected onto a tracing span: a name, whether it
+    represents an error, and flat attributes. No SDK type appears here.
 
 type Writer struct {
 	// Path is the JSONL file. Must be set.
@@ -2156,6 +2215,10 @@ type Writer struct {
 	MaxAgeDays int
 	// Compress gzips rotated files.
 	Compress bool
+
+	// Sinks receive each appended record as a Span, after the JSONL write.
+	// A panicking or slow sink is the consumer's problem, never the log's.
+	Sinks []Sink
 
 	// Has unexported fields.
 }

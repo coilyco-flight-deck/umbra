@@ -172,6 +172,10 @@ type Writer struct {
 	// Compress gzips rotated files.
 	Compress bool
 
+	// Sinks receive each appended record as a Span, after the JSONL write.
+	// A panicking or slow sink is the consumer's problem, never the log's.
+	Sinks []Sink
+
 	mu     sync.Mutex
 	log    *lumberjack.Logger
 	redact RedactPolicy
@@ -233,7 +237,22 @@ func (w *Writer) Append(r Record) error {
 	if _, err := w.log.Write(buf.Bytes()); err != nil {
 		return fmt.Errorf("audit: write %s: %w", w.Path, err)
 	}
+	w.emit(r)
 	return nil
+}
+
+// emit projects the written record to every sink. Runs after the durable write
+// and never returns an error: telemetry cannot fail an audited invocation.
+func (w *Writer) emit(r Record) {
+	if len(w.Sinks) == 0 {
+		return
+	}
+	span := r.SpanOf()
+	for _, s := range w.Sinks {
+		if s != nil {
+			s.Emit(span)
+		}
+	}
 }
 
 // Close releases the underlying log file. Safe to call multiple times and
