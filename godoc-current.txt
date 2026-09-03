@@ -441,6 +441,11 @@ type Grant struct {
 	// resolved by convention (specverb.resolveOp); set it to override. Deny ignores it.
 	Op string
 
+	// OpMethod and OpPath address an operation by method+path, for a spec whose
+	// operations carry no operationId. See docs/specverb-resolution.md.
+	OpMethod string
+	OpPath   string
+
 	// FixedBody is the grant-body `body key=value...` map: a state-toggle leaf that
 	// always sends this exact JSON and mounts no body flags. Keeps KDL-native types.
 	FixedBody map[string]any

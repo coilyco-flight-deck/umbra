@@ -129,17 +129,34 @@ func parseOpenAPI3(raw []byte) (*spec, error) {
 	return newSpec(doc), nil
 }
 
-// findOp locates the operation with the given operationId, failing closed when
-// it is absent (an undeclared op can never be mounted).
-func (s *spec) findOp(operationID string) (method, path string, op operation, err error) {
+// findOp locates the addressed operation, failing closed when it is absent
+// (an undeclared op can never be mounted).
+func (s *spec) findOp(a opAddr) (method, path string, op operation, err error) {
+	if a.id == "" {
+		return s.findOpByRoute(a)
+	}
 	for _, methods := range s.ops {
 		for _, o := range methods {
-			if o.operationID == operationID {
+			if o.operationID == a.id {
 				return o.method, o.path, o, nil
 			}
 		}
 	}
-	return "", "", operation{}, fmt.Errorf("specverb: operationId %q not found in spec (fail-closed)", operationID)
+	return "", "", operation{}, fmt.Errorf("specverb: operationId %q not found in spec (fail-closed)", a.id)
+}
+
+// findOpByRoute locates an operation by method+path. Method and path are unique
+// within an OpenAPI document by construction, so this is total, not a heuristic.
+func (s *spec) findOpByRoute(a opAddr) (method, path string, op operation, err error) {
+	methods, ok := s.ops[a.path]
+	if !ok {
+		return "", "", operation{}, fmt.Errorf("specverb: path %q not found in spec (fail-closed)", a.path)
+	}
+	o, ok := methods[strings.ToLower(a.method)]
+	if !ok {
+		return "", "", operation{}, fmt.Errorf("specverb: path %q declares no %s operation (fail-closed)", a.path, a.method)
+	}
+	return o.method, o.path, o, nil
 }
 
 // parameters returns the operation's effective parameters: the path-item's shared

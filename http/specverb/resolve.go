@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/guardfile"
@@ -71,11 +72,30 @@ type resolvePlan struct {
 	search    bool // GET <ancestors...>/<leaf-collection>/search
 }
 
-// resolveOp returns the operationId a grant authorizes. An explicit g.Op wins;
-// otherwise verb+resource resolve by convention, failing closed unless unique.
-func resolveOp(spec *spec, g guardfile.Grant) (string, error) {
+// opAddr addresses one spec operation: an operationId, or a method+path pair
+// for a document whose operations declare none. See docs/specverb-resolution.md.
+type opAddr struct {
+	id     string
+	method string
+	path   string
+}
+
+// String renders the address for a fail-closed message, never a resolved value.
+func (a opAddr) String() string {
+	if a.id != "" {
+		return strconv.Quote(a.id)
+	}
+	return a.method + " " + a.path
+}
+
+// resolveOp returns the address a grant authorizes. An explicit method+path or
+// operationId wins; otherwise verb+resource resolve by convention.
+func resolveOp(spec *spec, g guardfile.Grant) (opAddr, error) {
+	if g.OpMethod != "" || g.OpPath != "" {
+		return opAddr{method: g.OpMethod, path: g.OpPath}, nil
+	}
 	if g.Op != "" {
-		return g.Op, nil
+		return opAddr{id: g.Op}, nil
 	}
 	plan := classify(g.Verb, g.Resource)
 	if plan.search {
@@ -226,16 +246,17 @@ func tokensHaveSingular(toks []string, want string) bool {
 
 // resolveResult turns a pick into either the operationId or a fail-closed error
 // that teaches the author to pin an `op`.
-func resolveResult(g guardfile.Grant, op string, ok bool, ambiguous []string) (string, error) {
+func resolveResult(g guardfile.Grant, op string, ok bool, ambiguous []string) (opAddr, error) {
 	if ok {
-		return op, nil
+		return opAddr{id: op}, nil
 	}
 	if len(ambiguous) > 1 {
 		sort.Strings(ambiguous)
-		return "", errResolve("cannot resolve %q %q: %d operations match (%s); add `op \"<operationId>\"` to pin one",
+		return opAddr{}, errResolve("cannot resolve %q %q: %d operations match (%s); add `op \"<operationId>\"` to pin one",
 			g.Verb, g.Resource, len(ambiguous), strings.Join(ambiguous, ", "))
 	}
-	return "", errResolve("cannot resolve %q %q: no operation matches by convention; add `op \"<operationId>\"`",
+	return opAddr{}, errResolve("cannot resolve %q %q: no operation matches by convention; add `op \"<operationId>\"`, "+
+		"or `op method=\"GET\" path=\"/x/{id}\"` when the spec declares no operationIds",
 		g.Verb, g.Resource)
 }
 

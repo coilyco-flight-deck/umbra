@@ -49,7 +49,7 @@ func TestResolveOpConvention(t *testing.T) {
 			if err != nil {
 				t.Fatalf("resolveOp(%s %s) errored: %v", c.verb, c.resource, err)
 			}
-			if got != c.want {
+			if got.id != c.want {
 				t.Errorf("resolveOp(%s %s) = %q, want %q", c.verb, c.resource, got, c.want)
 			}
 		})
@@ -63,7 +63,7 @@ func TestResolveOpExplicitOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveOp with override errored: %v", err)
 	}
-	if got != "repoDelete" {
+	if got.id != "repoDelete" {
 		t.Errorf("explicit op override = %q, want repoDelete", got)
 	}
 }
@@ -79,7 +79,7 @@ func TestResolveOpLeastNested(t *testing.T) {
 	if err != nil {
 		t.Fatalf("least-nested resolve errored: %v", err)
 	}
-	if got != "repoGet" {
+	if got.id != "repoGet" {
 		t.Errorf("least-nested = %q, want repoGet (the shallowest path)", got)
 	}
 }
@@ -95,7 +95,7 @@ func TestResolveOpPreferPluralCollection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plural-preference resolve errored: %v", err)
 	}
-	if got != "createKey" {
+	if got.id != "createKey" {
 		t.Errorf("plural preference = %q, want createKey", got)
 	}
 }
@@ -110,7 +110,7 @@ func TestResolveOpSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search resolve errored: %v", err)
 	}
-	if got != "repoSearch" {
+	if got.id != "repoSearch" {
 		t.Errorf("search repo = %q, want repoSearch", got)
 	}
 }
@@ -124,7 +124,7 @@ func TestResolveOpListChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list-lists resolve errored: %v", err)
 	}
-	if got != "get-boards-id-lists" {
+	if got.id != "get-boards-id-lists" {
 		t.Errorf("list-lists board = %q, want get-boards-id-lists", got)
 	}
 }
@@ -142,7 +142,7 @@ func TestResolveOpOperationIDFallback(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolveOp(%s policy) errored: %v", c.verb, err)
 		}
-		if got != c.want {
+		if got.id != c.want {
 			t.Errorf("resolveOp(%s policy) = %q, want %q", c.verb, got, c.want)
 		}
 	}
@@ -164,7 +164,7 @@ func TestResolveOpOperationIDExactBeatsSuperset(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolveOp(%s skills) errored: %v", c.verb, err)
 		}
-		if got != c.want {
+		if got.id != c.want {
 			t.Errorf("resolveOp(%s skills) = %q, want %q", c.verb, got, c.want)
 		}
 	}

@@ -48,7 +48,7 @@ func TestOpenAPI3TrelloReadsQueryPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseOpenAPI3: %v", err)
 	}
-	method, path, op, err := spec.findOp("post-cards")
+	method, path, op, err := spec.findOp(opAddr{id: "post-cards"})
 	if err != nil {
 		t.Fatalf("findOp post-cards: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestOpenAPI3TrelloReadsQueryPayload(t *testing.T) {
 	}
 
 	// get-boards-id carries a path param plus scalar query params.
-	_, gpath, gop, err := spec.findOp("get-boards-id")
+	_, gpath, gop, err := spec.findOp(opAddr{id: "get-boards-id"})
 	if err != nil {
 		t.Fatalf("findOp get-boards-id: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestOpenAPI3TailscaleResolvesComponentParams(t *testing.T) {
 		t.Fatalf("parseOpenAPI3: %v", err)
 	}
 	// listTailnetDevices draws its only path param from a path-level $ref param.
-	_, path, _, err := spec.findOp("listTailnetDevices")
+	_, path, _, err := spec.findOp(opAddr{id: "listTailnetDevices"})
 	if err != nil {
 		t.Fatalf("findOp listTailnetDevices: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestOpenAPI3TailscaleResolvesComponentParams(t *testing.T) {
 	}
 
 	// setPolicyFile's request body comes from requestBody.content (json + hujson).
-	_, _, op, err := spec.findOp("setPolicyFile")
+	_, _, op, err := spec.findOp(opAddr{id: "setPolicyFile"})
 	if err != nil {
 		t.Fatalf("findOp setPolicyFile: %v", err)
 	}

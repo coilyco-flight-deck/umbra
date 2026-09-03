@@ -76,6 +76,11 @@ type Grant struct {
 	// resolved by convention (specverb.resolveOp); set it to override. Deny ignores it.
 	Op string
 
+	// OpMethod and OpPath address an operation by method+path, for a spec whose
+	// operations carry no operationId. See docs/specverb-resolution.md.
+	OpMethod string
+	OpPath   string
+
 	// FixedBody is the grant-body `body key=value...` map: a state-toggle leaf that
 	// always sends this exact JSON and mounts no body flags. Keeps KDL-native types.
 	FixedBody map[string]any
@@ -804,11 +809,9 @@ func parseOverride(n *kdl.Node) (Grant, error) {
 func applyGrantChild(g *Grant, modal string, c *kdl.Node) error {
 	switch c.Name() {
 	case "op":
-		v, err := singleArg(c)
-		if err != nil {
+		if err := applyOpNode(g, c); err != nil {
 			return fmt.Errorf("guardfile: grant %q: %w", modal, err)
 		}
-		g.Op = v
 	case "body":
 		// A fixed-body toggle: `body state="closed"` -> always send that JSON.
 		// Properties keep their KDL-native type so booleans stay booleans.
@@ -833,6 +836,37 @@ func applyGrantChild(g *Grant, modal string, c *kdl.Node) error {
 		g.Describe = v
 	default:
 		return fmt.Errorf("guardfile: grant body: unknown node %q (want op | body | message | describe; fail-closed)", c.Name())
+	}
+	return nil
+}
+
+// applyOpNode reads `op "<operationId>"` or the method+path form
+// `op method="POST" path="/x/{id}"`, which addresses a spec that names no ops.
+func applyOpNode(g *Grant, c *kdl.Node) error {
+	props := c.Properties()
+	if len(props) == 0 {
+		v, err := singleArg(c)
+		if err != nil {
+			return err
+		}
+		g.Op = v
+		return nil
+	}
+	if len(c.Arguments()) > 0 {
+		return fmt.Errorf("`op` takes an operationId argument or method= and path= properties, never both")
+	}
+	for key, v := range props {
+		switch key {
+		case "method":
+			g.OpMethod = strings.ToUpper(v.String())
+		case "path":
+			g.OpPath = v.String()
+		default:
+			return fmt.Errorf("`op` property %q is unknown (want method | path; fail-closed)", key)
+		}
+	}
+	if g.OpMethod == "" || g.OpPath == "" {
+		return fmt.Errorf("`op` in method+path form needs both `method=` and `path=`")
 	}
 	return nil
 }
