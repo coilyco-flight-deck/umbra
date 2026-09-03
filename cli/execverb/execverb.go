@@ -289,26 +289,12 @@ func buildGates(g Grant) ([]gateFunc, error) {
 // policy, env resolution, then exec with the fixed, immutable argv.
 func actionFor(gf *Guardfile, g Grant, gates []gateFunc, run Runner, host HostResolver, providers map[string]valuesource.Provider) cli.ActionFunc {
 	return func(ctx context.Context, c *cli.Command) error {
-		args := c.Args().Slice()
-		for _, gate := range gates {
-			if err := gate(args); err != nil {
-				return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile gate")
-			}
+		args, err := applyPins(c.Args().Slice(), g)
+		if err != nil {
+			return exitcode.New(exitcode.UserError, "user_error", err, "this flag is pinned by the Guardfile and cannot be overridden")
 		}
-		// wrap-level guards (the passthrough host gate) apply to every leaf, then
-		// the grant's own argv guards.
-		if err := checkWhens(ctx, gf.Whens, g, args, host); err != nil {
-			return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
-		}
-		if err := checkWhens(ctx, g.Whens, g, args, host); err != nil {
-			return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
-		}
-		if err := checkFlagPolicy(args, g); err != nil {
-			return exitcode.New(exitcode.UserError, "user_error", err, "this flag is refused by the Guardfile policy")
-		}
-		if g.Sealed && len(args) > 0 {
-			err := fmt.Errorf("`%s` is sealed: it forwards its pinned command exactly and accepts no trailing arguments", g.subcommandLabel())
-			return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by the Guardfile: sealed verbs take no caller arguments")
+		if err := checkCallPolicy(ctx, gf, g, gates, args, host); err != nil {
+			return err
 		}
 		env, err := resolveEnv(ctx, gf, providers)
 		if err != nil {
@@ -326,6 +312,32 @@ func actionFor(gf *Guardfile, g Grant, gates []gateFunc, run Runner, host HostRe
 		}
 		return nil
 	}
+}
+
+// checkCallPolicy runs every refusal a call must survive, in order: the gates,
+// the wrap-level host guards, the grant's own argv guards, flag policy, sealed.
+func checkCallPolicy(ctx context.Context, gf *Guardfile, g Grant, gates []gateFunc, args []string, host HostResolver) error {
+	for _, gate := range gates {
+		if err := gate(args); err != nil {
+			return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile gate")
+		}
+	}
+	// wrap-level guards (the passthrough host gate) apply to every leaf, then
+	// the grant's own argv guards.
+	if err := checkWhens(ctx, gf.Whens, g, args, host); err != nil {
+		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
+	}
+	if err := checkWhens(ctx, g.Whens, g, args, host); err != nil {
+		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
+	}
+	if err := checkFlagPolicy(args, g); err != nil {
+		return exitcode.New(exitcode.UserError, "user_error", err, "this flag is refused by the Guardfile policy")
+	}
+	if g.Sealed && len(args) > 0 {
+		err := fmt.Errorf("`%s` is sealed: it forwards its pinned command exactly and accepts no trailing arguments", g.subcommandLabel())
+		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by the Guardfile: sealed verbs take no caller arguments")
+	}
+	return nil
 }
 
 // resolveEnv reads each env injection through its provider into `NAME=VALUE`

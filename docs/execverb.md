@@ -34,6 +34,24 @@ A wrap may declare `action` nodes: ordered `call run <grant>` sequences over gra
 
 A grant that guards `argN` or `any-arg` while allowing a long flag neither the table nor its own `value-flag` list names is **refused when the guardfile parses**, not at runtime. The arity is unknowable from the flag alone, and guessing it wrong binds the guard to the wrong token with no signal. Declare the flag either way: as a value-taker so the value is consumed, or to state that it is a boolean. agentic-os#1351.
 
+## Pinning a flag's value
+
+`pin "<--flag>" "<value>"` fixes a flag the caller cannot change. umbra supplies it when the call omits it, and refuses the call when it passes a different value.
+
+```kdl
+can run ssm put-parameter {
+    pin "--type" "SecureString"
+}
+```
+
+A `when` guard gets refusal; a pin gets **correctness by construction**. For a flag whose only safe value is one constant, the second is better: nothing to type, nothing to get wrong, and the guardfile stops depending on every caller remembering (umbra#6821). Passing the pinned value is not a conflict, so a caller who spells it out agrees with the policy rather than tripping it.
+
+A pin implies `value-flag`, since a pinned flag necessarily takes a separate token, so an `argN` guard beside one does not read the pinned value as a positional.
+
+Pins apply **before** the gates and guards, so a `when` reads the argv that will actually run. That is the opposite of `resolve-flag` below, and deliberately: a pin changes *what* the call does, so a guard must see the change; a resolve-flag changes only how a value travels, so a guard must see what the caller typed.
+
+`argv-prefix` is the neighbouring tool and a different one: it is wrap-level and prepends unoverridable leading argv, not a per-flag value.
+
 ## Resolving a flag's value instead of passing it through
 
 `resolve-flag <name>` declares that umbra reads the flag's value rather than forwarding it. umbra resolves the caller's token through `pkg/valuesource`, writes the result to a mode-0600 file it owns, and hands the subprocess `file://<that path>`, unlinking it once the command exits. It implies `value-flag`, since a resolved flag necessarily takes a separate token.

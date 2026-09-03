@@ -4,7 +4,7 @@ Inventory of umbra today, grouped by **guarded surface** over a shared `pkg/`. S
 
 ## CLI exec surface (`cli/`)
 
-- **execverb** - Exec-dialect KDL verbs, complex actions, and inspect lists. A grant may declare `resolve-flag`, so umbra resolves that flag's value through `pkg/valuesource` and spills it to a file rather than forwarding an argv token. See [execverb.md](execverb.md).
+- **execverb** - Exec-dialect KDL verbs, complex actions, and inspect lists. A grant may `pin` a flag to one value umbra supplies and a caller cannot override, and declare `resolve-flag`, so umbra resolves that flag's value through `pkg/valuesource` and spills it to a file rather than forwarding an argv token. See [execverb.md](execverb.md).
 - **verb** - Middleware wrapping every `*cli.Command.Action` in the validate -> execute -> audit pipeline, with audited argv and env injection.
 
 ## HTTP request surface (`http/`)

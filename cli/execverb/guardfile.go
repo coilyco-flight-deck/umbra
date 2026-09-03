@@ -79,9 +79,13 @@ type Grant struct {
 	// ResolveFlags are long flags whose caller value umbra resolves through
 	// pkg/valuesource and spills to a file. See docs/execverb.md.
 	ResolveFlags []string
-	Gates        []GateSpec
-	Whens        []WhenClause
-	Describe     string
+
+	// Pins fix a flag's value: umbra supplies it and refuses a caller who
+	// passes a different one. See docs/execverb.md.
+	Pins     []FlagPin
+	Gates    []GateSpec
+	Whens    []WhenClause
+	Describe string
 
 	// Argv is the per-grant `argv` override: tokens appended after argv-prefix
 	// in place of Subcommand. ArgvSet marks an explicit (maybe empty) override.
@@ -679,6 +683,15 @@ func (g *Grant) applyGrantChild(c *kdl.Node) error {
 		return nil
 	case "argv", "embed", "sealed", "bin":
 		return g.applyGrantPin(c)
+	case "pin":
+		values := make([]string, 0, len(c.Arguments()))
+		for _, a := range c.Arguments() {
+			values = append(values, a.String())
+		}
+		if err := parsePin(g, values); err != nil {
+			return fmt.Errorf("execverb: grant %q: %w", strings.Join(g.Subcommand, " "), err)
+		}
+		return nil
 	default:
 		return g.applyPolicyNode(c)
 	}

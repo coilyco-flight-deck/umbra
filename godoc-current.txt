@@ -67,6 +67,13 @@ type EnvVar struct {
     wrapped process, its value resolved at exec time through a provider.
     See docs/execverb.md.
 
+type FlagPin struct {
+	Flag  string
+	Value string
+}
+    FlagPin fixes one flag's value for a grant: umbra supplies it, and a caller
+    passing a different value is refused. See docs/execverb.md.
+
 type GateSpec struct {
 	Name     string   // registry key; consumers register their own gates
 	Patterns []string // gate-specific deny globs; empty = gate defaults
@@ -84,9 +91,13 @@ type Grant struct {
 	// ResolveFlags are long flags whose caller value umbra resolves through
 	// pkg/valuesource and spills to a file. See docs/execverb.md.
 	ResolveFlags []string
-	Gates        []GateSpec
-	Whens        []WhenClause
-	Describe     string
+
+	// Pins fix a flag's value: umbra supplies it and refuses a caller who
+	// passes a different one. See docs/execverb.md.
+	Pins     []FlagPin
+	Gates    []GateSpec
+	Whens    []WhenClause
+	Describe string
 
 	// Argv is the per-grant `argv` override: tokens appended after argv-prefix
 	// in place of Subcommand. ArgvSet marks an explicit (maybe empty) override.
