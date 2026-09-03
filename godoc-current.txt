@@ -2254,6 +2254,63 @@ func (w *Writer) WrapHook(ctx context.Context, base Record, fn func() error, onC
     fn returns and before the record is appended; it gets a pointer
 
 
+## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit/otelsink
+
+package otelsink // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/audit/otelsink"
+
+Package otelsink emits umbra audit records as OpenTelemetry spans. The
+projection lives in pkg/audit; this binds it to a tracer.
+
+CONSTANTS
+
+const ScopeName = "forgejo.coilysiren.me/coilyco-flight-deck/umbra"
+    ScopeName is the instrumentation scope every umbra span carries, so a
+    collector can select umbra's rows by scope rather than by span name.
+
+
+FUNCTIONS
+
+func NewProvider(ctx context.Context, cfg ProviderConfig) (*sdktrace.TracerProvider, error)
+    NewProvider builds a batching TracerProvider exporting over OTLP/HTTP.
+    The caller owns shutdown: call Shutdown to flush before the process exits.
+
+
+TYPES
+
+type ProviderConfig struct {
+	// ServiceName names the emitting binary in the resource. Required: an
+	// unnamed service is unattributable in a backend holding several.
+	ServiceName string
+
+	// ServiceVersion is optional and omitted from the resource when empty.
+	ServiceVersion string
+
+	// Endpoint overrides OTEL_EXPORTER_OTLP_ENDPOINT when set.
+	Endpoint string
+
+	// Insecure sends over plain HTTP. Off by default.
+	Insecure bool
+}
+    ProviderConfig wires an OTLP/HTTP exporter. Endpoint and headers follow the
+    OTEL_EXPORTER_* environment when left zero. See docs/audit-spans.md.
+
+type Sink struct {
+
+	// Now backstops a record with no timestamp; tests override it.
+	Now func() time.Time
+	// Has unexported fields.
+}
+    Sink emits one span per appended audit record.
+
+func New(tracer trace.Tracer) *Sink
+    New returns a Sink emitting through tracer. A nil tracer makes Emit a no-op,
+    so a consumer that has not wired a provider is not a crash.
+
+func (s *Sink) Emit(sp audit.Span)
+    Emit records one span. An audit record describes completed work, so the span
+    opens at the record's start and closes at start+duration rather than now.
+
+
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config
 
 package config // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/config"

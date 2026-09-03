@@ -15,25 +15,38 @@ instruments the process boundary and already publishes an exit-code taxonomy
 separating refusal from failure**, which none of those does. Do not restate the
 wider claim.
 
-## umbra ships no OTel SDK
+## Two layers, and umbra ships both
 
 `Record.SpanOf()` returns an `audit.Span`: a name, a start time, a duration, an
-error flag, and flat attributes. No SDK type appears in the signature.
+error flag, and flat attributes, with no OTel type in the signature. That
+projection is dependency-free and is what `Writer.Sinks` feeds.
 
-This is the same line `pkg/valuesource` draws. umbra is the base of the stack
-and a dependency here reaches every generated binary and every consumer's
-supply chain, so umbra states the shape and the consumer wires the exporter:
+`pkg/audit/otelsink` binds it to OpenTelemetry:
 
 ```go
+tp, err := otelsink.NewProvider(ctx, otelsink.ProviderConfig{ServiceName: "aosguard"})
+defer tp.Shutdown(ctx)
+
 w := audit.NewWriter(path)
-w.Sinks = []audit.Sink{audit.SinkFunc(func(s audit.Span) {
-    // consumer's tracer, consumer's SDK version, consumer's sampling
-})}
+w.Sinks = []audit.Sink{otelsink.New(tp.Tracer(otelsink.ScopeName))}
 ```
+
+`otelsink.New` takes any `trace.Tracer`, so a consumer that already has a
+provider passes it and ignores `NewProvider` entirely. A nil tracer makes
+`Emit` a no-op: a consumer that has not wired a provider is not a crash.
+
+**The dependency cost is real and worth knowing.** The OTLP exporter pulls
+gRPC and protobuf transitively, and umbra is the base of the umbra/ward stack,
+so this reaches every generated binary. A consumer wanting only the projection
+can still use `audit.SinkFunc` and import none of it, but the module requires
+are in umbra's `go.mod` either way.
 
 Sinks run **after** the durable JSONL write and cannot return an error.
 Telemetry never fails an audited invocation, and the log never depends on a
 collector being reachable.
+
+An audit record describes completed work, so the span opens at the record's own
+timestamp and closes at start+duration rather than at export time.
 
 ## Refusal is not an error
 
@@ -51,6 +64,11 @@ A refusal is a **successful boundary**. Marking its span an error would bury it
 in the same bucket as a broken upstream, which is exactly the confusion the
 exit-code taxonomy exists to prevent. `umbra.refused` is a boolean attribute so
 a query selects the population directly, without parsing an error string.
+
+On the emitted span this is the OTel status: a refusal is `codes.Ok`, and a
+failure is `codes.Error` described by its taxonomy token. So a dashboard
+filtering on span error status will show **zero** refusals and look healthy
+while every refusal is happening. Filter on `umbra.refused` instead.
 
 ## Attributes
 
