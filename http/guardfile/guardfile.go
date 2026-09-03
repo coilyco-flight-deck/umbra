@@ -923,7 +923,9 @@ func parseAction(n *kdl.Node) (Action, error) {
 	case act.Poll == nil && len(act.Calls) == 0 && act.Collect == nil:
 		return Action{}, fmt.Errorf("guardfile: action %q: needs a `poll`, `collect`, or at least one `call` step", act.Name)
 	case countActionKinds(act) > 1:
-		return Action{}, fmt.Errorf("guardfile: action %q: `poll`, `collect`, and `call` are mutually exclusive", act.Name)
+		return Action{}, fmt.Errorf("guardfile: action %q: `poll`, `collect`, and `call` are mutually exclusive. "+
+			"Combining them would let one action emit an unbounded number of writes, which is the property that "+
+			"makes an action reviewable by reading it. Split it into two actions, or see docs/specverb-actions.md", act.Name)
 	}
 	return act, nil
 }

@@ -10,6 +10,10 @@ A **complex action** is a named composite verb authored inside a `wrap` block, o
 4. **Dry-run is a plan.** `--dry-run` prints the call with bound params and the compiled `until`, firing nothing.
 5. **One expression engine.** Conditions are JMESPath, the engine `--query` uses, extended with native `$input` variables.
 
+## What an action deliberately cannot express
+
+`poll`, `collect`, and `call` are mutually exclusive within one action, and there is no per-element fan-out. Both fall out of invariant 2 and are deliberate, so snapshot-mutate-snapshot-restore is structurally outside this dialect. The boundary, its cost, and the two guard shapes that *are* expressible: [action limits](specverb-action-limits.md).
+
 ## Input defaulting
 
 An `input` may carry `default <jmespath>`. When the operator omits it, the action fires the poll leaf **once as a pre-flight**, evaluates the expression against that response, and binds the result before the loop starts, so `ci-watch owner/repo` with no `--run` resolves to the latest run. The pre-flight hits only the poll leaf, adding no new target or grant, and writes its own audit row like any tick.

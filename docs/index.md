@@ -27,6 +27,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 - [Op resolution](specverb-resolution.md) - verbs, wildcards, unrecognised shapes.
 - [Request semantics](specverb-request.md) - how a mounted leaf assembles and fires.
 - [Complex actions](specverb-actions.md) - composite verbs and their five invariants.
+- [Action limits](specverb-action-limits.md) - what an action deliberately cannot express, and what to reach for instead.
 - [Describe model](specverb-describe.md) - generated visibility for a generated surface.
 - [Inline operations](opcore-inline.md) - descriptors stated directly in KDL.
 - [Body projection](opcore-body.md) - `map`, `set`, and pinned values.
