@@ -270,7 +270,7 @@ func (e *queryEncoder) addTyped(name string, value any) error {
 func (e *queryEncoder) add(localName string, values []string) error {
 	wireName := localName
 	if f, ok := e.fields[localName]; ok {
-		wireName = f.QueryName()
+		wireName = f.QueryWireName()
 	}
 	if prior, exists := e.owners[wireName]; exists {
 		return queryUserError(

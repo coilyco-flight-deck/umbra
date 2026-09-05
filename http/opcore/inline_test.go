@@ -366,6 +366,7 @@ func TestParseInlineTypedQueryBlock(t *testing.T) {
                 field "pinned" type="boolean"
                 field "score" type="number" minimum=0.5 maximum=9.5
                 array "author_id" items="string" min-items=1 max-items=25
+                array "record_id" items="string" encode="brackets"
                 array "enabled" items="boolean"
                 array "page" items="integer"
                 array "weight" items="number"
@@ -386,6 +387,7 @@ func TestParseInlineTypedQueryBlock(t *testing.T) {
 		{Name: "pinned", Type: "boolean"},
 		{Name: "score", Type: "number", Minimum: &minScore, Maximum: &maxScore},
 		{Name: "author_id", Type: "array", Items: "string", MinItems: &minAuthors, MaxItems: &maxAuthors},
+		{Name: "record_id", Type: "array", Items: "string", ArrayEncode: "brackets"},
 		{Name: "enabled", Type: "array", Items: "boolean"},
 		{Name: "page", Type: "array", Items: "integer"},
 		{Name: "weight", Type: "array", Items: "number"},
@@ -619,6 +621,12 @@ func TestParseInlineTypedQueryFailsClosed(t *testing.T) {
         }`,
 		"negative min-items": `query {
             array "ids" items="string" min-items=-1
+        }`,
+		"encode on scalar": `query {
+            field "cursor" type="string" encode="brackets"
+        }`,
+		"unsupported array encode": `query {
+            array "ids" items="string" encode="json"
         }`,
 		"fractional max-items": `query {
             array "ids" items="string" max-items=2.5

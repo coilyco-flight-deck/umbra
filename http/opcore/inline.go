@@ -882,7 +882,7 @@ func applyQueryFieldProperties(f *Field, n *kdl.Node) error {
 
 func applyQueryFieldProperty(f *Field, nodeName, key string, value kdl.Value) error {
 	switch key {
-	case "type", "items", "upstream":
+	case "type", "items", "upstream", "encode":
 		return applyQueryStringFieldProperty(f, nodeName, key, value)
 	case "required":
 		b, ok := value.RawValue().(bool)
@@ -915,6 +915,8 @@ func applyQueryStringFieldProperty(f *Field, nodeName, key string, value kdl.Val
 		f.Items = raw
 	case "upstream":
 		f.UpstreamName = raw
+	case "encode":
+		f.ArrayEncode = raw
 	}
 	return nil
 }
@@ -1001,11 +1003,16 @@ func validateQueryArrayShape(f *Field) error {
 	if f.MinItems != nil && f.MaxItems != nil && *f.MinItems > *f.MaxItems {
 		return fmt.Errorf("query array %q has min-items greater than max-items (fail-closed)", f.Name)
 	}
+	switch f.ArrayEncode {
+	case "", "repeat", "brackets":
+	default:
+		return fmt.Errorf("query array %q has unsupported encode %q (want repeat | brackets, fail-closed)", f.Name, f.ArrayEncode)
+	}
 	return validateQueryAliasShape(*f)
 }
 
 func validateNoQueryArrayProperties(f Field) error {
-	if f.Items != "" || f.MinItems != nil || f.MaxItems != nil {
+	if f.Items != "" || f.MinItems != nil || f.MaxItems != nil || f.ArrayEncode != "" {
 		return fmt.Errorf("query field %q sets array properties on type %q (fail-closed)", f.Name, f.Type)
 	}
 	return nil

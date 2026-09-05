@@ -96,6 +96,9 @@ type Field struct {
 	Maximum      *float64 // inclusive numeric upper bound
 	MinItems     *int     // inclusive array-length lower bound
 	MaxItems     *int     // inclusive array-length upper bound
+	// ArrayEncode is "" or "repeat" for the bare repeated name, "brackets" for
+	// the []-suffixed form. docs/specverb-request.md (umbra#7013).
+	ArrayEncode string
 }
 
 // QueryName returns the outgoing query parameter name for this field. An empty
@@ -105,6 +108,15 @@ func (f Field) QueryName() string {
 		return f.UpstreamName
 	}
 	return f.Name
+}
+
+// QueryWireName returns the outgoing parameter name including any array-encoding
+// suffix, which is what actually reaches the URL.
+func (f Field) QueryWireName() string {
+	if f.Type == "array" && f.ArrayEncode == "brackets" {
+		return f.QueryName() + "[]"
+	}
+	return f.QueryName()
 }
 
 // TypeLabel renders the flag's type for help and describe output.

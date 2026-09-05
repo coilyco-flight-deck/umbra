@@ -290,6 +290,77 @@ func TestTypedQueryRepeatedValueEncodesMetacharacters(t *testing.T) {
 	}
 }
 
+// A repeated bare name carries no arity at length one (umbra#7013). The default
+// rows are load bearing: every existing surface encodes against them.
+func TestQueryArrayEncodingWireShape(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		encode string
+		values []string
+		want   string
+	}{
+		{"default keeps one element bare", "", []string{"a"}, "author_id=a"},
+		{"default repeats the bare name", "", []string{"a", "b"}, "author_id=a&author_id=b"},
+		{"repeat is the default spelled out", "repeat", []string{"a"}, "author_id=a"},
+		{"brackets state arity at one", "brackets", []string{"a"}, "author_id%5B%5D=a"},
+		{"brackets repeat at two", "brackets", []string{"a", "b"}, "author_id%5B%5D=a&author_id%5B%5D=b"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotRaw string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotRaw = r.URL.RawQuery
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+			op := newTestOp(srv, tokenAuth("s3cret"), nil)
+			op.Desc.QueryFlags = []opcore.Field{
+				{Name: "author_id", Type: "array", Items: "string", ArrayEncode: tc.encode},
+			}
+			_, err := op.Execute(context.Background(), opcore.Args{
+				Path:        map[string]string{"owner": "kai", "repo": "aos"},
+				QueryValues: map[string]any{"author_id": tc.values},
+				Body:        map[string]any{"title": "search"},
+			})
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			if gotRaw != tc.want {
+				t.Fatalf("raw query = %q, want %q", gotRaw, tc.want)
+			}
+		})
+	}
+}
+
+// The suffix belongs to the wire, so it follows the aliased upstream name.
+func TestQueryArrayBracketsApplyToAliasedName(t *testing.T) {
+	var gotRaw string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotRaw = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	op := newTestOp(srv, tokenAuth("s3cret"), nil)
+	op.Desc.QueryFlags = []opcore.Field{
+		{Name: "ids", Type: "array", Items: "string", UpstreamName: "selectedRecordIds", ArrayEncode: "brackets"},
+	}
+	_, err := op.Execute(context.Background(), opcore.Args{
+		Path:        map[string]string{"owner": "kai", "repo": "aos"},
+		QueryValues: map[string]any{"ids": []string{"rec1"}},
+		Body:        map[string]any{"title": "search"},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if gotRaw != "selectedRecordIds%5B%5D=rec1" {
+		t.Fatalf("raw query = %q, want the aliased name with the brackets suffix", gotRaw)
+	}
+	if strings.Contains(gotRaw, "ids=") {
+		t.Fatalf("raw query %q leaked the local input name", gotRaw)
+	}
+}
+
 // Checked one byte at a time so a later widening of ShellMeta cannot quietly
 // outrun the encoder that query values rely on instead of the gate.
 func TestEveryShellMetaByteIsEncodedInAQueryValue(t *testing.T) {

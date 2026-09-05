@@ -54,6 +54,31 @@ The gate then skips that param and no other. It is per-param rather than per-ver
 
 Until umbra#6827 the two refusal messages named `allow_metacharacters` as the remedy and no grammar implemented it, so the gate had no exit at all. The messages now name the node the grammar parses.
 
+## A one-element array needs `encode="brackets"`
+
+Query arrays reach the URL as the bare name repeated once per element, which is
+correct at every length except one. `ids=a&ids=b` is unambiguously two values;
+`ids=a` is indistinguishable from a scalar, so a server whose schema wants an
+array refuses it and one that coerces accepts it. Both happen on the same API.
+
+An array declares the shape it needs:
+
+```kdl
+array "selectedRecordIds" items="string" min-items=1 encode="brackets"
+```
+
+`brackets` emits `selectedRecordIds[]=rec1` at every length, so the arity is on
+the wire rather than inferred from how many times the key appears. `repeat` is
+the default and the historical behavior, and it stays the default because every
+existing guardfile is written against it. `encode` on a non-array is refused.
+
+Observed on Teable (umbra#7013): `selectedRecordIds` with one id returned
+`expected array, received string`, `search` with one element returned `expected
+tuple, received string` though its schema accepts a one-element tuple, and
+`projection` with one element succeeded because that parameter coerces. Teable's
+own client is axios with no `paramsSerializer`, so it emits the bracket form and
+the backend parses it.
+
 ## Firing
 
 Auth resolves the secret through the value-provider registry. `--dry-run` prints the resolved request with the secret redacted and fires nothing. Live responses render through the `--query`/`--output` rail, and an empty 2xx prints an `ok:` line. The client refuses redirects for mutating methods, so a renamed target cannot silently swallow a write.

@@ -1180,6 +1180,9 @@ type Field struct {
 	Maximum      *float64 // inclusive numeric upper bound
 	MinItems     *int     // inclusive array-length lower bound
 	MaxItems     *int     // inclusive array-length upper bound
+	// ArrayEncode is "" or "repeat" for the bare repeated name, "brackets" for
+	// the []-suffixed form. docs/specverb-request.md (umbra#7013).
+	ArrayEncode string
 }
     Field is one spec input. The flat cases lower to CLI flags, while body
     fields may carry nested shape and query fields may carry numeric or array
@@ -1188,6 +1191,10 @@ type Field struct {
 func (f Field) QueryName() string
     QueryName returns the outgoing query parameter name for this field. An empty
     UpstreamName preserves the historical Name-to-wire mapping.
+
+func (f Field) QueryWireName() string
+    QueryWireName returns the outgoing parameter name including any
+    array-encoding suffix, which is what actually reaches the URL.
 
 func (f Field) TypeLabel() string
     TypeLabel renders the flag's type for help and describe output.
