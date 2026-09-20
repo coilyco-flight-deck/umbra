@@ -44,9 +44,10 @@ And the refused one:
 {
     "id": "01a08aad-6350-7851-9fb0-1da6b7802d3d",
     "ts": 1789033014,
+    "decision": "reject",
     "verb": "example.git.commit",
     "argv": ["git", "commit", "--no-verify", "-m", "x"],
-    "exit_code": 5,
+    "exit_code": 2,
     "error": "flag \"--no-verify\" is denied for `commit`",
     "repo_root": "./demo",
     "cwd_subprocess": "./demo"
@@ -62,16 +63,14 @@ is the more interesting half when the caller is an agent.
 `example git` plus `commit` becomes `example.git.commit`. That is what makes
 rows from different binaries comparable.
 
-The refused row carries `error` and a non-zero `exit_code` and nothing else
-changes shape, so a reader parsing these does not need two schemas. One field is
-trimmed from the second row here rather than shown, because it is currently
-under repair and printing it would teach you something about to stop being true.
-Read the rows you get yourself for the full set.
-
-**One case writes no row at all.** A withheld verb like `git push` is mounted as
-a stub that reaches no binary, so there is nothing to wrap and nothing to
-record. If you are counting attempts from the audit trail, withheld verbs are
-invisible in it, and `--help` is where they are visible instead.
+The refused row differs from the granted one in three fields: `decision` is
+`reject`, `exit_code` is 2, and `error` says why. Nothing else changes shape, so
+a reader parsing these does not need two schemas. `decision` is derived from the
+exit code, and it reads `reject` exactly when the code is 2. A refusal by the
+guardfile, whether a gate, a guard, flag policy, a pin or a seal, exits 2, so
+filtering on `reject` finds all of them. A withheld verb is refused the same way
+but writes no row, because it reaches no binary. Read the rows you get yourself
+for the full set.
 
 ## The gate
 
@@ -175,7 +174,9 @@ The codes differ because the two binaries are answering different questions.
 
 * **A generated binary exits 5** because it refuses to guess. A denied verb and
   a misspelt one land in the same place, and it deliberately does not say which.
-  5 is UserError: you supplied a name this binary does not have.
+  5 is UserError: you supplied a name this binary does not have. A flag the
+  guardfile denies on a verb it does grant is different. The binary knows the
+  verb, so that refusal is policy and exits 2.
 * **A replacement exits 2** because a caller under occlusion has no other view
   of the tool. Absence cannot read as a typo when the replacement is
   the only `git` you can see, so it is stated as policy instead.

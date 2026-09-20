@@ -110,21 +110,21 @@ func (r *execStepRunner) prepare(ctx context.Context, leaf stepflow.Leaf, args [
 		return execLeaf{}, nil, err
 	}
 	if err := policy.ValidateArgSlice("step", tokens); err != nil {
-		return execLeaf{}, nil, exitcode.New(exitcode.UserError, "user_error", err, "a resolved step arg carries a shell metacharacter; step args must stay clean")
+		return execLeaf{}, nil, refused(err, "a resolved step arg carries a shell metacharacter; step args must stay clean")
 	}
 	for _, gate := range l.gates {
 		if err := gate(tokens); err != nil {
-			return execLeaf{}, nil, exitcode.New(exitcode.UserError, "user_error", err, "this step is refused by a Guardfile gate")
+			return execLeaf{}, nil, refused(err, "this step is refused by a Guardfile gate")
 		}
 	}
 	if err := checkWhens(ctx, r.gf.Whens, l.grant, tokens, r.host); err != nil {
-		return execLeaf{}, nil, exitcode.New(exitcode.UserError, "user_error", err, "this step is refused by a Guardfile guard")
+		return execLeaf{}, nil, refused(err, "this step is refused by a Guardfile guard")
 	}
 	if err := checkWhens(ctx, l.grant.Whens, l.grant, tokens, r.host); err != nil {
-		return execLeaf{}, nil, exitcode.New(exitcode.UserError, "user_error", err, "this step is refused by a Guardfile guard")
+		return execLeaf{}, nil, refused(err, "this step is refused by a Guardfile guard")
 	}
 	if err := checkFlagPolicy(tokens, l.grant); err != nil {
-		return execLeaf{}, nil, exitcode.New(exitcode.UserError, "user_error", err, "this flag is refused by the Guardfile policy")
+		return execLeaf{}, nil, refused(err, "this flag is refused by the Guardfile policy")
 	}
 	return l, tokens, nil
 }

@@ -68,7 +68,13 @@ func Run(ctx context.Context, c *cli.Command, steps []Step, strVars map[string]s
 		resolve := func(v string) (string, error) { return ResolveArg(v, strVars, bindings) }
 		decoded, raw, ferr := r.Fire(ctx, c, step.Leaf, step.Args, resolve, sliceOf)
 		if ferr != nil {
-			return bindings, lastRaw, exitcode.New(exitcode.UpstreamFailed, "action_failed",
+			// A step the policy refused stays a refusal. Wrapping it as an
+			// upstream failure would exit 3 and audit the refusal as accepted.
+			code, kind := exitcode.UpstreamFailed, "action_failed"
+			if c := exitcode.From(ferr); c != nil && c.Code() == exitcode.PolicyDenied {
+				code, kind = c.Code(), c.Kind()
+			}
+			return bindings, lastRaw, exitcode.New(code, kind,
 				fmt.Errorf("call %d (%s): %w", i+1, step.Leaf.Label(), ferr),
 				"a step in the action sequence failed; no later steps ran")
 		}

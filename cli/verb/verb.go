@@ -196,7 +196,7 @@ func logReject(writer *audit.Writer, verbName string, argv []string, err error) 
 		Decision: audit.DecisionReject,
 		Verb:     verbName,
 		Argv:     argv,
-		ExitCode: 1,
+		ExitCode: exitcode.Of(err),
 		Error:    err.Error(),
 	}
 	if aerr := writer.Append(rec); aerr != nil {

@@ -2593,7 +2593,7 @@ const (
 	// New code should not return this; reach for one of the typed codes
 	Generic = 1
 	// PolicyDenied = the consumer's pre-flight rejected the invocation
-	// (shell-metacharacter validation, missing required arg, etc).
+	// (metacharacters, a Guardfile gate, guard, flag policy, pin or seal).
 	PolicyDenied = 2
 	// UpstreamFailed = the underlying tool / SDK call ran and returned a
 	// non-zero exit. Stdout/stderr from the tool flow through; the

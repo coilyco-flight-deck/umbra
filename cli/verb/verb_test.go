@@ -75,8 +75,8 @@ func TestWrap_RejectsShellMetacharInArg(t *testing.T) {
 	if records[0].Decision != audit.DecisionReject {
 		t.Errorf("decision = %q, want %q", records[0].Decision, audit.DecisionReject)
 	}
-	if records[0].ExitCode != 1 {
-		t.Errorf("exit_code = %d, want 1", records[0].ExitCode)
+	if records[0].ExitCode != exitcode.PolicyDenied {
+		t.Errorf("exit_code = %d, want %d, what the process exits with", records[0].ExitCode, exitcode.PolicyDenied)
 	}
 }
 

@@ -312,7 +312,7 @@ func actionFor(gf *Guardfile, g Grant, gates []gateFunc, run Runner, host HostRe
 	return func(ctx context.Context, c *cli.Command) error {
 		args, err := applyPins(c.Args().Slice(), g)
 		if err != nil {
-			return exitcode.New(exitcode.UserError, "user_error", err, "this flag is pinned by the Guardfile and cannot be overridden")
+			return refused(err, "this flag is pinned by the Guardfile and cannot be overridden")
 		}
 		if err := checkCallPolicy(ctx, gf, g, gates, args, host); err != nil {
 			return err
@@ -335,28 +335,34 @@ func actionFor(gf *Guardfile, g Grant, gates []gateFunc, run Runner, host HostRe
 	}
 }
 
+// refused codes a Guardfile refusal as PolicyDenied, the one code audit logs as
+// reject. An unknown verb stays UserError: that binary will not guess which.
+func refused(err error, hint string) error {
+	return exitcode.New(exitcode.PolicyDenied, "policy_denied", err, hint)
+}
+
 // checkCallPolicy runs every refusal a call must survive, in order: the gates,
 // the wrap-level host guards, the grant's own argv guards, flag policy, sealed.
 func checkCallPolicy(ctx context.Context, gf *Guardfile, g Grant, gates []gateFunc, args []string, host HostResolver) error {
 	for _, gate := range gates {
 		if err := gate(args); err != nil {
-			return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile gate")
+			return refused(err, "this call is refused by a Guardfile gate")
 		}
 	}
 	// wrap-level guards (the passthrough host gate) apply to every leaf, then
 	// the grant's own argv guards.
 	if err := checkWhens(ctx, gf.Whens, g, args, host); err != nil {
-		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
+		return refused(err, "this call is refused by a Guardfile guard")
 	}
 	if err := checkWhens(ctx, g.Whens, g, args, host); err != nil {
-		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by a Guardfile guard")
+		return refused(err, "this call is refused by a Guardfile guard")
 	}
 	if err := checkFlagPolicy(args, g); err != nil {
-		return exitcode.New(exitcode.UserError, "user_error", err, "this flag is refused by the Guardfile policy")
+		return refused(err, "this flag is refused by the Guardfile policy")
 	}
 	if g.Sealed && len(args) > 0 {
 		err := fmt.Errorf("`%s` is sealed: it forwards its pinned command exactly and accepts no trailing arguments", g.subcommandLabel())
-		return exitcode.New(exitcode.UserError, "user_error", err, "this call is refused by the Guardfile: sealed verbs take no caller arguments")
+		return refused(err, "this call is refused by the Guardfile: sealed verbs take no caller arguments")
 	}
 	return nil
 }
