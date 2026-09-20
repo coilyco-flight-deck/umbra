@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	kdl "github.com/calico32/kdl-go"
+
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/umbra/codegen"
 	"gopkg.in/yaml.v3"
 )
@@ -786,5 +788,99 @@ func TestDiscover_NamesTheRenameRatherThanReportingNoProject(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), ".specgen") || !strings.Contains(err.Error(), ".umbra") {
 		t.Errorf("error = %q, want both directory names so the fix is obvious", err)
+	}
+}
+
+const yamlSpecMember = `wrap:
+  command: [ward-kdl, ops, cloud]
+  spec: forgejo.swagger.v1.json
+  base_url: forgejo.coilysiren.me/api/v1
+  auth:
+    scheme: header-token
+    header: Authorization
+    prefix: "token "
+    value: {ssm: /forgejo/api-token}
+  can:
+    - {verb: read, resource: repos, op: repoGet}
+`
+
+const tomlExecMember = `[wrap]
+command = ["ward-kdl", "ops", "aws"]
+kdl = "exec aws"
+
+[[wrap.can]]
+verb = "run"
+resource = "sts"
+qualifiers = ["get-caller-identity"]
+
+[[wrap.can]]
+verb = "run"
+resource = "s3"
+qualifiers = ["ls"]
+kdl = 'deny-when arg0 matches "*tfstate*"'
+`
+
+func TestProjectRootDiscoversYAMLAndTOMLMembersBesideKDL(t *testing.T) {
+	dir := t.TempDir()
+	writeMember(t, dir, "forge/writes.kdl", guardfileFixture)
+	writeMember(t, dir, "cloud/reads.yaml", yamlSpecMember)
+	selected := writeMember(t, dir, "tools/aws.toml", tomlExecMember)
+	// Config that merely lives in the tree is unrelated and never an error.
+	writeMember(t, dir, "compose.yaml", "services:\n  web:\n    image: x\n")
+	writeMember(t, dir, "Cargo.toml", "[package]\nname = \"x\"\n")
+	writeMember(t, dir, "flag.yml", "wrap: true\n")
+	g, err := loadGroup(Options{ProjectRoot: dir, GuardfilePath: selected})
+	if err != nil {
+		t.Fatalf("loadGroup: %v", err)
+	}
+	var paths, embeds []string
+	for _, m := range g.Members {
+		paths = append(paths, m.Path)
+		embeds = append(embeds, m.Params.GuardfileName)
+		if _, err := kdl.ParseString(string(m.Bytes)); err != nil {
+			t.Errorf("%s: embedded bytes are not KDL: %v", m.Path, err)
+		}
+	}
+	if got, want := strings.Join(paths, ","), "cloud/reads.yaml,forge/writes.kdl,tools/aws.toml"; got != want {
+		t.Errorf("members = %s, want %s", got, want)
+	}
+	if got, want := strings.Join(embeds, ","), "cloud/reads.yaml.kdl,forge/writes.kdl,tools/aws.toml.kdl"; got != want {
+		t.Errorf("embed names = %s, want %s", got, want)
+	}
+	main, err := g.render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"//go:embed cloud/reads.yaml.kdl", "//go:embed tools/aws.toml.kdl"} {
+		if !strings.Contains(string(main), want) {
+			t.Errorf("rendered source missing %q", want)
+		}
+	}
+}
+
+func TestProjectRootFailsOnAMalformedYAMLMember(t *testing.T) {
+	dir := t.TempDir()
+	writeMember(t, dir, "forge/writes.kdl", guardfileFixture)
+	writeMember(t, dir, "cloud/typo.yaml", "wrap:\n  command: [ward-kdl, ops, cloud]\n  spce: forgejo.swagger.v1.json\n")
+	if _, err := loadGroup(Options{ProjectRoot: dir}); err == nil || !strings.Contains(err.Error(), `unknown key "spce"`) {
+		t.Fatalf("a misspelt key in a YAML guardfile must fail the load, got %v", err)
+	}
+}
+
+func TestLegacyDiscoveryFindsYAMLAndTOMLGuardfiles(t *testing.T) {
+	dir := t.TempDir()
+	writeMember(t, dir, "a.guardfile.kdl", guardfileFixture)
+	writeMember(t, dir, "b.guardfile.yaml", yamlSpecMember)
+	writeMember(t, dir, "c.guardfile.toml", tomlExecMember)
+	members, err := legacyMembers(dir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range members {
+		got = append(got, m.Path)
+	}
+	if want := "a.guardfile.kdl,b.guardfile.yaml,c.guardfile.toml"; strings.Join(got, ",") != want {
+		t.Errorf("legacy members = %v, want %s", got, want)
 	}
 }

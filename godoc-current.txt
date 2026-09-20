@@ -422,12 +422,32 @@ const AuthSchemeNone = "none"
     an unset scheme, which is a spec that forgot. See docs/specverb-policy.md.
 
 
+VARIABLES
+
+var ErrNotGuardfile = errors.New("guardfile: not a guardfile")
+    ErrNotGuardfile marks a YAML or TOML file that is not a guardfile, which
+    project discovery skips as unrelated (KDL without `wrap` is skipped alike).
+
+
 FUNCTIONS
 
 func Flatten(path string) ([]byte, error)
     Flatten resolves every `inherit` in the guardfile at path into one
     self-contained KDL document's bytes (no `inherit` => source verbatim).
     docs/specverb-policy.md.
+
+func IsFormatExtension(path string) bool
+    IsFormatExtension reports whether path names a YAML or TOML guardfile.
+
+func Lower(path string, src []byte) ([]byte, error)
+    Lower returns KDL source for the guardfile at path. KDL and any unrecognised
+    extension come back verbatim, and .yaml, .yml, and .toml are decoded and
+    lowered.
+
+func LowerForDiscovery(path string, src []byte) ([]byte, error)
+    LowerForDiscovery is Lower for a project walk: a member is a top-level
+    `wrap` mapping naming its `command`, other files yield ErrNotGuardfile,
+    malformed ones fail.
 
 func ParseAllowMetaNode(n *kdl.Node) ([]string, error)
     ParseAllowMetaNode parses one `allow-metacharacters` KDL node into its param

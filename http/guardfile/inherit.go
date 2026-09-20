@@ -64,6 +64,9 @@ func flattenFile(path string, stack []string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("guardfile: inherit: read %q: %w", path, err)
 	}
+	if src, err = Lower(abs, src); err != nil {
+		return nil, err
+	}
 	doc, err := kdl.ParseString(string(src))
 	if err != nil {
 		return nil, fmt.Errorf("guardfile: inherit: parse %q: %w", path, err)

@@ -193,9 +193,13 @@ func sniffTransport(src []byte) (string, error) {
 // readMember reads a single guardfile, sniffs its transport, and parses+plans
 // it with the matching dialect.
 func readMember(path, identity string) (member, error) {
-	b, err := os.ReadFile(path) //nolint:gosec // operator-supplied policy input
+	raw, err := os.ReadFile(path) //nolint:gosec // operator-supplied policy input
 	if err != nil {
 		return member{}, fmt.Errorf("umbra: read guardfile: %w", err)
+	}
+	b, err := guardfile.Lower(path, raw)
+	if err != nil {
+		return member{}, fmt.Errorf("umbra: %w", err)
 	}
 	transport, err := sniffTransport(b)
 	if err != nil {
@@ -217,7 +221,7 @@ func readMCPMember(path, identity string, src []byte) (member, error) {
 	if err != nil {
 		return member{}, fmt.Errorf("umbra: parse mcp guardfile %s: %w", path, err)
 	}
-	p, err := codegen.PlanMCP(gf.Group, gf.Providers(), identity, gf.ProviderDecls)
+	p, err := codegen.PlanMCP(gf.Group, gf.Providers(), embeddedGuardfileName(identity), gf.ProviderDecls)
 	if err != nil {
 		return member{}, err
 	}
@@ -233,7 +237,7 @@ func readExecMember(path, identity string, src []byte) (member, error) {
 	if err != nil {
 		return member{}, fmt.Errorf("umbra: parse exec guardfile %s: %w", path, err)
 	}
-	p, err := codegen.PlanExec(egf.Group, egf.Providers(), identity, egf.ProviderDecls)
+	p, err := codegen.PlanExec(egf.Group, egf.Providers(), embeddedGuardfileName(identity), egf.ProviderDecls)
 	if err != nil {
 		return member{}, err
 	}
@@ -260,7 +264,7 @@ func readSpecMember(path, identity string) (member, error) {
 	if err != nil {
 		return member{}, fmt.Errorf("umbra: parse guardfile %s: %w", path, err)
 	}
-	p, err := codegen.Plan(gf, identity)
+	p, err := codegen.Plan(gf, embeddedGuardfileName(identity))
 	if err != nil {
 		return member{}, err
 	}
@@ -306,6 +310,15 @@ func readEmbeddedFiles(guardfilePath, identity string, sources []string) ([]embe
 		out = append(out, embeddedFile{Source: source, Name: name, Bytes: data})
 	}
 	return out, nil
+}
+
+// embeddedGuardfileName names the embedded artifact. A YAML or TOML member
+// embeds its lowered KDL, so the name says which format the bytes are in.
+func embeddedGuardfileName(identity string) string {
+	if guardfile.IsFormatExtension(identity) {
+		return identity + ".kdl"
+	}
+	return identity
 }
 
 // operationIntent reports whether malformed KDL is clearly an operation member.
@@ -364,7 +377,7 @@ func discoverProjectMembers(root string) ([]member, error) {
 				return err
 			}
 		}
-		if d.IsDir() || filepath.Ext(path) != ".kdl" {
+		if d.IsDir() || filepath.Ext(path) != ".kdl" && !guardfile.IsFormatExtension(path) {
 			return nil
 		}
 		paths = append(paths, path)
@@ -402,6 +415,13 @@ func projectMember(root, path string, seenSource map[string]string) (member, boo
 	if err != nil {
 		return member{}, false, fmt.Errorf("umbra: read member %s: %w", identity, err)
 	}
+	src, err = guardfile.LowerForDiscovery(path, src)
+	if errors.Is(err, guardfile.ErrNotGuardfile) {
+		return member{}, false, nil
+	}
+	if err != nil {
+		return member{}, false, fmt.Errorf("umbra: %w", err)
+	}
 	doc, err := kdl.ParseString(string(src))
 	if err != nil {
 		if operationIntent(src) {
@@ -417,9 +437,13 @@ func projectMember(root, path string, seenSource map[string]string) (member, boo
 }
 
 func legacyMembers(dir, selected string) ([]member, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, "*.guardfile.kdl"))
-	if err != nil {
-		return nil, fmt.Errorf("umbra: discover guardfiles: %w", err)
+	var matches []string
+	for _, ext := range []string{"kdl", "yaml", "yml", "toml"} {
+		found, err := filepath.Glob(filepath.Join(dir, "*.guardfile."+ext))
+		if err != nil {
+			return nil, fmt.Errorf("umbra: discover guardfiles: %w", err)
+		}
+		matches = append(matches, found...)
 	}
 	if selected != "" {
 		found := false
@@ -483,7 +507,7 @@ func loadGroup(opts Options) (*group, error) {
 		if opts.ProjectRoot != "" {
 			return nil, fmt.Errorf("umbra: no operation KDL members in project root %s", dir)
 		}
-		return nil, errors.New("umbra: no *.guardfile.kdl in cwd (set --guardfile or --project-root)")
+		return nil, errors.New("umbra: no *.guardfile.{kdl,yaml,yml,toml} in cwd (set --guardfile or --project-root)")
 	}
 	byBinary := map[string][]member{}
 	order := []string{}

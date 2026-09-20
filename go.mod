@@ -3,6 +3,7 @@ module forgejo.coilysiren.me/coilyco-flight-deck/umbra
 go 1.25.5
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/calico32/kdl-go v0.14.1
 	github.com/getkin/kin-openapi v0.140.0
 	github.com/jmespath-community/go-jmespath v1.1.1
