@@ -717,6 +717,12 @@ func validateBodyField(body map[string]any, f Field, prefix string) error {
 		}
 		return nil
 	}
+	return validateFieldValue(v, f, path)
+}
+
+// validateFieldValue applies a field's own shape check to a value already
+// known to be present - the presence check and a keyed iteration both funnel here.
+func validateFieldValue(v any, f Field, path string) error {
 	if f.Raw {
 		return nil
 	}
@@ -730,9 +736,15 @@ func validateBodyField(body map[string]any, f Field, prefix string) error {
 	}
 }
 
-// validateObjectBodyValue walks a nested object value when the field declares
-// child requirements.
+// validateObjectBodyValue walks a nested object, or a keyed map or variant
+// when the field declares one. See docs/opcore-body-variants.md.
 func validateObjectBodyValue(v any, f Field, path string) error {
+	if f.Variant != nil {
+		return validateVariantBodyValue(v, *f.Variant, path)
+	}
+	if f.Keyed {
+		return validateKeyedObjectBodyValue(v, f, path)
+	}
 	child, ok := v.(map[string]any)
 	if !ok || len(f.Fields) == 0 {
 		return nil
@@ -740,14 +752,67 @@ func validateObjectBodyValue(v any, f Field, path string) error {
 	return validateBodyFields(child, f.Fields, path)
 }
 
+// validateKeyedObjectBodyValue validates every caller-chosen key's value
+// against the field's shared EntrySchema.
+func validateKeyedObjectBodyValue(v any, f Field, path string) error {
+	obj, ok := v.(map[string]any)
+	if !ok || f.EntrySchema == nil {
+		return nil
+	}
+	for key, val := range obj {
+		if err := validateFieldValue(val, *f.EntrySchema, fmt.Sprintf("%s.%s", path, key)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateVariantBodyValue selects a case by its discriminator, failing
+// closed on a missing, non-string, or unrecognized value.
+func validateVariantBodyValue(v any, variant Variant, path string) error {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	discRaw, present := obj[variant.On]
+	if !present {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("%s is missing discriminator %q", path, variant.On),
+			"supply the discriminator field naming which variant this is")
+	}
+	disc, ok := discRaw.(string)
+	if !ok {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("%s discriminator %q must be a string", path, variant.On),
+			"supply the discriminator as a string")
+	}
+	fields, known := variant.Cases[disc]
+	if !known {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("%s: unknown value %q for discriminator %q", path, disc, variant.On),
+			"use one of the variant's declared case values")
+	}
+	return validateBodyFields(obj, fields, path)
+}
+
 // validateArrayBodyValue walks an array of object items when the field declares
 // an item schema.
 func validateArrayBodyValue(v any, f Field, path string) error {
-	if f.Item == nil || len(f.Item.Fields) == 0 {
-		return nil
-	}
 	items, ok := v.([]any)
 	if !ok {
+		return nil
+	}
+	if f.MinItems != nil && len(items) < *f.MinItems {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("%s has %d items, fewer than the minimum %d", path, len(items), *f.MinItems),
+			"supply at least the minimum number of items")
+	}
+	if f.MaxItems != nil && len(items) > *f.MaxItems {
+		return exitcode.New(exitcode.UserError, "user_error",
+			fmt.Errorf("%s has %d items, more than the maximum %d", path, len(items), *f.MaxItems),
+			"supply at most the maximum number of items")
+	}
+	if f.Item == nil || len(f.Item.Fields) == 0 {
 		return nil
 	}
 	for i, item := range items {

@@ -99,6 +99,19 @@ type Field struct {
 	// ArrayEncode is "" or "repeat" for the bare repeated name, "brackets" for
 	// the []-suffixed form. docs/specverb-request.md (umbra#7013).
 	ArrayEncode string
+	// Keyed marks an object whose key set is the caller's, not a fixed
+	// named list. See docs/opcore-body-variants.md.
+	Keyed       bool
+	EntrySchema *Field
+	// Variant is a discriminated union: exactly one Cases entry applies. See
+	// docs/opcore-body-variants.md.
+	Variant *Variant
+}
+
+// Variant is one discriminated-union body shape. See docs/opcore-body-variants.md.
+type Variant struct {
+	On    string
+	Cases map[string][]Field
 }
 
 // QueryName returns the outgoing query parameter name for this field. An empty

@@ -24,7 +24,7 @@ Unknown nodes, missing requirements, malformed predicates, and input collisions 
 
 ## Typed inputs
 
-`field` takes `string`, `boolean`, `integer`, `number`. `array` takes one via `items`. Bounds are inclusive `minimum`/`maximum` and `min-items`/`max-items`. `mutually-exclusive` declares an at-most-one group over local names. Objects, duplicates, impossible bounds, and unresolved names fail closed. `Args.Query` stays strings. `Args.QueryValues` carries typed scalars and arrays, and one name through both fails closed. `query "search_query" upstream="query"` aliases a local whose upstream name would collide with `dry-run`, `query`, `output`, or `body-file`. Body projection and pinned values are [their own page](opcore-body.md).
+`field` takes `string`, `boolean`, `integer`, `number`. `array` takes one via `items`. Bounds are inclusive `minimum`/`maximum` and `min-items`/`max-items`, the latter also usable on a body `array`. `mutually-exclusive` declares an at-most-one group over local names. Objects, duplicates, impossible bounds, and unresolved names fail closed. `Args.Query` stays strings. `Args.QueryValues` carries typed scalars and arrays, and one name through both fails closed. `query "search_query" upstream="query"` aliases a local whose upstream name would collide with `dry-run`, `query`, `output`, or `body-file`. Body projection and pinned values are [their own page](opcore-body.md); a body object whose keys are the caller's, or whose shape depends on a sibling field's value, is [`keyed` and `variant`](opcore-body-variants.md).
 
 ## GraphQL grants
 

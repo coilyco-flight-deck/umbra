@@ -1293,6 +1293,13 @@ type Field struct {
 	// ArrayEncode is "" or "repeat" for the bare repeated name, "brackets" for
 	// the []-suffixed form. docs/specverb-request.md (umbra#7013).
 	ArrayEncode string
+	// Keyed marks an object whose key set is the caller's, not a fixed
+	// named list. See docs/opcore-body-variants.md.
+	Keyed       bool
+	EntrySchema *Field
+	// Variant is a discriminated union: exactly one Cases entry applies. See
+	// docs/opcore-body-variants.md.
+	Variant *Variant
 }
     Field is one spec input. The flat cases lower to CLI flags, while body
     fields may carry nested shape and query fields may carry numeric or array
@@ -1393,9 +1400,21 @@ type Property struct {
 	Maximum      *float64
 	MinItems     *int
 	MaxItems     *int
+	// Keyed marks an object whose key set is the caller's, every value shaped
+	// like Entry. umbra#8032.
+	Keyed   bool
+	Entry   *Property
+	Variant *PropertyVariant
 }
     Property is one input in a Schema: its type (or array element type),
     the neutral where-it-goes hint, its help text, and any nested shape.
+
+type PropertyVariant struct {
+	On    string
+	Cases map[string]Property
+}
+    PropertyVariant is the schema-facing form of Variant. See
+    opcore-body-variants.md.
 
 type Provider = valuesource.Provider
     Provider resolves the value at address for one named value source:
@@ -1545,6 +1564,13 @@ type UpstreamTool struct {
 	Tool   string
 }
     UpstreamTool names the proxied MCP server and upstream tool exactly.
+
+type Variant struct {
+	On    string
+	Cases map[string][]Field
+}
+    Variant is one discriminated-union body shape. See
+    docs/opcore-body-variants.md.
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/http/openapigen

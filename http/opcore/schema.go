@@ -30,6 +30,17 @@ type Property struct {
 	Maximum      *float64
 	MinItems     *int
 	MaxItems     *int
+	// Keyed marks an object whose key set is the caller's, every value shaped
+	// like Entry. umbra#8032.
+	Keyed   bool
+	Entry   *Property
+	Variant *PropertyVariant
+}
+
+// PropertyVariant is the schema-facing form of [Variant]. See opcore-body-variants.md.
+type PropertyVariant struct {
+	On    string
+	Cases map[string]Property
 }
 
 // Location constants label where a Property lowers onto the outgoing request.
@@ -88,6 +99,7 @@ func (f Field) toProperty(loc string) Property {
 		Maximum:      f.Maximum,
 		MinItems:     f.MinItems,
 		MaxItems:     f.MaxItems,
+		Keyed:        f.Keyed,
 	}
 	if f.Item != nil {
 		item := f.Item.toProperty("")
@@ -100,6 +112,23 @@ func (f Field) toProperty(loc string) Property {
 			if child.Required {
 				p.Required = append(p.Required, child.Name)
 			}
+		}
+	}
+	if f.EntrySchema != nil {
+		entry := f.EntrySchema.toProperty("")
+		p.Entry = &entry
+	}
+	if f.Variant != nil {
+		p.Variant = &PropertyVariant{On: f.Variant.On, Cases: map[string]Property{}}
+		for value, fields := range f.Variant.Cases {
+			branch := Property{Type: "object", Properties: map[string]Property{}}
+			for _, child := range fields {
+				branch.Properties[child.Name] = child.toProperty("")
+				if child.Required {
+					branch.Required = append(branch.Required, child.Name)
+				}
+			}
+			p.Variant.Cases[value] = branch
 		}
 	}
 	return p
@@ -160,35 +189,83 @@ func cloneStringGroups(groups [][]string) [][]string {
 
 // jsonSchema emits one Property as a draft-07 fragment.
 func (p Property) jsonSchema() map[string]any {
+	if p.Variant != nil {
+		return p.variantJSONSchema()
+	}
 	entry := p.schemaEntry()
 	switch p.Type {
 	case "array":
-		switch {
-		case p.Item != nil:
-			entry["items"] = p.Item.jsonSchema()
-		case p.Raw:
-			// raw arrays are open-ended subtrees, so the schema leaves items
-			// unconstrained instead of defaulting to string.
-		default:
-			items := p.Items
-			if items == "" {
-				items = "string"
-			}
-			entry["items"] = map[string]any{"type": items}
-		}
+		p.arrayJSONSchema(entry)
 	case "object":
-		if len(p.Properties) > 0 {
-			props := map[string]any{}
-			for name, child := range p.Properties {
-				props[name] = child.jsonSchema()
-			}
-			entry["properties"] = props
-			if len(p.Required) > 0 {
-				required := append([]string(nil), p.Required...)
-				sort.Strings(required)
-				entry["required"] = required
-			}
+		p.objectJSONSchema(entry)
+	}
+	return entry
+}
+
+// arrayJSONSchema fills in an array property's `items` sub-schema.
+func (p Property) arrayJSONSchema(entry map[string]any) {
+	switch {
+	case p.Item != nil:
+		entry["items"] = p.Item.jsonSchema()
+	case p.Raw:
+		// raw arrays are open-ended subtrees, so the schema leaves items
+		// unconstrained instead of defaulting to string.
+	default:
+		items := p.Items
+		if items == "" {
+			items = "string"
 		}
+		entry["items"] = map[string]any{"type": items}
+	}
+}
+
+// objectJSONSchema fills in an object property's shape: `additionalProperties`
+// for a keyed map (umbra#8032), or a fixed `properties`/`required` set.
+func (p Property) objectJSONSchema(entry map[string]any) {
+	switch {
+	case p.Keyed:
+		if p.Entry != nil {
+			entry["additionalProperties"] = p.Entry.jsonSchema()
+		}
+	case len(p.Properties) > 0:
+		props := map[string]any{}
+		for name, child := range p.Properties {
+			props[name] = child.jsonSchema()
+		}
+		entry["properties"] = props
+		if len(p.Required) > 0 {
+			required := append([]string(nil), p.Required...)
+			sort.Strings(required)
+			entry["required"] = required
+		}
+	}
+}
+
+// variantJSONSchema lowers a discriminated union to draft-07 `oneOf`.
+func (p Property) variantJSONSchema() map[string]any {
+	values := make([]string, 0, len(p.Variant.Cases))
+	for value := range p.Variant.Cases {
+		values = append(values, value)
+	}
+	sort.Strings(values)
+	oneOf := make([]any, 0, len(values))
+	for _, value := range values {
+		branch := p.Variant.Cases[value].jsonSchema()
+		props, _ := branch["properties"].(map[string]any)
+		if props == nil {
+			props = map[string]any{}
+			branch["properties"] = props
+		}
+		props[p.Variant.On] = map[string]any{"const": value}
+		required, _ := branch["required"].([]string)
+		required = append(append([]string(nil), required...), p.Variant.On)
+		sort.Strings(required)
+		branch["required"] = required
+		oneOf = append(oneOf, branch)
+	}
+	entry := map[string]any{"oneOf": oneOf}
+	if p.Description != "" {
+		entry["description"] = p.Description
 	}
 	return entry
 }

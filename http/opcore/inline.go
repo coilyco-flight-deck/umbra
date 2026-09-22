@@ -57,6 +57,8 @@ func normalizeInlineBooleans(src string) string {
 		"required=false", "required=#false",
 		"raw=true", "raw=#true",
 		"raw=false", "raw=#false",
+		"keyed=true", "keyed=#true",
+		"keyed=false", "keyed=#false",
 	)
 	return repl.Replace(src)
 }
@@ -1185,30 +1187,48 @@ func parseTypedBodyField(n *kdl.Node, defaultType string) (Field, error) {
 // properties into the working Field, failing closed on anything else.
 func applyBodyFieldProperties(f *Field, n *kdl.Node) error {
 	for k, v := range n.Properties() {
-		switch k {
-		case "type":
-			if f.Type != "" {
-				return fmt.Errorf("`%s` sets type twice (fail-closed)", n.Name())
-			}
-			f.Type = v.String()
-		case "items":
-			f.Items = v.String()
-		case "required":
-			b, ok := v.RawValue().(bool)
-			if !ok {
-				return fmt.Errorf("`%s` needs `required=true|false`", n.Name())
-			}
-			f.Required = b
-		case "raw":
-			b, ok := v.RawValue().(bool)
-			if !ok {
-				return fmt.Errorf("`%s` needs `raw=true|false`", n.Name())
-			}
-			f.Raw = b
-		default:
-			return fmt.Errorf("unknown property %q on `body` field %q (want type | items | required | raw; fail-closed)", k, f.Name)
+		if err := applyBodyFieldProperty(f, n, k, v); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+// applyBodyFieldProperty reads one property of a `field` / `object` / `array`
+// node into the working Field.
+func applyBodyFieldProperty(f *Field, n *kdl.Node, key string, v kdl.Value) error {
+	switch key {
+	case "type":
+		if f.Type != "" {
+			return fmt.Errorf("`%s` sets type twice (fail-closed)", n.Name())
+		}
+		f.Type = v.String()
+	case "items":
+		f.Items = v.String()
+	case "required":
+		return applyBodyFieldBool(&f.Required, n, key, v)
+	case "raw":
+		return applyBodyFieldBool(&f.Raw, n, key, v)
+	case "keyed":
+		return applyBodyFieldBool(&f.Keyed, n, key, v)
+	case "min-items", "max-items":
+		return applyQueryArrayBound(f, key, v.RawValue())
+	default:
+		return fmt.Errorf(
+			"unknown property %q on `body` field %q (want type | items | required | raw | keyed | min-items | max-items; fail-closed)",
+			key, f.Name)
+	}
+	return nil
+}
+
+// applyBodyFieldBool reads one boolean body-field property, failing closed on
+// a non-boolean value.
+func applyBodyFieldBool(dst *bool, n *kdl.Node, key string, v kdl.Value) error {
+	b, ok := v.RawValue().(bool)
+	if !ok {
+		return fmt.Errorf("`%s` needs `%s=true|false`", n.Name(), key)
+	}
+	*dst = b
 	return nil
 }
 
@@ -1226,7 +1246,8 @@ func validateBodyFieldShape(n *kdl.Node, f *Field) error {
 	}
 }
 
-// validateScalarBodyField rejects nested blocks and raw markers on scalars.
+// validateScalarBodyField rejects nested blocks and raw/keyed markers on
+// scalars.
 func validateScalarBodyField(n *kdl.Node, f Field) error {
 	if n.Children() != nil && len(n.Children().Nodes) > 0 {
 		return fmt.Errorf("`%s` does not take a block when it is scalar (fail-closed)", n.Name())
@@ -1234,11 +1255,24 @@ func validateScalarBodyField(n *kdl.Node, f Field) error {
 	if f.Raw {
 		return fmt.Errorf("`%s` only accepts `raw=true` on `object` or `array` fields (fail-closed)", n.Name())
 	}
+	if f.Keyed {
+		return fmt.Errorf("`%s` only accepts `keyed=true` on `object` fields (fail-closed)", n.Name())
+	}
+	if f.MinItems != nil || f.MaxItems != nil {
+		return fmt.Errorf("`%s` only accepts `min-items`/`max-items` on `array` fields (fail-closed)", n.Name())
+	}
 	return nil
 }
 
-// validateObjectBodyField wires nested object children into the Field tree.
+// validateObjectBodyField wires nested object children into the Field tree,
+// or the `keyed` shape when set. See docs/opcore-body-variants.md.
 func validateObjectBodyField(n *kdl.Node, f *Field) error {
+	if f.MinItems != nil || f.MaxItems != nil {
+		return fmt.Errorf("`%s` only accepts `min-items`/`max-items` on `array` fields (fail-closed)", n.Name())
+	}
+	if f.Keyed {
+		return validateKeyedObjectBodyField(n, f)
+	}
 	if f.Raw {
 		if n.Children() != nil && len(n.Children().Nodes) > 0 {
 			return fmt.Errorf("`object` with `raw=true` cannot also declare nested fields (fail-closed)")
@@ -1256,22 +1290,180 @@ func validateObjectBodyField(n *kdl.Node, f *Field) error {
 	return nil
 }
 
-// validateArrayBodyField keeps v1 arrays scalar or raw, never nested.
-func validateArrayBodyField(n *kdl.Node, f *Field) error {
+// validateKeyedObjectBodyField requires exactly one `entry` child, the shape
+// every caller-chosen key's value must satisfy.
+func validateKeyedObjectBodyField(n *kdl.Node, f *Field) error {
 	if f.Raw {
-		if n.Children() != nil && len(n.Children().Nodes) > 0 {
-			return fmt.Errorf("`array` with `raw=true` cannot also declare nested fields (fail-closed)")
+		return fmt.Errorf("`object` cannot set both `keyed=true` and `raw=true` (fail-closed)")
+	}
+	children := n.Children()
+	if children == nil || len(children.Nodes) != 1 || children.Nodes[0].Name() != "entry" {
+		return fmt.Errorf("`keyed` object needs exactly one nested `entry` node (fail-closed)")
+	}
+	entry, err := parseEntryNode(children.Nodes[0])
+	if err != nil {
+		return err
+	}
+	f.EntrySchema = &entry
+	return nil
+}
+
+// parseEntryNode reads a `keyed` object's sole child: the shape every
+// caller-chosen key must satisfy, a scalar `type=` or a nested `variant`.
+func parseEntryNode(n *kdl.Node) (Field, error) {
+	if len(n.Arguments()) != 0 {
+		return Field{}, fmt.Errorf("`entry` takes no arguments (fail-closed)")
+	}
+	children := n.Children()
+	hasChildren := children != nil && len(children.Nodes) > 0
+	hasProps := len(n.Properties()) > 0
+	switch {
+	case hasChildren && hasProps:
+		return Field{}, fmt.Errorf("`entry` takes either `type=...` or a nested block, not both (fail-closed)")
+	case hasProps:
+		return parseScalarEntryNode(n)
+	case hasChildren:
+		return parseVariantEntryNode(children)
+	default:
+		return Field{}, fmt.Errorf("`entry` needs a `type=...` property or a nested block")
+	}
+}
+
+// parseScalarEntryNode reads an `entry type="..."` shape.
+func parseScalarEntryNode(n *kdl.Node) (Field, error) {
+	f := Field{}
+	if err := applyBodyFieldProperties(&f, n); err != nil {
+		return Field{}, err
+	}
+	if f.Type == "" {
+		return Field{}, fmt.Errorf("`entry` needs a `type=...` property or a nested block")
+	}
+	if err := validateBodyFieldShape(n, &f); err != nil {
+		return Field{}, err
+	}
+	return f, nil
+}
+
+// parseVariantEntryNode reads an `entry { variant ... }` shape: the block's
+// sole child must be the discriminated union.
+func parseVariantEntryNode(children *kdl.Document) (Field, error) {
+	if len(children.Nodes) != 1 || children.Nodes[0].Name() != "variant" {
+		return Field{}, fmt.Errorf("`entry` block must contain exactly one `variant` node (fail-closed)")
+	}
+	variant, err := parseVariantNode(children.Nodes[0])
+	if err != nil {
+		return Field{}, err
+	}
+	return Field{Type: "object", Variant: variant}, nil
+}
+
+// parseVariantNode reads `variant on="<field>" { case "<literal>" { ... } }`.
+// See docs/opcore-body-variants.md.
+func parseVariantNode(n *kdl.Node) (*Variant, error) {
+	if len(n.Arguments()) != 0 {
+		return nil, fmt.Errorf("`variant` takes no arguments, only `on=` and `case` children (fail-closed)")
+	}
+	on, err := variantDiscriminator(n)
+	if err != nil {
+		return nil, err
+	}
+	children := n.Children()
+	if children == nil || len(children.Nodes) == 0 {
+		return nil, fmt.Errorf("`variant` needs at least one `case` (fail-closed)")
+	}
+	cases := map[string][]Field{}
+	for _, c := range children.Nodes {
+		value, fields, err := parseVariantCase(c, on)
+		if err != nil {
+			return nil, err
 		}
-		if f.Items != "" {
-			return fmt.Errorf("`%s` with `raw=true` cannot also set `items` (fail-closed)", n.Name())
+		if _, dup := cases[value]; dup {
+			return nil, fmt.Errorf("duplicate `case %q` in `variant` (fail-closed)", value)
 		}
-		return nil
+		cases[value] = fields
+	}
+	return &Variant{On: on, Cases: cases}, nil
+}
+
+// variantDiscriminator reads `variant`'s sole `on=` property.
+func variantDiscriminator(n *kdl.Node) (string, error) {
+	on := ""
+	for k, v := range n.Properties() {
+		if k != "on" {
+			return "", fmt.Errorf("unknown property %q on `variant` (want on; fail-closed)", k)
+		}
+		raw, ok := v.RawValue().(string)
+		if !ok || raw == "" {
+			return "", fmt.Errorf("`variant` needs a non-empty `on=` discriminator field name")
+		}
+		on = raw
+	}
+	if on == "" {
+		return "", fmt.Errorf("`variant` needs an `on=` discriminator field name")
+	}
+	return on, nil
+}
+
+// parseVariantCase reads one `case "<literal>" { ... }` branch, refusing a
+// branch that redeclares the implicit discriminator field.
+func parseVariantCase(c *kdl.Node, on string) (string, []Field, error) {
+	if c.Name() != "case" {
+		return "", nil, fmt.Errorf("unknown node %q in `variant` (want case; fail-closed)", c.Name())
+	}
+	args := c.Arguments()
+	if len(args) != 1 || args[0].String() == "" {
+		return "", nil, fmt.Errorf("`case` expects exactly one non-empty literal value")
+	}
+	value := args[0].String()
+	caseChildren := c.Children()
+	if caseChildren == nil || len(caseChildren.Nodes) == 0 {
+		return "", nil, fmt.Errorf("`case %q` needs at least one body field", value)
+	}
+	fields, err := parseBodyChildren(caseChildren.Nodes)
+	if err != nil {
+		return "", nil, err
+	}
+	for _, cf := range fields {
+		if cf.Name == on {
+			return "", nil, fmt.Errorf(
+				"`case %q` declares field %q, which is `variant`'s own discriminator and is implicit (fail-closed)",
+				value, on)
+		}
+	}
+	return value, fields, nil
+}
+
+// validateArrayBodyField keeps v1 arrays scalar or raw, never nested or keyed.
+func validateArrayBodyField(n *kdl.Node, f *Field) error {
+	if f.Keyed {
+		return fmt.Errorf("`%s` does not support `keyed=true` in v1 (fail-closed)", n.Name())
+	}
+	if f.Raw {
+		return validateRawArrayBodyField(n, f)
 	}
 	if f.Items == "" {
 		f.Items = "string"
 	}
 	if n.Children() != nil && len(n.Children().Nodes) > 0 {
 		return fmt.Errorf("`array` does not take a block in v1 (use `items=...` or `raw=true`; fail-closed)")
+	}
+	if f.MinItems != nil && f.MaxItems != nil && *f.MinItems > *f.MaxItems {
+		return fmt.Errorf("body array %q has min-items greater than max-items (fail-closed)", f.Name)
+	}
+	return nil
+}
+
+// validateRawArrayBodyField keeps a raw array's escape hatch free of any
+// other array property, which would otherwise silently go unenforced.
+func validateRawArrayBodyField(n *kdl.Node, f *Field) error {
+	if n.Children() != nil && len(n.Children().Nodes) > 0 {
+		return fmt.Errorf("`array` with `raw=true` cannot also declare nested fields (fail-closed)")
+	}
+	if f.Items != "" {
+		return fmt.Errorf("`%s` with `raw=true` cannot also set `items` (fail-closed)", n.Name())
+	}
+	if f.MinItems != nil || f.MaxItems != nil {
+		return fmt.Errorf("`%s` with `raw=true` cannot also set `min-items`/`max-items` (fail-closed)", n.Name())
 	}
 	return nil
 }
