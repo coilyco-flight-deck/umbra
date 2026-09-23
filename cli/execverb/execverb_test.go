@@ -81,8 +81,9 @@ func TestMountsOnlyGrantedSubcommands(t *testing.T) {
 			t.Errorf("missing granted leaf %q", want)
 		}
 	}
-	// deny-by-default: rebase was never granted, reflog is a `never` denial
-	if findChild(root, "rebase") != nil || findChild(root, "reflog") != nil {
+	// deny-by-default: rebase was never granted. The `never` is asserted by its
+	// refusal in never_test.go, since an unmounted path proves nothing about it.
+	if findChild(root, "rebase") != nil {
 		t.Error("ungranted subcommand mounted")
 	}
 }

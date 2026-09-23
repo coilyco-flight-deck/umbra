@@ -78,7 +78,7 @@ func Build(cfg Config) (*cli.Command, error) {
 		Name:  gf.Group[len(gf.Group)-1],
 		Usage: fmt.Sprintf("guarded %s verbs (exec dialect)", strings.Join(gf.Group, " ")),
 	}
-	if err := validateWithheld(gf); err != nil {
+	if err := validateRefusals(gf); err != nil {
 		return nil, err
 	}
 	if len(gf.Allow) > 0 {
@@ -90,6 +90,7 @@ func Build(cfg Config) (*cli.Command, error) {
 	if err := mountWithheld(root, gf); err != nil {
 		return nil, err
 	}
+	mountNeverRules(root, gf)
 	capture := cfg.RunCapture
 	if capture == nil {
 		capture = realCapture
@@ -344,6 +345,9 @@ func refused(err error, hint string) error {
 // checkCallPolicy runs every refusal a call must survive, in order: the gates,
 // the wrap-level host guards, the grant's own argv guards, flag policy, sealed.
 func checkCallPolicy(ctx context.Context, gf *Guardfile, g Grant, gates []gateFunc, args []string, host HostResolver) error {
+	if err := checkNeverRules(gf, g, args); err != nil {
+		return err
+	}
 	for _, gate := range gates {
 		if err := gate(args); err != nil {
 			return refused(err, "this call is refused by a Guardfile gate")

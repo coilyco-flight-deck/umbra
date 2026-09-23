@@ -19,8 +19,8 @@ corpus ask-tier {
     call "git commit -m corpus" class=granted expect=accept
 
     call "git gc" class=never expect=unaudited
-    call "git reflog expire" class=never expect=accept note="umbra#8120: a covering can-run parent lets it through"
-    call "git reflog expire --all" class=never expect=accept note="umbra#8120: a covering can-run parent lets it through"
+    call "git reflog expire" class=never expect=unaudited
+    call "git reflog expire --all" class=never expect=unaudited
     call "git stash drop" class=never expect=unaudited
 
     call "git push" class=withheld expect=unaudited

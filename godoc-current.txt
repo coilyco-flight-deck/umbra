@@ -246,6 +246,9 @@ type Guardfile struct {
 	// tell policy from an unimplemented feature. See docs/execverb.md.
 	Withheld []WithheldStub
 
+	// NeverRules are `never run` paths, refused ahead of every grant.
+	NeverRules []NeverRule
+
 	// DefaultAllow inverts the default: an unnamed verb is forwarded to the
 	// wrapped binary rather than refused. See docs/execverb-default-allow.md.
 	DefaultAllow DefaultAllow
@@ -281,6 +284,15 @@ type HostResolver func(ctx context.Context, cmd []string) (string, error)
     HostResolver resolves a `shell <cmd>` selector: it execs cmd and returns
     the trimmed stdout. Injected for tests; nil execs for real. An error fails
     closed.
+
+type NeverRule struct {
+	Subcommand []string
+}
+    NeverRule is one `never run <subcommand...>` line: a path refused ahead of
+    every grant, including a grant that covers it. See docs/execverb.md.
+
+func (r NeverRule) Label() string
+    Label renders the refused path for help and error text.
 
 type Runner func(ctx context.Context, bin string, argv, env []string) error
     Runner fires the resolved command; env is the `NAME=VALUE` overrides to

@@ -45,6 +45,9 @@ type Guardfile struct {
 	// tell policy from an unimplemented feature. See docs/execverb.md.
 	Withheld []WithheldStub
 
+	// NeverRules are `never run` paths, refused ahead of every grant.
+	NeverRules []NeverRule
+
 	// DefaultAllow inverts the default: an unnamed verb is forwarded to the
 	// wrapped binary rather than refused. See docs/execverb-default-allow.md.
 	DefaultAllow DefaultAllow
@@ -423,13 +426,20 @@ func (gf *Guardfile) appendWrapWhen(n *kdl.Node) error {
 }
 
 // applyNever routes a `never`/`cannot` node: `never pass ...` enforces a
-// wrap-level guard, `never run ...` is a doc-only grant that mounts nothing.
+// wrap-level guard, `never run ...` a refused path (never.go).
 func (gf *Guardfile) applyNever(n *kdl.Node) error {
 	if firstArg(n) == "pass" {
 		return gf.appendPassClause(n, true)
 	}
-	_, err := parseGrant(n)
-	return err
+	g, err := parseGrant(n)
+	if err != nil {
+		return err
+	}
+	if g.Wildcard {
+		return fmt.Errorf("execverb: `%s run *` refuses nothing a missing grant does not; name the path (fail-closed)", n.Name())
+	}
+	gf.NeverRules = append(gf.NeverRules, NeverRule{Subcommand: g.Subcommand})
+	return nil
 }
 
 // parsePassthrough reads `passthrough <bin> [prefix...]`: sets Bin + ArgvPrefix
