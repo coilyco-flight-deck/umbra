@@ -1,0 +1,18 @@
+description "A git that reads, and commits only through the hooks."
+
+wrap demo git {
+    exec git
+    replace
+
+    can run status
+    can run log
+    can run diff
+    can run commit {
+        deny-flag "--no-verify"
+    }
+
+    withhold push {
+        reason "nothing in this demo reaches a remote"
+        alternative "status"
+    }
+}

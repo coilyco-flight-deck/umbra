@@ -9,7 +9,7 @@ code, enforced across two surfaces: `cli/` around subprocess exec, `http/` aroun
 ## Start here
 - [Getting started](getting-started.md) - install it, then watch a refusal.
 - [Features](FEATURES.md) - the inventory of what ships today.
-- [Examples](https://forgejo.coilysiren.me/coilyco-flight-deck/umbra/src/branch/main/examples) - one runnable app per primitive.
+- [Demos](demos.md) - one verified, recorded demo per guardfile.
 
 ## Concepts
 - [Architecture](architecture.md) - the two guarded surfaces and the shared core.

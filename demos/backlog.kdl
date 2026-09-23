@@ -1,0 +1,12 @@
+target git-read-only tool=git
+target git-no-force-push tool=git
+target gh-read-only tool=gh
+target kubectl-no-delete tool=kubectl
+target docker-no-privileged tool=docker
+target aws-read-only tool=aws
+target terraform-plan-not-apply tool=terraform
+target npm-no-publish tool=npm
+target cargo-no-publish tool=cargo
+target helm-template-only tool=helm
+target brew-no-uninstall tool=brew
+target uv-no-publish tool=uv

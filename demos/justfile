@@ -1,0 +1,35 @@
+# Demo verbs. A slug argument takes one slug or --all, e.g. `just verify git-read-only`.
+
+mint := "go run ./mint"
+
+# List the verbs.
+default:
+    @just --list
+
+# Print the first backlog target with no demo yet.
+next:
+    @{{mint}} next
+
+# Scaffold demos/<slug>/ from its backlog target.
+new slug:
+    @{{mint}} new {{slug}}
+
+# Run every step in a clean fixture and check exit, output, and frame fit.
+verify +slugs:
+    @{{mint}} verify {{slugs}}
+
+# Verify, then record the clip with the pinned vhs.
+render +slugs:
+    @{{mint}} render {{slugs}}
+
+# Convert a rendered clip to gif, for markdown.
+gif +slugs:
+    @{{mint}} gif {{slugs}}
+
+# Write .render/index.html, the review page.
+sheet:
+    @{{mint}} sheet
+
+# List every target with its state.
+status:
+    @{{mint}} status
