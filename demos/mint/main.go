@@ -19,6 +19,7 @@ const usage = `usage: mint <verb> [slug...]
   gif <slug...>    convert a rendered clip to gif, for markdown
   sheet            write .render/index.html, the review page
   status           list every target with its state
+  corpus <slug...> regenerate corpora/<slug>/corpus.jsonl; --check compares instead of writing
 
   --all in place of slugs means every minted demo.`
 
@@ -70,6 +71,8 @@ func run(args []string) error {
 		return err
 	case "status":
 		return status(root)
+	case "corpus":
+		return corpus(root, rest)
 	}
 	return fmt.Errorf("unknown verb %q\n%s", verb, usage)
 }

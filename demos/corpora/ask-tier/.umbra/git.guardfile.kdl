@@ -1,0 +1,27 @@
+description "The ask-tier corpus policy: one git, with a call on every side of each decision boundary."
+
+wrap corpus git {
+    exec git
+    replace
+
+    can run status
+    can run diff
+    can run log {
+        deny-when any-arg matches "*secret*"
+    }
+    can run commit {
+        deny-flag "--no-verify"
+        deny-flag "--amend"
+    }
+    can run reflog
+    can run "stash list"
+
+    never run gc
+    never run "reflog expire"
+    never run "stash drop"
+
+    withhold push {
+        reason "nothing in the corpus reaches a remote"
+        alternative "status"
+    }
+}

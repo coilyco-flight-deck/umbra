@@ -39,7 +39,7 @@ func (d *Demo) Guardfile(format string) string {
 
 // SetupAction prepares the fixture directory the steps run in.
 type SetupAction struct {
-	Kind string // git-init, file, guardfile
+	Kind string // git-init, git-commit, file, guardfile
 	Path string
 	Body string
 }
@@ -105,6 +105,11 @@ func (d *Demo) apply(n *kdl.Node) error {
 			a := SetupAction{Kind: c.Name()}
 			switch a.Kind {
 			case "git-init":
+			case "git-commit":
+				if len(c.Arguments()) != 1 {
+					return fmt.Errorf("`git-commit` takes a message")
+				}
+				a.Body = c.Arg(0).String()
 			case "file":
 				if len(c.Arguments()) != 2 {
 					return fmt.Errorf("`file` takes a path and a body")
@@ -116,7 +121,7 @@ func (d *Demo) apply(n *kdl.Node) error {
 				}
 				a.Path = c.Arg(0).String()
 			default:
-				return fmt.Errorf("unknown setup action %q (git-init, file, guardfile)", a.Kind)
+				return fmt.Errorf("unknown setup action %q (git-init, git-commit, file, guardfile)", a.Kind)
 			}
 			d.Setup = append(d.Setup, a)
 		}

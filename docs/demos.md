@@ -92,3 +92,7 @@ stays out of render because encoding both formats doubled every render's cost.
 A rerun renames the previous workspace aside before deleting it. Back-to-back runs
 intermittently lost a `RemoveAll` race inside the previous run's `HOME`, and a rename
 cannot.
+
+## Corpora
+
+The same harness also generates labelled call corpora for measurement. See [corpora](corpora.md).

@@ -135,33 +135,7 @@ func verify(demosRoot string, d *Demo) (*Result, workspace, error) {
 // runFormat installs the demo's policy in one format and runs every step
 // against it, in that format's own fixture.
 func (w workspace) runFormat(demosRoot, bin string, d *Demo, format string) ([]StepResult, error) {
-	for _, k := range []string{"build/.umbra", "shims", "fixture", "home"} {
-		if err := os.MkdirAll(w.dir(k, format), 0o755); err != nil {
-			return nil, err
-		}
-	}
-	src, err := os.ReadFile(d.Guardfile(format))
-	if err != nil {
-		return nil, err
-	}
-	// Only this format's file, or discovery would see three members for one tool.
-	if err := os.WriteFile(filepath.Join(w.dir("build/.umbra", format), filepath.Base(d.Guardfile(format))), src, 0o644); err != nil {
-		return nil, err
-	}
-	for _, args := range [][]string{{"lock", "--umbra-replace", filepath.Dir(demosRoot)}, {"install", "--shim-dir", w.dir("shims", format)}} {
-		cmd := exec.Command(bin, args...)
-		cmd.Dir = w.dir("build", format)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("%s (%s): umbra %s: %w\n%s", d.Slug, format, args[0], err, out)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(w.dir("shims", format), d.Tool)); err != nil {
-		return nil, fmt.Errorf("%s (%s): umbra installed no %q shim; does the guardfile wrap `exec %s` with `replace`?", d.Slug, format, d.Tool, d.Tool)
-	}
-	if err := w.setup(d, format); err != nil {
-		return nil, err
-	}
-	if err := w.writeEnv(format); err != nil {
+	if err := w.prepare(demosRoot, bin, d, format); err != nil {
 		return nil, err
 	}
 	var out []StepResult
@@ -170,6 +144,37 @@ func (w workspace) runFormat(demosRoot, bin string, d *Demo, format string) ([]S
 		out = append(out, StepResult{Cmd: s.Cmd, Exit: code, Output: o})
 	}
 	return out, nil
+}
+
+// prepare locks and installs the policy in one format, then builds its fixture.
+func (w workspace) prepare(demosRoot, bin string, d *Demo, format string) error {
+	for _, k := range []string{"build/.umbra", "shims", "fixture", "home"} {
+		if err := os.MkdirAll(w.dir(k, format), 0o755); err != nil {
+			return err
+		}
+	}
+	src, err := os.ReadFile(d.Guardfile(format))
+	if err != nil {
+		return err
+	}
+	// Only this format's file, or discovery would see three members for one tool.
+	if err := os.WriteFile(filepath.Join(w.dir("build/.umbra", format), filepath.Base(d.Guardfile(format))), src, 0o644); err != nil {
+		return err
+	}
+	for _, args := range [][]string{{"lock", "--umbra-replace", filepath.Dir(demosRoot)}, {"install", "--shim-dir", w.dir("shims", format)}} {
+		cmd := exec.Command(bin, args...)
+		cmd.Dir = w.dir("build", format)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("%s (%s): umbra %s: %w\n%s", d.Slug, format, args[0], err, out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(w.dir("shims", format), d.Tool)); err != nil {
+		return fmt.Errorf("%s (%s): umbra installed no %q shim; does the guardfile wrap `exec %s` with `replace`?", d.Slug, format, d.Tool, d.Tool)
+	}
+	if err := w.setup(d, format); err != nil {
+		return err
+	}
+	return w.writeEnv(format)
 }
 
 // check holds the filmed format's transcript to the manifest and the frame.
@@ -210,6 +215,18 @@ func (w workspace) setup(d *Demo, format string) error {
 			cmd := exec.Command("git", "init", "-q", "-b", "main", ".")
 			cmd.Dir = fixture
 			err = cmd.Run()
+		case "git-commit":
+			// Fixed identity and dates, so the commit id is the same on every run.
+			env := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+				"GIT_AUTHOR_NAME=demo", "GIT_AUTHOR_EMAIL=demo@example.invalid", "GIT_AUTHOR_DATE=2026-01-01T00:00:00Z",
+				"GIT_COMMITTER_NAME=demo", "GIT_COMMITTER_EMAIL=demo@example.invalid", "GIT_COMMITTER_DATE=2026-01-01T00:00:00Z")
+			for _, args := range [][]string{{"add", "-A"}, {"commit", "-q", "-m", a.Body}} {
+				cmd := exec.Command("git", args...)
+				cmd.Dir, cmd.Env = fixture, env
+				if err = cmd.Run(); err != nil {
+					break
+				}
+			}
 		case "file":
 			p := filepath.Join(fixture, a.Path)
 			if err = os.MkdirAll(filepath.Dir(p), 0o755); err == nil {

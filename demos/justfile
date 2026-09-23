@@ -33,3 +33,11 @@ sheet:
 # List every target with its state.
 status:
     @{{mint}} status
+
+# Regenerate corpora/<slug>/corpus.jsonl from its committed call set and guardfile.
+corpus +slugs:
+    @{{mint}} corpus {{slugs}}
+
+# Regenerate and fail unless the committed corpus.jsonl matches byte for byte.
+corpus-check +slugs:
+    @{{mint}} corpus --check {{slugs}}
