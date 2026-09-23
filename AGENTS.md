@@ -22,16 +22,16 @@ Every package here must be importable from a different binary without consumer-s
 
 ## Commands
 
-Run the dev verbs through `make`, not bare go. umbra is deliberately unguarded: it is the framework, not a consumer of it, so it routes every dev verb through the Makefile.
+Run the dev verbs through `just`, not bare go. umbra is deliberately unguarded: it is the framework, not a consumer of it, so it routes every dev verb through the justfile.
 
-- `make build` - compile every package.
-- `make test` - run the unit test suite.
-- `make lint` - golangci-lint v2.12.2 with the urfave-mirrored `.golangci.yaml`.
-- `make vet` - `go vet ./...`.
-- `make tidy` - `go mod tidy`.
-- `make cover` - tests with a coverage profile.
+- `just build` - compile every package.
+- `just test` - run the unit test suite.
+- `just lint` - golangci-lint v2.12.2 with the urfave-mirrored `.golangci.yaml`.
+- `just vet` - `go vet ./...`.
+- `just tidy` - `go mod tidy`.
+- `just cover` - tests with a coverage profile.
 
-umbra declares no dev verbs: its Makefile is the dev surface, [`.ward/ward.yaml`](.ward/ward.yaml) the catalog.
+umbra declares no dev verbs: its justfile is the dev surface, [`.ward/ward.yaml`](.ward/ward.yaml) the catalog.
 
 ## Validation
 

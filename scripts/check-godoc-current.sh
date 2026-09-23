@@ -34,7 +34,7 @@ case "${1:-}" in
       echo
       echo "godoc-current.txt is out of date." >&2
       echo "Regenerate with: ./scripts/check-godoc-current.sh --update" >&2
-      echo "Or: make godoc-update" >&2
+      echo "Or: just godoc-update" >&2
       exit 1
     fi
     ;;

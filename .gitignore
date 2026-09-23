@@ -12,7 +12,7 @@
 /bin/
 /dist/
 
-# generated CLI reference (make docs-cli)
+# generated CLI reference (just docs-cli)
 /site/
 
 # Editor / OS

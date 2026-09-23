@@ -75,8 +75,8 @@ v0.x. Minor API breaks land on `main` with a note in the commit body and no
 deprecation cycle, so pin a commit in your `go.mod` until v1.0.0. The API locks
 once a second consumer lands. Forgejo is canonical and the GitHub mirror is
 verified. umbra is deliberately unguarded, being the framework rather than a
-consumer of one, so its dev verbs run through the [`Makefile`](Makefile):
-`make build test lint vet`, and `make docs-cli` for the generated CLI reference.
+consumer of one, so its dev verbs run through the [`justfile`](justfile):
+`just build`, `just test`, `just lint`, `just vet`, and `just docs-cli` for the generated CLI reference.
 
 ## See also
 
