@@ -26,7 +26,7 @@ func tape(d *Demo, w workspace) string {
 	b.WriteString("Set TypingSpeed 45ms\nSet Framerate 30\nSet Theme \"Catppuccin Mocha\"\nSet Padding 30\n")
 	// Off-camera lines type at 1ms: at the on-camera speed the env line alone
 	// cost 23 seconds a render.
-	fmt.Fprintf(&b, "Hide\nType@1ms %q\nEnter\nType@1ms \"clear\"\nEnter\nWait+Line /\\$\\s*$/\nShow\nSleep 500ms\n", "source "+w.envFile())
+	fmt.Fprintf(&b, "Hide\nType@1ms %q\nEnter\nType@1ms \"clear\"\nEnter\nWait+Line /\\$\\s*$/\nShow\nSleep 500ms\n", "source "+w.envFile(d.Formats[0]))
 	for _, s := range d.Steps {
 		// Wait on the prompt rather than sleeping: a sleep too short types the
 		// next command into the previous one's output.

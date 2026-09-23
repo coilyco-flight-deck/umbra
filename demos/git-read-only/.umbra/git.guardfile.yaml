@@ -1,0 +1,20 @@
+description: A git that reads, and commits only through the hooks.
+wrap:
+  command: [demo, git]
+  kdl: |
+    exec git
+    replace
+    withhold push {
+        reason "nothing in this demo reaches a remote"
+        alternative "status"
+    }
+  can:
+    - verb: run
+      resource: status
+    - verb: run
+      resource: log
+    - verb: run
+      resource: diff
+    - verb: run
+      resource: commit
+      kdl: 'deny-flag "--no-verify"'

@@ -144,8 +144,9 @@ Four verbs, one stated refusal, and no sign of the other hundred and thirty-five
 
 ## 5. Find out what it refuses
 
-Each of these is a different kind of no, and the exit code is how a caller tells
-them apart without reading English.
+Each of these is a different kind of no. Every refusal exits 2, so a caller tells
+a refusal from a tool failure without reading English, and the message says which
+kind of refusal it was.
 
 ```sh
 git status --short
@@ -163,7 +164,7 @@ git commit --no-verify -m x
 git: flag "--no-verify" is denied for `commit`
 ```
 
-Exit 5. The verb is granted and the flag is not.
+Exit 2. The verb is granted and the flag is not, so policy refused it.
 
 ```sh
 git push

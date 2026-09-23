@@ -167,13 +167,21 @@ func scaffold(root, slug string) error {
 	if err := os.MkdirAll(filepath.Join(dir, ".umbra"), 0o755); err != nil {
 		return err
 	}
-	manifest := fmt.Sprintf("demo %s {\n    tool %s\n    state minted\n    frame cols=80 rows=16\n    setup {\n    }\n    step \"%s --help\" exit=0 shows=\"occluded by umbra\"\n}\n", slug, t.Tool, t.Tool)
-	guard := fmt.Sprintf("wrap demo %s {\n    exec %s\n    replace\n\n    can run version\n}\n", t.Tool, t.Tool)
+	manifest := fmt.Sprintf("demo %s {\n    tool %s\n    state minted\n    formats kdl yaml toml\n    frame cols=80 rows=16\n    setup {\n    }\n    step \"%s --help\" exit=0 shows=\"occluded by umbra\"\n}\n", slug, t.Tool, t.Tool)
 	if err := os.WriteFile(filepath.Join(dir, "demo.kdl"), []byte(manifest), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".umbra", t.Tool+".guardfile.kdl"), []byte(guard), 0o644); err != nil {
-		return err
+	// The exec grammar has no YAML or TOML schema yet, so exec and replace ride
+	// the `kdl` escape inside wrap. See docs/guardfile-formats.md.
+	guards := map[string]string{
+		"kdl":  fmt.Sprintf("wrap demo %s {\n    exec %s\n    replace\n\n    can run version\n}\n", t.Tool, t.Tool),
+		"yaml": fmt.Sprintf("wrap:\n  command: [demo, %s]\n  kdl: |\n    exec %s\n    replace\n  can:\n    - verb: run\n      resource: version\n", t.Tool, t.Tool),
+		"toml": fmt.Sprintf("[wrap]\ncommand = [\"demo\", %q]\nkdl = \"\"\"\nexec %s\nreplace\n\"\"\"\n\n[[wrap.can]]\nverb = \"run\"\nresource = \"version\"\n", t.Tool, t.Tool),
+	}
+	for _, f := range allFormats {
+		if err := os.WriteFile(filepath.Join(dir, ".umbra", t.Tool+".guardfile."+f), []byte(guards[f]), 0o644); err != nil {
+			return err
+		}
 	}
 	fmt.Println(dir)
 	return nil

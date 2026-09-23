@@ -14,17 +14,27 @@ import (
 // it is the only transition the harness never makes on its own.
 var states = []string{"minted", "approved", "bounced", "published"}
 
+// allFormats are the guardfile syntaxes umbra reads. A demo ships its policy
+// in each one, and verify proves they refuse identically.
+var allFormats = []string{"kdl", "yaml", "toml"}
+
 // Demo is one parsed demo.kdl. Every field is structured on purpose: the only
 // strings a manifest carries are commands, file bodies and expected substrings.
 type Demo struct {
-	Slug  string
-	Dir   string
-	Tool  string
-	State string
-	Cols  int
-	Rows  int
-	Setup []SetupAction
-	Steps []Step
+	Slug    string
+	Dir     string
+	Tool    string
+	State   string
+	Cols    int
+	Rows    int
+	Formats []string // the first is the one filmed
+	Setup   []SetupAction
+	Steps   []Step
+}
+
+// Guardfile is the demo's policy in one format.
+func (d *Demo) Guardfile(format string) string {
+	return filepath.Join(d.Dir, ".umbra", d.Tool+".guardfile."+format)
 }
 
 // SetupAction prepares the fixture directory the steps run in.
@@ -60,7 +70,7 @@ func loadDemo(dir string) (*Demo, error) {
 	if root == nil || len(root.Arguments()) != 1 {
 		return nil, fmt.Errorf("%s: needs exactly one top-level `demo <slug>` node", dir)
 	}
-	d := &Demo{Slug: root.Arg(0).String(), Dir: dir, Cols: 80, Rows: 16}
+	d := &Demo{Slug: root.Arg(0).String(), Dir: dir, Cols: 80, Rows: 16, Formats: allFormats}
 	if d.Slug != filepath.Base(dir) {
 		return nil, fmt.Errorf("%s: demo slug %q must match its directory", dir, d.Slug)
 	}
@@ -78,6 +88,11 @@ func (d *Demo) apply(n *kdl.Node) error {
 		d.Tool = n.Arg(0).String()
 	case "state":
 		d.State = n.Arg(0).String()
+	case "formats":
+		d.Formats = nil
+		for _, a := range n.Arguments() {
+			d.Formats = append(d.Formats, a.String())
+		}
 	case "frame":
 		if v := n.Prop("cols"); v.IsValid() {
 			d.Cols = v.Int()
@@ -111,7 +126,7 @@ func (d *Demo) apply(n *kdl.Node) error {
 		}
 		d.Steps = append(d.Steps, Step{Cmd: n.Arg(0).String(), Exit: n.Prop("exit").Int(), Shows: n.Prop("shows").String()})
 	default:
-		return fmt.Errorf("unknown node %q (tool, state, frame, setup, step)", n.Name())
+		return fmt.Errorf("unknown node %q (tool, state, formats, frame, setup, step)", n.Name())
 	}
 	return nil
 }
@@ -122,6 +137,17 @@ func (d *Demo) validate() error {
 	}
 	if !contains(states, d.State) {
 		return fmt.Errorf("%s: state %q is not one of %s", d.Slug, d.State, strings.Join(states, ", "))
+	}
+	if len(d.Formats) == 0 {
+		return fmt.Errorf("%s: `formats` names at least one of %s", d.Slug, strings.Join(allFormats, ", "))
+	}
+	for _, f := range d.Formats {
+		if !contains(allFormats, f) {
+			return fmt.Errorf("%s: format %q is not one of %s", d.Slug, f, strings.Join(allFormats, ", "))
+		}
+		if _, err := os.Stat(d.Guardfile(f)); err != nil {
+			return fmt.Errorf("%s: format %s has no guardfile at .umbra/%s", d.Slug, f, filepath.Base(d.Guardfile(f)))
+		}
 	}
 	if len(d.Steps) == 0 {
 		return fmt.Errorf("%s: a demo needs at least one step", d.Slug)

@@ -1,6 +1,7 @@
 demo git-read-only {
     tool git
     state minted
+    formats kdl yaml toml
     frame cols=80 rows=14
     setup {
         git-init
@@ -8,6 +9,6 @@ demo git-read-only {
     }
     step "git status --short" exit=0 shows="notes.txt"
     step "git push" exit=2 shows="is withheld"
-    step "git commit --no-verify -m wip" exit=5 shows="is denied"
+    step "git commit --no-verify -m wip" exit=2 shows="is denied"
     step "git fetch" exit=2 shows="is not granted"
 }

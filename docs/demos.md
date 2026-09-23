@@ -12,7 +12,7 @@ guardfile's `reason` strings, never from prose written for the clip.
 
 * `backlog.kdl` - `target <slug> tool=<binary>`, one line per demo that should exist.
 * `<slug>/demo.kdl` - the manifest.
-* `<slug>/.umbra/<tool>.guardfile.kdl` - the policy under demonstration.
+* `<slug>/.umbra/<tool>.guardfile.{kdl,yaml,toml}` - the policy, once per format.
 * `.render/` - ignored. The workspace, `result.json`, the clip, and the review sheet.
 
 ## The manifest
@@ -21,6 +21,7 @@ guardfile's `reason` strings, never from prose written for the clip.
 demo git-read-only {
     tool git
     state minted
+    formats kdl yaml toml
     frame cols=80 rows=14
     setup {
         git-init
@@ -32,6 +33,8 @@ demo git-read-only {
 
 * `state` - `minted`, `approved`, `bounced`, or `published`. Only a human moves it
   past `minted`.
+* `formats` - the [guardfile formats](guardfile-formats.md) the policy ships in, all
+  three by default. The first is the one filmed.
 * `frame` - the terminal in columns and rows. Verify fails any output that would
   wrap or scroll off.
 * `setup` - `git-init`, `file <path> <body>`, and `guardfile <path>`, which copies
@@ -44,9 +47,27 @@ Run these from `demos/`.
 
 1. `just next` prints the first queued slug, and `just new <slug>` scaffolds it.
 2. Write the guardfile and the steps. Read [replacement](../guides/replacement.md) first.
-3. `just verify <slug>` until it passes. It takes about 25 seconds.
-4. `just render <slug>` records the clip in about 75 seconds. Open `last.png` and look.
+3. `just verify <slug>` until it passes. Three formats take about 80 seconds.
+4. `just render <slug>` verifies, then records the clip. Open `last.png` and look.
 5. `just sheet` writes `.render/index.html`, the page a reviewer approves from.
+
+## One policy, three formats
+
+Verify installs the policy once per format and runs every step against each. It fails
+unless the three transcripts match byte for byte, so a clip filmed in KDL stands for
+the YAML and TOML twins too. The review sheet has a kdl, yaml and toml switch, and
+the `f` key cycles it, flipping every card's guardfile at once.
+
+The exec grammar has no YAML or TOML schema yet, so `exec`, `replace`, `withhold` and
+`deny-flag` ride the `kdl` escape inside `wrap`. A top-level `withhold` list is
+dropped without an error for an exec wrap, and verify catches the divergence if a
+demo writes one.
+
+## Which umbra
+
+Verify builds umbra from the checkout `demos/` sits in and locks against it with
+`--umbra-replace`, so a demo tests the umbra beside it rather than an installed
+release. An exit code that changes on `main` fails the demo that pinned the old one.
 
 ## What a step can reach
 
