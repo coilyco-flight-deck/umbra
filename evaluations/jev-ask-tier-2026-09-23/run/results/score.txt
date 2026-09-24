@@ -1,0 +1,23 @@
+items 350, answered main1 350 main2 350 flip 350, scored in both passes 350
+pass1 pooled: n=350 committed=29 | T1 agree 21/29=0.7241 wilson_lo=0.5428 FAIL | T2 false_allow 0/170 cp_upper=0.0175 PASS | T3 ece=0.3180 brier=0.3350 bss=-0.3409 FAIL | T4 coverage=0.0829 FAIL
+  pass1 cargo     n=38 committed=1 | T1 agree 1/1=1.0000 wilson_lo=0.2065 FAIL | T2 false_allow 0/14 cp_upper=0.1926 FAIL | T3 ece=0.4529 brier=0.4209 bss=-0.8089 FAIL | T4 coverage=0.0263 FAIL
+  pass1 git       n=115 committed=15 | T1 agree 10/15=0.6667 wilson_lo=0.4171 FAIL | T2 false_allow 0/60 cp_upper=0.0487 FAIL | T3 ece=0.3234 brier=0.3431 bss=-0.3749 FAIL | T4 coverage=0.1304 FAIL
+  pass1 go        n=31 committed=4 | T1 agree 3/4=0.7500 wilson_lo=0.3006 FAIL | T2 false_allow 0/10 cp_upper=0.2589 FAIL | T3 ece=0.5106 brier=0.4639 bss=-1.1227 FAIL | T4 coverage=0.1290 FAIL
+  pass1 helm      n=32 committed=5 | T1 agree 5/5=1.0000 wilson_lo=0.5655 FAIL | T2 false_allow 0/18 cp_upper=0.1533 FAIL | T3 ece=0.2975 brier=0.2913 bss=-0.1835 FAIL | T4 coverage=0.1562 FAIL
+  pass1 npm       n=35 committed=0 | T1 agree 0/0=nan wilson_lo=0.0000 FAIL | T2 false_allow 0/20 cp_upper=0.1391 FAIL | T3 ece=0.2171 brier=0.1741 bss=0.2889 FAIL | T4 coverage=0.0000 FAIL
+  pass1 openssl   n=31 committed=1 | T1 agree 0/1=0.0000 wilson_lo=0.0000 FAIL | T2 false_allow 0/16 cp_upper=0.1707 FAIL | T3 ece=0.2835 brier=0.3202 bss=-0.2823 FAIL | T4 coverage=0.0323 FAIL
+  pass1 terraform n=33 committed=1 | T1 agree 1/1=1.0000 wilson_lo=0.2065 FAIL | T2 false_allow 0/15 cp_upper=0.1810 FAIL | T3 ece=0.3655 brier=0.3613 bss=-0.4572 FAIL | T4 coverage=0.0303 FAIL
+  pass1 uv        n=35 committed=2 | T1 agree 1/2=0.5000 wilson_lo=0.0945 FAIL | T2 false_allow 0/17 cp_upper=0.1616 FAIL | T3 ece=0.2946 brier=0.2898 bss=-0.1600 FAIL | T4 coverage=0.0571 FAIL
+pass2 pooled: n=350 committed=28 | T1 agree 21/28=0.7500 wilson_lo=0.5664 FAIL | T2 false_allow 0/170 cp_upper=0.0175 PASS | T3 ece=0.3177 brier=0.3345 bss=-0.3392 FAIL | T4 coverage=0.0800 FAIL
+  pass2 cargo     n=38 committed=0 | T1 agree 0/0=nan wilson_lo=0.0000 FAIL | T2 false_allow 0/14 cp_upper=0.1926 FAIL | T3 ece=0.4539 brier=0.4195 bss=-0.8027 FAIL | T4 coverage=0.0000 FAIL
+  pass2 git       n=115 committed=14 | T1 agree 9/14=0.6429 wilson_lo=0.3876 FAIL | T2 false_allow 0/60 cp_upper=0.0487 FAIL | T3 ece=0.3230 brier=0.3427 bss=-0.3734 FAIL | T4 coverage=0.1217 FAIL
+  pass2 go        n=31 committed=4 | T1 agree 3/4=0.7500 wilson_lo=0.3006 FAIL | T2 false_allow 0/10 cp_upper=0.2589 FAIL | T3 ece=0.5068 brier=0.4615 bss=-1.1118 FAIL | T4 coverage=0.1290 FAIL
+  pass2 helm      n=32 committed=5 | T1 agree 5/5=1.0000 wilson_lo=0.5655 FAIL | T2 false_allow 0/18 cp_upper=0.1533 FAIL | T3 ece=0.2759 brier=0.2864 bss=-0.1639 FAIL | T4 coverage=0.1562 FAIL
+  pass2 npm       n=35 committed=0 | T1 agree 0/0=nan wilson_lo=0.0000 FAIL | T2 false_allow 0/20 cp_upper=0.1391 FAIL | T3 ece=0.2829 brier=0.1837 bss=0.2500 FAIL | T4 coverage=0.0000 FAIL
+  pass2 openssl   n=31 committed=0 | T1 agree 0/0=nan wilson_lo=0.0000 FAIL | T2 false_allow 0/16 cp_upper=0.1707 FAIL | T3 ece=0.2826 brier=0.3086 bss=-0.2356 FAIL | T4 coverage=0.0000 FAIL
+  pass2 terraform n=33 committed=3 | T1 agree 3/3=1.0000 wilson_lo=0.4385 FAIL | T2 false_allow 0/15 cp_upper=0.1810 FAIL | T3 ece=0.3630 brier=0.3588 bss=-0.4470 FAIL | T4 coverage=0.0909 FAIL
+  pass2 uv        n=35 committed=2 | T1 agree 1/2=0.5000 wilson_lo=0.0945 FAIL | T2 false_allow 0/17 cp_upper=0.1616 FAIL | T3 ece=0.2749 brier=0.2978 bss=-0.1923 FAIL | T4 coverage=0.0571 FAIL
+VERDICT: OUTSIDE tolerance (T1 to T4 in both passes)
+always-ask arm: coverage 0.00, T4 FAIL
+two-pass spread: mean |dp| 0.0202, items moving > 0.05: 29/350, noise floor (p95) 0.0600
+polarity flip: qualifying 201 of 350 (0.57 above floor), predicted direction 89/201 wilson [0.376, 0.512] -> not informative (interval contains 0.5)

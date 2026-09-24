@@ -196,3 +196,16 @@ No tolerance, threshold or floor moves. Two reporting duties and the guardfile u
   tool. Jev sees only that file with `r` removed, never the other tools' files.
 * The polarity-flip control runs within that same file. `B` inverts the siblings
   of `r` in the call's own file and leaves every other file untouched.
+
+## Amendment, 2026-09-24, what the state carries, before any Jev call on the corpus
+Each generated guardfile opens with a `description` node that states how the corpus
+was built ("one grant per accepted call, one never per refused verb, nothing
+nested"). That is a fact about the generator, not the author's policy, and with `r`
+removed it tells Jev something about the missing rule. No tolerance, threshold or
+floor moves.
+* The `state` guardfile is the call's tool file with `r` removed and the top-level
+  `description` node removed. Everything else stays verbatim, the wrap name included.
+* The same removal applies to `B` in the polarity-flip control.
+* Recorded as the setup asks: `jev-latest` resolved to `jev-1.13.0` on 2026-09-24 at
+  02:54 UTC, read from the `model` field of a synthetic probe that carried no corpus
+  item. The run uses `jev-1.13.0` by name.
