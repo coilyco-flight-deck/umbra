@@ -1,0 +1,11 @@
+matcher disagreements with the engine's recorded rule: 0
+accept: eligible 180  dropped 0  floor 150  MEETS
+reject: eligible 170  dropped 0  floor 150  MEETS
+  cargo: accept 24 reject 14 dropped 0
+  git: accept 55 reject 60 dropped 0
+  go: accept 21 reject 10 dropped 0
+  helm: accept 14 reject 18 dropped 0
+  npm: accept 15 reject 20 dropped 0
+  openssl: accept 15 reject 16 dropped 0
+  terraform: accept 18 reject 15 dropped 0
+  uv: accept 18 reject 17 dropped 0
