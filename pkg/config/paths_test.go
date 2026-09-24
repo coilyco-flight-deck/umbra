@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -58,4 +59,16 @@ func TestRepoAuditSlug_FallbackOutsideGit(t *testing.T) {
 		t.Errorf("RepoAuditSlug() = %q outside a git repo, want %q", got, config.UnrootedAuditName)
 	}
 	config.ResetRepoSlugCacheForTest()
+}
+
+// A git replacement points GitBinary past itself; the lookup must go through it.
+func TestRepoAuditSlugRunsTheResolvedGit(t *testing.T) {
+	prev := config.GitBinary
+	t.Cleanup(func() { config.GitBinary = prev; config.ResetRepoSlugCacheForTest() })
+	called := false
+	config.GitBinary = func() (string, []string, error) { called = true; return "", nil, errors.New("no git here") }
+	config.ResetRepoSlugCacheForTest()
+	if got := config.RepoAuditSlug(); got != config.UnrootedAuditName || !called {
+		t.Fatalf("slug = %q, resolver called = %v; want the unrooted name via config.GitBinary", got, called)
+	}
 }

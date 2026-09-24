@@ -152,6 +152,10 @@ func occludeCapture(capture CaptureRunner) CaptureRunner {
 	}
 }
 
+// Occluded is occlude for a caller outside the runner, such as the audit
+// writer's git lookup: the real bin and the env entries to run it under.
+func Occluded(bin string) (string, []string, error) { return occlude(bin, nil) }
+
 // occlude resolves the real binary and the environment to run it under, shared
 // by the streamed and captured paths.
 func occlude(bin string, env []string) (string, []string, error) {

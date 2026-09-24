@@ -42,6 +42,10 @@ func NegativeControls(ctx context.Context, gf *Guardfile) ([]negcontrol.Control,
     NegativeControls invokes every `never run` and `withhold` in gf, spawning
     nothing, then again with each removed. See docs/negative-controls.md.
 
+func Occluded(bin string) (string, []string, error)
+    Occluded is occlude for a caller outside the runner, such as the audit
+    writer's git lookup: the real bin and the env entries to run it under.
+
 func RefuseRootFlag(gf *Guardfile, err error) error
     RefuseRootFlag answers a flag the root does not define. A replacement
     registers none of its own, and `--version` is the flag that finds this
@@ -2620,6 +2624,17 @@ const FallbackAppDir = ".umbra"
 const UnrootedAuditName = "_unrooted"
     UnrootedAuditName is the slug used when the consumer is invoked outside any
     git repo (or inside one with no origin remote). All such invocations land in
+
+
+VARIABLES
+
+var GitBinary = func() (string, []string, error) {
+	path, err := exec.LookPath("git")
+	return path, nil, err
+}
+    GitBinary resolves the git the slug lookup runs, plus env entries for it.
+    A generated git replacement skips itself, or the lookup audits itself in a
+    loop.
 
 
 FUNCTIONS

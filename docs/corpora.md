@@ -29,6 +29,8 @@ Every row names what produced it, because audit rows carry no version (umbra#798
 uncommitted build and a HEAD that lacks the `requires` commit. Only umbra's refusal
 text is kept as `output`, since the wrapped tool's own output varies by its version.
 
-Uncovered, `never run` and withheld refusals wrote no audit row until umbra#8121, so
-the committed ask-tier corpus carries `audit: null` on those rows and the refusal text
-is the evidence. A regenerated corpus attaches the reject row each one now writes.
+Every accept and reject row declares `rule=`, the one guardfile line meant to decide
+it: `can run`, `never run`, `withhold`, `deny-flag`, `deny-when`, or `uncovered` for
+the default refusal. The run fails when the audit verb or refusal text names another
+line, so a consumer dropping one rule at a time can trust the pairing. Since umbra#8121
+every refusal writes its reject row, so only umbra's own help carries `audit: null`.

@@ -101,12 +101,26 @@ func SanitizeSlug(s string) string {
 	return s
 }
 
+// GitBinary resolves the git the slug lookup runs, plus env entries for it. A
+// generated git replacement skips itself, or the lookup audits itself in a loop.
+var GitBinary = func() (string, []string, error) {
+	path, err := exec.LookPath("git")
+	return path, nil, err
+}
+
 // gitOriginURL shells out to `git remote get-url origin`. A 2-second timeout
 // keeps a hung git from blocking every invocation. Returns the empty
 func gitOriginURL() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+	git, env, err := GitBinary()
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.CommandContext(ctx, git, "remote", "get-url", "origin")
+	if env != nil {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.Stderr = nil
 	out, err := cmd.Output()
 	if err != nil {

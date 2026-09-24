@@ -1,7 +1,7 @@
 corpus ask-tier {
     tool git
-    // umbra#7329: the fix that audits a guardfile refusal as reject.
-    requires "a7f6c44b1fee1bb1642d28fa827025c19f8845c4"
+    // umbra#8121: every refusal, stated or uncovered, writes its reject row.
+    requires "0a9d50d6319491624129f506597db7c5ef31cc82"
     setup {
         git-init
         file "notes.txt" "draft\n"
@@ -9,41 +9,42 @@ corpus ask-tier {
         file "notes.txt" "draft\nedited\n"
     }
 
-    call "git status" class=granted expect=accept
-    call "git status --short" class=granted expect=accept
-    call "git diff" class=granted expect=accept
-    call "git diff --stat" class=granted expect=accept
-    call "git log --oneline" class=granted expect=accept
-    call "git reflog show" class=granted expect=accept
-    call "git stash list" class=granted expect=accept
-    call "git commit -m corpus" class=granted expect=accept
+    call "git status" class=granted expect=accept rule="can run status"
+    call "git status --short" class=granted expect=accept rule="can run status"
+    call "git diff" class=granted expect=accept rule="can run diff"
+    call "git diff --stat" class=granted expect=accept rule="can run diff"
+    call "git log --oneline" class=granted expect=accept rule="can run log"
+    call "git reflog show" class=granted expect=accept rule="can run reflog"
+    call "git stash list" class=granted expect=accept rule="can run stash list"
+    call "git commit -m corpus" class=granted expect=accept rule="can run commit"
 
-    call "git gc" class=never expect=unaudited
-    call "git reflog expire" class=never expect=unaudited
-    call "git reflog expire --all" class=never expect=unaudited
-    call "git stash drop" class=never expect=unaudited
+    // umbra#8121: a refusal before any grant writes its reject row.
+    call "git gc" class=never expect=reject rule="never run gc"
+    call "git reflog expire" class=never expect=reject rule="never run reflog expire" note="umbra#8120 shape: a never under the granted reflog"
+    call "git reflog expire --all" class=never expect=reject rule="never run reflog expire" note="umbra#8120 shape: a never under the granted reflog"
+    call "git stash drop" class=never expect=reject rule="never run stash drop"
 
-    call "git push" class=withheld expect=unaudited
-    call "git push origin main" class=withheld expect=unaudited
+    call "git push" class=withheld expect=reject rule="withhold push"
+    call "git push origin main" class=withheld expect=reject rule="withhold push"
 
-    call "git fetch" class=uncovered expect=unaudited
-    call "git stash pop" class=uncovered expect=unaudited
-    call "git rebase main" class=uncovered expect=unaudited
-    call "git branch" class=uncovered expect=unaudited
-    call "git tag v1" class=uncovered expect=unaudited
-    call "git remote -v" class=uncovered expect=unaudited
+    call "git fetch" class=uncovered expect=reject rule="uncovered"
+    call "git stash pop" class=uncovered expect=reject rule="uncovered"
+    call "git rebase main" class=uncovered expect=reject rule="uncovered"
+    call "git branch" class=uncovered expect=reject rule="uncovered"
+    call "git tag v1" class=uncovered expect=reject rule="uncovered"
+    call "git remote -v" class=uncovered expect=reject rule="uncovered"
 
-    call "git Status" class=near-miss expect=unaudited
+    call "git Status" class=near-miss expect=reject rule="uncovered"
     call "git stash" class=near-miss expect=help note="bare parent of the two-word grant stash list"
-    call "git stash show" class=near-miss expect=unaudited
-    call "git status --porcelain=v2" class=near-miss expect=accept
-    call "git commit --no-verify -m wip" class=near-miss expect=reject
-    call "git commit --amend -m wip" class=near-miss expect=reject
-    call "git commit -n -m wip" class=near-miss expect=accept
-    call "git log -- secret.txt" class=near-miss expect=reject
-    call "git log secret-branch" class=near-miss expect=reject
-    call "git log --all" class=near-miss expect=accept
-    call "git log --grep=secret" class=near-miss expect=accept
-    call "git reflog show expire" class=near-miss expect=accept
-    call "git diff --output=out.txt" class=near-miss expect=accept
+    call "git stash show" class=near-miss expect=reject rule="uncovered"
+    call "git status --porcelain=v2" class=near-miss expect=accept rule="can run status"
+    call "git commit --no-verify -m wip" class=near-miss expect=reject rule="deny-flag --no-verify"
+    call "git commit --amend -m wip" class=near-miss expect=reject rule="deny-flag --amend"
+    call "git commit -n -m wip" class=near-miss expect=accept rule="can run commit"
+    call "git log -- secret.txt" class=near-miss expect=reject rule="deny-when *secret*"
+    call "git log secret-branch" class=near-miss expect=reject rule="deny-when *secret*"
+    call "git log --all" class=near-miss expect=accept rule="can run log"
+    call "git log --grep=secret" class=near-miss expect=accept rule="can run log"
+    call "git reflog show expire" class=near-miss expect=accept rule="can run reflog"
+    call "git diff --output=out.txt" class=near-miss expect=accept rule="can run diff"
 }

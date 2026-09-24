@@ -46,6 +46,7 @@ type Call struct {
 	Cmd    string
 	Class  string
 	Expect string
+	Rule   string
 	Note   string
 }
 
@@ -57,6 +58,7 @@ type Row struct {
 	Argv         []string  `json:"argv"`
 	Class        string    `json:"class"`
 	Expect       string    `json:"expect"`
+	Rule         string    `json:"rule,omitempty"`
 	Note         string    `json:"note,omitempty"`
 	Build        string    `json:"build"`
 	Generator    string    `json:"generator"`
@@ -114,6 +116,9 @@ func loadCorpus(dir string) (*Corpus, error) {
 			if v := n.Prop("note"); v.IsValid() {
 				call.Note = v.String()
 			}
+			if v := n.Prop("rule"); v.IsValid() {
+				call.Rule = v.String()
+			}
 			c.Calls = append(c.Calls, call)
 		default:
 			return nil, fmt.Errorf("%s: unknown node %q (tool, requires, setup, call)", dir, n.Name())
@@ -142,6 +147,14 @@ func (c *Corpus) validate() error {
 			return fmt.Errorf("%s: %q uses shell syntax; a call is plain space-separated words", c.Slug, call.Cmd)
 		case seen[call.Cmd]:
 			return fmt.Errorf("%s: %q appears twice", c.Slug, call.Cmd)
+		case (call.Expect == "accept" || call.Expect == "reject") && call.Rule == "":
+			// The label consumer drops one rule at a time and needs each row's own.
+			return fmt.Errorf("%s: %q expects %s and names no rule=", c.Slug, call.Cmd, call.Expect)
+		}
+		if call.Rule != "" {
+			if _, _, err := parseRule(call.Rule); err != nil {
+				return fmt.Errorf("%s: %q: %w", c.Slug, call.Cmd, err)
+			}
 		}
 		seen[call.Cmd] = true
 	}
@@ -210,7 +223,7 @@ func generate(demosRoot string, c *Corpus) ([]byte, error) {
 		}
 		row := Row{
 			Corpus: c.Slug, N: i + 1, Call: call.Cmd, Argv: strings.Fields(call.Cmd),
-			Class: call.Class, Expect: call.Expect, Note: call.Note,
+			Class: call.Class, Expect: call.Expect, Rule: call.Rule, Note: call.Note,
 			Build: build, Generator: gen, Requires: c.Requires,
 			Guardfile: filepath.Base(gfPath), GuardfileSHA: hex.EncodeToString(sum[:]),
 			Exit: code,
@@ -227,6 +240,8 @@ func generate(demosRoot string, c *Corpus) ([]byte, error) {
 		}
 		if got := observed(row); got != call.Expect {
 			failures = append(failures, fmt.Sprintf("%q is labelled expect=%s but was %s (exit %d)", call.Cmd, call.Expect, got, code))
+		} else if err := ruleDecided(row); err != nil {
+			failures = append(failures, fmt.Sprintf("%q: %v", call.Cmd, err))
 		}
 		b, err := json.Marshal(row)
 		if err != nil {
@@ -250,6 +265,54 @@ func observed(r Row) string {
 	default:
 		return r.Audit.Decision
 	}
+}
+
+// parseRule splits a declared rule into its kind and the word it names, e.g.
+// `never run reflog expire` into ("never run", "reflog expire").
+func parseRule(rule string) (kind, arg string, err error) {
+	if rule == "uncovered" {
+		return rule, "", nil
+	}
+	for _, k := range []string{"can run", "never run", "withhold", "deny-flag", "deny-when"} {
+		if rest, ok := strings.CutPrefix(rule, k+" "); ok && rest != "" {
+			return k, rest, nil
+		}
+	}
+	return "", "", fmt.Errorf("rule %q is not `uncovered` or one of can run, never run, withhold, deny-flag, deny-when", rule)
+}
+
+// ruleDecided checks the declared rule against what the call observably did, so
+// a row cannot carry a rule some other line of the guardfile decided.
+func ruleDecided(r Row) error {
+	kind, arg, _ := parseRule(r.Rule)
+	var want string
+	switch kind {
+	case "":
+		return nil
+	case "can run":
+		if r.Audit != nil && strings.HasSuffix(r.Audit.Verb, "."+strings.ReplaceAll(arg, " ", ".")) {
+			return nil
+		}
+		return fmt.Errorf("rule %q, but the audit row names %v", r.Rule, r.Audit)
+	case "uncovered":
+		// A root flag is refused before any verb resolves, with its own text.
+		if strings.Contains(r.Output, "flag provided but not defined") {
+			return nil
+		}
+		want = "is not granted"
+	case "never run":
+		want = "`" + arg + "` is never allowed"
+	case "withhold":
+		want = "`" + arg + "` is withheld"
+	case "deny-flag":
+		want = fmt.Sprintf("flag %q is denied", arg)
+	case "deny-when":
+		want = fmt.Sprintf("matched %q", arg)
+	}
+	if !strings.Contains(r.Output, want) {
+		return fmt.Errorf("rule %q, but the refusal does not say %q", r.Rule, want)
+	}
+	return nil
 }
 
 // treeID hashes the committed trees of paths at HEAD, refusing uncommitted
