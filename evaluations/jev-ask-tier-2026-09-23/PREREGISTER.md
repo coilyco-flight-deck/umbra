@@ -175,3 +175,24 @@ Git history holds its timestamps. PR #152 opened at 19:10:36 UTC and merged at
 at `0db8051`. Moved here unchanged apart from this section, because an evaluation
 lives in the repository that consumes its result, and this one gates
 `teable:coilyco-flight-deck/umbra#7978`. housecast grades, it does not host.
+
+## Amendment, 2026-09-24, corpus spans several tools, before any corpus or tally
+Git alone yields about 55 to 60 distinct verb-level grants that exit 0, short of
+the 150 accept floor (`teable:coilyco-flight-deck/umbra#8024`). The corpus grows
+by adding tools at pinned versions, not by positional-argument grants, which would
+put near-duplicate siblings beside every `r`. Jev `jev-1.13.0` picked this on a
+choice call (`more_tools` 0.93, confidence 0.89), with state written by this seat.
+No tolerance, threshold or floor moves. Two reporting duties and the guardfile unit are added.
+* T1 to T4 are reported per wrap as well as pooled. The verdict is the pooled
+  result, as written above. A wrap whose own agreement falls outside T1 is named
+  beside the verdict, so a tool Jev reads easily cannot carry the number unseen.
+* Reject items are ungranted `never run` rules over each tool's real verbs. A rule
+  over a verb the tool does not have is not a rule an author writes, and it is
+  dropped and counted.
+* One fixed guardfile per tool, fixed as a set. umbra reads only the first
+  `wrap` node of a guardfile, so each tool is its own file with one wrap, all
+  committed together in one `.umbra` directory, each with its own sha256 on every
+  row. Wherever this file says the fixed guardfile, read the file for the call's
+  tool. Jev sees only that file with `r` removed, never the other tools' files.
+* The polarity-flip control runs within that same file. `B` inverts the siblings
+  of `r` in the call's own file and leaves every other file untouched.
