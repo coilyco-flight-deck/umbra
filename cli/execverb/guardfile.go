@@ -224,6 +224,10 @@ func Parse(src []byte) (*Guardfile, error) {
 	if wrap == nil {
 		return nil, fmt.Errorf("execverb: missing top-level `wrap` node")
 	}
+	// GetNode returns the first, so a second wrap would drop silently (umbra#8163).
+	if n := countWrap(doc); n > 1 {
+		return nil, fmt.Errorf("execverb: %d top-level `wrap` nodes; a guardfile holds one, so split the rest into their own files (fail-closed)", n)
+	}
 	gf := &Guardfile{}
 	if err := gf.applyDescription(doc); err != nil {
 		return nil, err
@@ -923,4 +927,15 @@ func (g Grant) subcommandLabel() string {
 		return "*"
 	}
 	return strings.Join(g.Subcommand, " ")
+}
+
+// countWrap counts top-level `wrap` nodes. One guardfile is one wrap.
+func countWrap(doc *kdl.Document) int {
+	n := 0
+	for _, node := range doc.Nodes {
+		if node.Name() == "wrap" {
+			n++
+		}
+	}
+	return n
 }
