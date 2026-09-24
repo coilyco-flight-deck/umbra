@@ -64,7 +64,7 @@ func mountNeverRules(root *cli.Command, gf *Guardfile, wrap func(verb.Spec) cli.
 			Usage:           "NOT AVAILABLE - never allowed by policy.",
 			SkipFlagParsing: true,
 			// Through the grant pipeline, so the refusal writes its reject row (umbra#8121).
-			Action: wrap(verb.Spec{Name: refusalVerb(gf, rule.Subcommand), SkipPolicy: true,
+			Action: wrap(verb.Spec{Name: auditVerb(gf, rule.Subcommand), SkipPolicy: true,
 				Action: func(context.Context, *cli.Command) error { return rule.refusal() }}),
 		})
 	}
@@ -108,7 +108,7 @@ func validateRefusals(gf *Guardfile) error {
 	return validateNeverRules(gf)
 }
 
-// refusalVerb names a refusal's audit row the way a grant's is named.
-func refusalVerb(gf *Guardfile, sub []string) string {
+// auditVerb names an audit row the way a grant's is named.
+func auditVerb(gf *Guardfile, sub []string) string {
 	return strings.Join(gf.Group, ".") + "." + strings.Join(sub, ".")
 }

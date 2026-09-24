@@ -130,7 +130,7 @@ func mountWithheld(root *cli.Command, gf *Guardfile, wrap func(verb.Spec) cli.Ac
 			Name:            leafName,
 			Usage:           withheldUsage(w),
 			SkipFlagParsing: true,
-			Action: wrap(verb.Spec{Name: refusalVerb(gf, w.Subcommand), SkipPolicy: true,
+			Action: wrap(verb.Spec{Name: auditVerb(gf, w.Subcommand), SkipPolicy: true,
 				Action: withheldAction(w)}),
 		})
 	}

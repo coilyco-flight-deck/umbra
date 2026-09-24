@@ -28,7 +28,7 @@ It is the only node here that a `can run` grant does not already have an equival
 
 **A named grant is still a tightening.** `can run api { allow-flag ... }` under default-allow means `api` is reachable **and** constrained, where an unnamed sibling is reachable and unconstrained. Naming a verb is how you take something away here, not how you add it.
 
-**The audit still records every granted call.** A forwarded call is not a granted one, so it carries no grant name.
+**The audit records forwarded calls too.** A forwarded call is not a granted one, so it carries no grant name. Its row names the tool and the first word it was asked for, such as `gh.repo`, and reads `accept` when it ran or `reject` when a wrap-level guard refused it (umbra#8162).
 
 ## Refused shapes
 

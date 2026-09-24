@@ -198,3 +198,47 @@ func TestReplacementUnmatchedRefusalsWriteARejectRow(t *testing.T) {
 		}
 	}
 }
+
+// umbra#8162: a call forwarded under default-allow writes its own row, accept
+// when it runs, reject when a wrap-level guard refuses it.
+func TestForwardedCallsWriteAnAuditRow(t *testing.T) {
+	gf, err := Parse([]byte(`wrap gh {
+		exec gh
+		replace
+		default-allow { reason "test fixture" }
+		never pass delete
+		withhold pr merge { reason "fixture" }
+	}`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	w := &audit.Writer{Path: filepath.Join(t.TempDir(), "audit.jsonl")}
+	t.Cleanup(func() { _ = w.Close() })
+	var cp capture
+	fb, err := NewFallback(Config{Guardfile: gf, Run: cp.run,
+		Wrap: func(s verb.Spec) cli.ActionFunc { return verb.Wrap(s, w) }})
+	if err != nil {
+		t.Fatalf("NewFallback: %v", err)
+	}
+	ctx := context.Background()
+	if err := fb.forwardAudited(ctx, nil, []string{"repo", "view"}); err != nil {
+		t.Fatalf("forwarded call refused: %v", err)
+	}
+	if cp.bin == "" {
+		t.Fatal("forwarded call never reached the runner")
+	}
+	if err := fb.forwardAudited(ctx, nil, []string{"repo", "delete"}); exitcode.From(err) == nil {
+		t.Fatalf("guarded forward = %v, want a coded refusal", err)
+	}
+	data, _ := os.ReadFile(w.Path)
+	records, _ := audit.ReadAll(bytes.NewReader(data))
+	if len(records) != 2 {
+		t.Fatalf("audit rows = %d, want one per forwarded call", len(records))
+	}
+	if r := records[0]; r.Decision != audit.DecisionAccept || r.Verb != "gh.repo" {
+		t.Errorf("row 0 = %+v, want accept for gh.repo", r)
+	}
+	if r := records[1]; r.Decision != audit.DecisionReject || r.Verb != "gh.repo" {
+		t.Errorf("row 1 = %+v, want reject for gh.repo", r)
+	}
+}

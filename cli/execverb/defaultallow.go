@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
@@ -129,13 +130,13 @@ func InstallFallback(root *cli.Command, gf *Guardfile, fb *Fallback) {
 // installForward is InstallFallback's open half with argv (read at call time)
 // and the exit injected, so negative controls observe the binary's own path.
 func installForward(root *cli.Command, fb *Fallback, argv func() []string, exit func(error)) {
-	handler := func(ctx context.Context, _ *cli.Command, _ string) {
-		exit(fb.Forward(ctx, argv()))
+	handler := func(ctx context.Context, cmd *cli.Command, _ string) {
+		exit(fb.forwardAudited(ctx, cmd, argv()))
 	}
 	// A group parses its own flags before it ever reaches CommandNotFound, so a
 	// partially-named group would kill an unnamed sibling's flag on the way in.
-	usage := func(ctx context.Context, _ *cli.Command, _ error, _ bool) error {
-		return fb.Forward(ctx, argv())
+	usage := func(ctx context.Context, cmd *cli.Command, _ error, _ bool) error {
+		return fb.forwardAudited(ctx, cmd, argv())
 	}
 	var walk func(cmds []*cli.Command)
 	walk = func(cmds []*cli.Command) {
@@ -155,7 +156,7 @@ func RootFlagFallback(ctx context.Context, gf *Guardfile, fb *Fallback, err erro
 	if !fb.Open() {
 		return fb.refuse(ctx, nil, "(root flag)", RefuseRootFlag(gf, err))
 	}
-	return fb.Forward(ctx, os.Args[1:])
+	return fb.forwardAudited(ctx, nil, os.Args[1:])
 }
 
 // label names this guardfile in an error: the occluded tool when it replaces
@@ -173,6 +174,27 @@ func (f *Fallback) refuse(ctx context.Context, cmd *cli.Command, name string, er
 	if f == nil || f.wrap == nil {
 		return err
 	}
-	return f.wrap(verb.Spec{Name: refusalVerb(f.gf, []string{name}), SkipPolicy: true,
+	return f.wrap(verb.Spec{Name: auditVerb(f.gf, []string{name}), SkipPolicy: true,
 		Action: func(context.Context, *cli.Command) error { return err }})(ctx, cmd)
+}
+
+// forwardAudited is Forward through the grant pipeline, so a forwarded call
+// writes its accept or reject row like a granted leaf (umbra#8162).
+func (f *Fallback) forwardAudited(ctx context.Context, cmd *cli.Command, argv []string) error {
+	if f.wrap == nil {
+		return f.Forward(ctx, argv)
+	}
+	return f.wrap(verb.Spec{Name: auditVerb(f.gf, []string{forwardedVerb(argv)}), SkipPolicy: true,
+		Action: func(ctx context.Context, _ *cli.Command) error { return f.Forward(ctx, argv) }})(ctx, cmd)
+}
+
+// forwardedVerb names a forwarded call by its first positional word, the
+// subcommand the unnamed surface was asked for.
+func forwardedVerb(argv []string) string {
+	for _, a := range argv {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return "(root)"
 }
