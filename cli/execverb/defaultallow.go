@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/valuesource"
 	kdl "github.com/calico32/kdl-go"
@@ -58,6 +59,7 @@ type Fallback struct {
 	// which keeps the closed default the shape a caller gets by doing nothing.
 	open      bool
 	gf        *Guardfile
+	wrap      func(verb.Spec) cli.ActionFunc
 	run       Runner
 	host      HostResolver
 	providers map[string]valuesource.Provider
@@ -73,16 +75,16 @@ func NewFallback(cfg Config) (*Fallback, error) {
 	if gf == nil {
 		return nil, fmt.Errorf("execverb: Config.Guardfile is nil")
 	}
+	wrap, run, host := cfg.defaults()
 	if !gf.DefaultAllow.Declared {
-		return &Fallback{gf: gf}, nil
+		return &Fallback{gf: gf, wrap: wrap}, nil
 	}
-	_, run, host := cfg.defaults()
 	if gf.Replace {
 		// A replacement wins PATH under the tool's own name, so a bare name
 		// handed to exec resolves back to this process. See realbin.go.
 		run = occludeRunner(run)
 	}
-	return &Fallback{open: true, gf: gf, run: run, host: host, providers: valuesource.Merge(cfg.Providers)}, nil
+	return &Fallback{open: true, gf: gf, wrap: wrap, run: run, host: host, providers: valuesource.Merge(cfg.Providers)}, nil
 }
 
 // Forward runs argv against the real binary. argv is the caller's, minus the
@@ -109,7 +111,11 @@ func (f *Fallback) Forward(ctx context.Context, argv []string) error {
 // default-allow, refused otherwise. Every group, not just the root.
 func InstallFallback(root *cli.Command, gf *Guardfile, fb *Fallback) {
 	if !fb.Open() {
-		InstallRefusal(root, gf)
+		installUnmatched(root, func(ctx context.Context, cmd *cli.Command, name string) {
+			err := fb.refuse(ctx, cmd, name, RefuseUngranted(gf, name))
+			fmt.Fprintf(os.Stderr, "%s: %v\n", gf.Occlude, err)
+			os.Exit(exitcode.Of(err))
+		})
 		return
 	}
 	installForward(root, fb, func() []string { return os.Args[1:] }, func(err error) {
@@ -147,7 +153,7 @@ func installForward(root *cli.Command, fb *Fallback, argv func() []string, exit 
 // default-allow, since a pre-verb flag is part of the unnamed surface.
 func RootFlagFallback(ctx context.Context, gf *Guardfile, fb *Fallback, err error) error {
 	if !fb.Open() {
-		return RefuseRootFlag(gf, err)
+		return fb.refuse(ctx, nil, "(root flag)", RefuseRootFlag(gf, err))
 	}
 	return fb.Forward(ctx, os.Args[1:])
 }
@@ -159,4 +165,14 @@ func (gf *Guardfile) label() string {
 		return gf.Occlude
 	}
 	return gf.Bin
+}
+
+// refuse returns err through the grant pipeline, so a refusal that reached no
+// mounted leaf still writes its reject row (umbra#8121).
+func (f *Fallback) refuse(ctx context.Context, cmd *cli.Command, name string, err error) error {
+	if f == nil || f.wrap == nil {
+		return err
+	}
+	return f.wrap(verb.Spec{Name: refusalVerb(f.gf, []string{name}), SkipPolicy: true,
+		Action: func(context.Context, *cli.Command) error { return err }})(ctx, cmd)
 }

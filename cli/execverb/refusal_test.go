@@ -100,19 +100,30 @@ func TestAGrantedCallStillAuditsAsAccept(t *testing.T) {
 	}
 }
 
-// A withheld verb is refused as policy but mounts without verb.Wrap, so it
-// writes no audit row. That is by design and a refusal auditor should know it.
-func TestAWithheldVerbRefusesAsPolicyAndWritesNoRow(t *testing.T) {
-	records, cp, err := runAudited(t, withholdGuardfile, "repo", "delete")
-	coded := exitcode.From(err)
-	if coded == nil || coded.Code() != exitcode.PolicyDenied {
-		t.Fatalf("withheld refusal = %v, want policy_denied", err)
+// umbra#8121: a withhold or never leaf refuses before any binary, and still
+// writes its reject row under its own verb name.
+func TestStatedRefusalsWriteARejectRow(t *testing.T) {
+	cases := []struct {
+		name, src, verb string
+		argv            []string
+	}{
+		{"withhold", withholdGuardfile, "ward.repo.delete", []string{"repo", "delete"}},
+		{"never run", gitGuardfile, "ward.git.reflog.expire", []string{"git", "reflog", "expire"}},
 	}
-	if cp.bin != "" {
-		t.Errorf("withheld verb reached a binary: %s %v", cp.bin, cp.argv)
-	}
-	if len(records) != 0 {
-		t.Errorf("audit rows = %d, want 0 for a withheld verb", len(records))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			records, cp, err := runAudited(t, tc.src, tc.argv...)
+			if coded := exitcode.From(err); coded == nil || coded.Code() != exitcode.PolicyDenied {
+				t.Fatalf("refusal = %v, want policy_denied", err)
+			}
+			if cp.bin != "" {
+				t.Errorf("refused call reached a binary: %s %v", cp.bin, cp.argv)
+			}
+			if len(records) != 1 || records[0].Decision != audit.DecisionReject ||
+				records[0].ExitCode != exitcode.PolicyDenied || records[0].Verb != tc.verb {
+				t.Errorf("records = %+v, want one reject row for %s", records, tc.verb)
+			}
+		})
 	}
 }
 
@@ -151,5 +162,39 @@ func TestActionStepRefusalsArePolicyDenied(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// umbra#8121: a closed replacement refuses an ungranted verb or root flag
+// before any leaf, and the fallback's wrap still writes the reject row.
+func TestReplacementUnmatchedRefusalsWriteARejectRow(t *testing.T) {
+	gf, err := Parse([]byte(`wrap gh { exec gh; replace; can run status }`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	w := &audit.Writer{Path: filepath.Join(t.TempDir(), "audit.jsonl")}
+	t.Cleanup(func() { _ = w.Close() })
+	fb, err := NewFallback(Config{Guardfile: gf, Wrap: func(s verb.Spec) cli.ActionFunc { return verb.Wrap(s, w) }})
+	if err != nil {
+		t.Fatalf("NewFallback: %v", err)
+	}
+	ctx := context.Background()
+	for _, e := range []error{
+		fb.refuse(ctx, nil, "repo", RefuseUngranted(gf, "repo")),
+		RootFlagFallback(ctx, gf, fb, errors.New("flag provided but not defined: -x")),
+	} {
+		if c := exitcode.From(e); c == nil || c.Code() != exitcode.PolicyDenied {
+			t.Fatalf("refusal = %v, want policy_denied", e)
+		}
+	}
+	data, _ := os.ReadFile(w.Path)
+	records, _ := audit.ReadAll(bytes.NewReader(data))
+	if len(records) != 2 {
+		t.Fatalf("audit rows = %d, want one per refusal", len(records))
+	}
+	for i, want := range []string{"gh.repo", "gh.(root flag)"} {
+		if r := records[i]; r.Decision != audit.DecisionReject || r.Verb != want {
+			t.Errorf("row %d = %+v, want a reject row for %s", i, r, want)
+		}
 	}
 }

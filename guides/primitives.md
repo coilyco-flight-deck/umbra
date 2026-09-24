@@ -65,12 +65,12 @@ rows from different binaries comparable.
 
 The refused row differs from the granted one in three fields: `decision` is
 `reject`, `exit_code` is 2, and `error` says why. Nothing else changes shape, so
-a reader parsing these does not need two schemas. `decision` is derived from the
-exit code, and it reads `reject` exactly when the code is 2. A refusal by the
-guardfile, whether a gate, a guard, flag policy, a pin or a seal, exits 2, so
-filtering on `reject` finds all of them. A withheld verb is refused the same way
-but writes no row, because it reaches no binary. Read the rows you get yourself
-for the full set.
+a reader parsing these does not need two schemas. A refusal by the guardfile,
+whether a gate, a guard, flag policy, a pin, a seal, a `never run` or a
+`withhold`, exits 2 and writes a `reject` row, so filtering on `reject` finds all
+of them. An unknown verb writes a `reject` row too, with `exit_code` 5, because a
+misspelt verb and a denied one are deliberately not told apart. Read the rows you
+get yourself for the full set.
 
 ## The gate
 

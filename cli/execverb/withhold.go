@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 	kdl "github.com/calico32/kdl-go"
 	"github.com/urfave/cli/v3"
@@ -115,7 +116,7 @@ func validateWithheld(gf *Guardfile) error {
 
 // mountWithheld mounts each stub as a real leaf that refuses every call. It
 // spawns nothing and holds no credential: it converts silence into a statement.
-func mountWithheld(root *cli.Command, gf *Guardfile) error {
+func mountWithheld(root *cli.Command, gf *Guardfile, wrap func(verb.Spec) cli.ActionFunc) error {
 	for _, w := range gf.Withheld {
 		parent := root
 		for _, seg := range w.Subcommand[:len(w.Subcommand)-1] {
@@ -129,7 +130,8 @@ func mountWithheld(root *cli.Command, gf *Guardfile) error {
 			Name:            leafName,
 			Usage:           withheldUsage(w),
 			SkipFlagParsing: true,
-			Action:          withheldAction(w),
+			Action: wrap(verb.Spec{Name: refusalVerb(gf, w.Subcommand), SkipPolicy: true,
+				Action: withheldAction(w)}),
 		})
 	}
 	return nil

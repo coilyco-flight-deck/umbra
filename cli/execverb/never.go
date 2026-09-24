@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/cli/verb"
 	"forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/exitcode"
 	"github.com/urfave/cli/v3"
 )
@@ -51,7 +52,7 @@ func validateNeverRules(gf *Guardfile) error {
 
 // mountNeverRules mounts each rule as a leaf that refuses every call, so the refusal
 // names the rule rather than reading as an ungranted verb.
-func mountNeverRules(root *cli.Command, gf *Guardfile) {
+func mountNeverRules(root *cli.Command, gf *Guardfile, wrap func(verb.Spec) cli.ActionFunc) {
 	for _, r := range gf.NeverRules {
 		parent := root
 		for _, seg := range r.Subcommand[:len(r.Subcommand)-1] {
@@ -62,7 +63,9 @@ func mountNeverRules(root *cli.Command, gf *Guardfile) {
 			Name:            r.Subcommand[len(r.Subcommand)-1],
 			Usage:           "NOT AVAILABLE - never allowed by policy.",
 			SkipFlagParsing: true,
-			Action:          func(context.Context, *cli.Command) error { return rule.refusal() },
+			// Through the grant pipeline, so the refusal writes its reject row (umbra#8121).
+			Action: wrap(verb.Spec{Name: refusalVerb(gf, rule.Subcommand), SkipPolicy: true,
+				Action: func(context.Context, *cli.Command) error { return rule.refusal() }}),
 		})
 	}
 }
@@ -103,4 +106,9 @@ func validateRefusals(gf *Guardfile) error {
 		return err
 	}
 	return validateNeverRules(gf)
+}
+
+// refusalVerb names a refusal's audit row the way a grant's is named.
+func refusalVerb(gf *Guardfile, sub []string) string {
+	return strings.Join(gf.Group, ".") + "." + strings.Join(sub, ".")
 }

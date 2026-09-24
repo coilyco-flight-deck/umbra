@@ -370,6 +370,10 @@ standard pipeline of:
 
 FUNCTIONS
 
+func LogReject(writer *audit.Writer, verbName string, argv []string, err error)
+    LogReject appends a reject row for a refusal that reached no mounted verb,
+    such as an unknown one. A nil writer writes nothing.
+
 func Wrap(spec Spec, writer *audit.Writer) cli.ActionFunc
     Wrap returns a cli.ActionFunc that runs the full verb pipeline.
 

@@ -87,10 +87,10 @@ func Build(cfg Config) (*cli.Command, error) {
 	if done, out, err := mountGrants(root, gf, wrap, run, host, providers); done || err != nil {
 		return out, err
 	}
-	if err := mountWithheld(root, gf); err != nil {
+	if err := mountWithheld(root, gf, wrap); err != nil {
 		return nil, err
 	}
-	mountNeverRules(root, gf)
+	mountNeverRules(root, gf, wrap)
 	capture := cfg.RunCapture
 	if capture == nil {
 		capture = realCapture

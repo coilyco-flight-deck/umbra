@@ -188,6 +188,12 @@ func writeDenyRecord(writer *audit.Writer, base audit.Record, pd *audit.ProfileD
 	}
 }
 
+// LogReject appends a reject row for a refusal that reached no mounted verb,
+// such as an unknown one. A nil writer writes nothing.
+func LogReject(writer *audit.Writer, verbName string, argv []string, err error) {
+	logReject(writer, verbName, argv, err)
+}
+
 func logReject(writer *audit.Writer, verbName string, argv []string, err error) {
 	if writer == nil {
 		return
