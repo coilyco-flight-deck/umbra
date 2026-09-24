@@ -38,6 +38,10 @@ func Mount(root *cli.Command, cfg Config) error
     Mount builds the guarded group and grafts it onto root, generating the
     intermediate path groups the Guardfile names, mirroring specverb.Mount.
 
+func NegativeControls(ctx context.Context, gf *Guardfile) ([]negcontrol.Control, error)
+    NegativeControls invokes every `never run` and `withhold` in gf, spawning
+    nothing, then again with each removed. See docs/negative-controls.md.
+
 func RefuseRootFlag(gf *Guardfile, err error) error
     RefuseRootFlag answers a flag the root does not define. A replacement
     registers none of its own, and `--version` is the flag that finds this
@@ -1685,6 +1689,11 @@ func Mount(root *cli.Command, cfg Config) error
     Mount builds the guarded group and grafts it onto root, generating the
     intermediate path groups the Guardfile names. See docs/specverb.md.
 
+func NegativeControls(ctx context.Context, gf *guardfile.Guardfile, spec []byte) ([]negcontrol.Control, error)
+    NegativeControls invokes every `never`/`cannot` grant in gf,
+    sending and resolving nothing, then again with each removed. See
+    docs/negative-controls.md.
+
 func Prune(spec []byte, gf *guardfile.Guardfile) ([]byte, error)
     Prune returns a minimal spec doc holding only the operations gf grants and
     their reachable schemas. Dispatches on version. See docs/umbra-cli.md.
@@ -1940,6 +1949,10 @@ const LockName = "specverb.lock"
 
 VARIABLES
 
+var ErrControlsFailed = errors.New("umbra: negative controls failed")
+    ErrControlsFailed is returned when a stated refusal does not hold.
+    The report names every such rule rather than stopping at the first.
+
 var ErrNoLock = errors.New("missing committed lock; run 'umbra lock' first")
     ErrNoLock is returned by run and skew when a required committed lock is
     absent, so the caller can point the user at `umbra lock`.
@@ -1989,11 +2002,26 @@ func Skew(opts Options) error
     Skew reports drift between each member's committed lock and live upstream,
     never writing. ErrSkew signals drift; a fetch failure is a plain error.
 
+func WriteControls(w io.Writer, results []ControlResult) error
+    WriteControls prints one line per rule, members with none included,
+    and returns ErrControlsFailed when any rule does not hold.
+
 func WriteFindings(w io.Writer, findings []Finding)
     WriteFindings renders a doctor report, `ok` leading each line that holds.
 
 
 TYPES
+
+type ControlResult struct {
+	Member   string
+	Controls []negcontrol.Control
+}
+    ControlResult is one member's controls, keyed by its path in the project.
+
+func Controls(ctx context.Context, opts Options) ([]ControlResult, error)
+    Controls runs the negative controls for every exec and spec member
+    of the project. MCP members carry no refusal rule to control. See
+    docs/negative-controls.md.
 
 type DepLock struct {
 	Version  int      `json:"version"`  // schema version
@@ -3138,6 +3166,56 @@ type Tool struct {
 }
     Tool is one upstream tool as umbra records it. It is umbra's own type rather
     than the SDK's so the lock format does not move when the SDK does.
+
+
+## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/negcontrol
+
+package negcontrol // import "forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/negcontrol"
+
+Package negcontrol is the shared result of a negative control, which the
+dialects produce and the umbra driver reports. See docs/negative-controls.md.
+
+FUNCTIONS
+
+func Run(ctx context.Context, root *cli.Command, argv []string) error
+    Run runs argv on root in-process with urfave's exit globals swapped out.
+    Not safe to call concurrently. See docs/negative-controls.md.
+
+func Summarize(cs []Control) (held int, failed []string)
+    Summarize counts passing controls and names every failure, so a run cannot
+    report a pass while omitting a rule it could not hold.
+
+
+TYPES
+
+type Control struct {
+	Kind        string // "never", "withhold", or "spec never"
+	Rule        string // the refused path, e.g. "config set"
+	Argv        []string
+	Refused     bool   // the shipped guardfile refused with this rule's own text
+	LoadBearing bool   // removing the rule changed the observed outcome
+	Observed    string // what the shipped guardfile did
+	Without     string // what it did with the rule removed
+}
+    Control is one rule's result.
+
+func Judge(kind, rule string, argv []string, got, without Outcome, want string, denied int) Control
+    Judge builds a Control from the two observed outcomes. want is the rule's
+    own refusal text: exit 2 alone would pass on a refusal that came from
+    elsewhere.
+
+func (c Control) Holds() bool
+    Holds reports whether the control passes: refused by its own text, and
+    removing it would let something different happen.
+
+type Outcome struct {
+	Spawned bool
+	Code    int
+	Text    string
+}
+    Outcome is what one invocation did, observed rather than read off the tree.
+
+func (o Outcome) String() string
 
 
 ## forgejo.coilysiren.me/coilyco-flight-deck/umbra/pkg/policy

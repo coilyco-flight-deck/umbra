@@ -143,7 +143,10 @@ func replacementNotFound(gf *Guardfile) func(context.Context, *cli.Command, stri
 // InstallRefusal sets the refusal on root and every group under it: urfave
 // resolves a subcommand against the group that owns it.
 func InstallRefusal(root *cli.Command, gf *Guardfile) {
-	handler := replacementNotFound(gf)
+	installUnmatched(root, replacementNotFound(gf))
+}
+
+func installUnmatched(root *cli.Command, handler func(context.Context, *cli.Command, string)) {
 	var walk func(cmds []*cli.Command)
 	walk = func(cmds []*cli.Command) {
 		for _, c := range cmds {

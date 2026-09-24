@@ -67,6 +67,7 @@ func app() *cli.Command {
 			openapiCmd(),
 			installCmd(),
 			doctorCmd(),
+			controlsCmd(),
 		},
 		// Root action keeps the legacy `--guardfile X --out Y` one-shot working:
 		// with --out set and no subcommand, behave as `gen --out Y`.
@@ -208,6 +209,25 @@ func doctorCmd() *cli.Command {
 			}
 			umbra.WriteFindings(c.Root().Writer, findings)
 			return nil
+		},
+	}
+}
+
+// controlsCmd invokes every never and withhold rule and fails when one does not
+// hold. See docs/negative-controls.md.
+func controlsCmd() *cli.Command {
+	return &cli.Command{
+		Name:  "controls",
+		Usage: "check that every never and withhold rule refuses, and that removing it changes the outcome (read-only)",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			results, err := umbra.Controls(ctx, umbra.Options{
+				GuardfilePath: resolveGuardfile(c),
+				ProjectRoot:   c.String("project-root"),
+			})
+			if err != nil {
+				return err
+			}
+			return umbra.WriteControls(c.Root().Writer, results)
 		},
 	}
 }

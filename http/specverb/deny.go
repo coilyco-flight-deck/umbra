@@ -77,9 +77,14 @@ func (rt *runtime) buildDenyLeaf(d denyDescriptor) *cli.Command {
 			Name:       d.VerbName,
 			SkipPolicy: true, // the deny is the policy; there is no argv to gate
 			Action: func(context.Context, *cli.Command) error {
-				return exitcode.New(exitcode.PolicyDenied, "policy_denied",
-					fmt.Errorf("%s", d.Message), "this operation is blocked by a guardrail and cannot be run")
+				return denyError(d.Message)
 			},
 		}),
 	}
+}
+
+// denyError is the refusal a deny leaf returns, shared with the negative controls.
+func denyError(message string) error {
+	return exitcode.New(exitcode.PolicyDenied, "policy_denied",
+		fmt.Errorf("%s", message), "this operation is blocked by a guardrail and cannot be run")
 }

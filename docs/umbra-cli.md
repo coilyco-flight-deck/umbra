@@ -26,6 +26,7 @@ An exec member skips every lock-bearing seam: no lock, no fetch or skew, no toke
 - **`build`** - materialize out-of-band and copy to `--out` (default `bin`) rather than exec it, following `go build -o`. `--set-version` stamps `--version` via `-ldflags`. Refuses without committed locks.
 - **`run`** - materialize out-of-band and exec with passed-through args. Every spec may carry a top-level [`description`](value-providers.md) node.
 - **`install`** / **`doctor`** - the replacement pair. `install` is `build` with the destination filename fixed by the guardfile rather than by a flag, since a replacement installed under any other name occludes nothing. `doctor` changes nothing and reports what the installation achieves on this host. See [occluded replacement binaries](execverb-replacement.md).
+- **`controls`** - read-only. Invokes every `never`, `cannot` and `withhold` rule, then again with each one removed, and fails when a rule does not hold. See [negative controls](negative-controls.md).
 
 ## Vendored sources
 

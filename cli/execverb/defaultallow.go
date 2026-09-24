@@ -112,17 +112,24 @@ func InstallFallback(root *cli.Command, gf *Guardfile, fb *Fallback) {
 		InstallRefusal(root, gf)
 		return
 	}
-	handler := func(ctx context.Context, _ *cli.Command, _ string) {
-		if err := fb.Forward(ctx, os.Args[1:]); err != nil {
+	installForward(root, fb, func() []string { return os.Args[1:] }, func(err error) {
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", gf.label(), err)
-			os.Exit(exitcode.Of(err))
 		}
-		os.Exit(0)
+		os.Exit(exitcode.Of(err))
+	})
+}
+
+// installForward is InstallFallback's open half with argv (read at call time)
+// and the exit injected, so negative controls observe the binary's own path.
+func installForward(root *cli.Command, fb *Fallback, argv func() []string, exit func(error)) {
+	handler := func(ctx context.Context, _ *cli.Command, _ string) {
+		exit(fb.Forward(ctx, argv()))
 	}
 	// A group parses its own flags before it ever reaches CommandNotFound, so a
 	// partially-named group would kill an unnamed sibling's flag on the way in.
 	usage := func(ctx context.Context, _ *cli.Command, _ error, _ bool) error {
-		return fb.Forward(ctx, os.Args[1:])
+		return fb.Forward(ctx, argv())
 	}
 	var walk func(cmds []*cli.Command)
 	walk = func(cmds []*cli.Command) {
