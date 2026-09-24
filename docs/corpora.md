@@ -34,3 +34,10 @@ it: `can run`, `never run`, `withhold`, `deny-flag`, `deny-when`, or `uncovered`
 the default refusal. The run fails when the audit verb or refusal text names another
 line, so a consumer dropping one rule at a time can trust the pairing. Since umbra#8121
 every refusal writes its reject row, so only umbra's own help carries `audit: null`.
+
+The ask-tier set spans eight tools, one corpus and one guardfile each
+(`ask-tier-<tool>`): git, go, cargo, helm, terraform, uv, npm and openssl. Each
+grants only leaf paths, so no `can run` parents another, and refuses real verbs with
+`never run`, never a nested path. `env` sets a corpus offline, and `tool-version`
+pins the real tool's version line: generation refuses a host that differs, and the
+line lands on every row as `tool_version`.

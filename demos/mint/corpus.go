@@ -37,8 +37,13 @@ type Corpus struct {
 	Dir      string
 	Tool     string
 	Requires string
-	Setup    []SetupAction
-	Calls    []Call
+	Env      []string
+	// VersionCmd is run against the real tool, and its first line must equal
+	// Version: a label that moves with an unpinned tool is a different input.
+	VersionCmd []string
+	Version    string
+	Setup      []SetupAction
+	Calls      []Call
 }
 
 // Call is one invocation and the label it carries.
@@ -63,6 +68,7 @@ type Row struct {
 	Build        string    `json:"build"`
 	Generator    string    `json:"generator"`
 	Requires     string    `json:"requires"`
+	ToolVersion  string    `json:"tool_version,omitempty"`
 	Guardfile    string    `json:"guardfile"`
 	GuardfileSHA string    `json:"guardfile_sha256"`
 	Exit         int       `json:"exit"`
@@ -104,6 +110,20 @@ func loadCorpus(dir string) (*Corpus, error) {
 			c.Tool = n.Arg(0).String()
 		case "requires":
 			c.Requires = n.Arg(0).String()
+		case "env":
+			if len(n.Arguments()) != 2 {
+				return nil, fmt.Errorf("%s: `env` takes a name and a value", dir)
+			}
+			c.Env = append(c.Env, n.Arg(0).String()+"="+n.Arg(1).String())
+		case "tool-version":
+			args := n.Arguments()
+			if len(args) < 2 {
+				return nil, fmt.Errorf("%s: `tool-version` takes the version command then the expected first line", dir)
+			}
+			for _, a := range args[:len(args)-1] {
+				c.VersionCmd = append(c.VersionCmd, a.String())
+			}
+			c.Version = args[len(args)-1].String()
 		case "setup":
 			if err := scratch.apply(n); err != nil {
 				return nil, fmt.Errorf("%s: %w", dir, err)
@@ -121,7 +141,7 @@ func loadCorpus(dir string) (*Corpus, error) {
 			}
 			c.Calls = append(c.Calls, call)
 		default:
-			return nil, fmt.Errorf("%s: unknown node %q (tool, requires, setup, call)", dir, n.Name())
+			return nil, fmt.Errorf("%s: unknown node %q (tool, requires, env, tool-version, setup, call)", dir, n.Name())
 		}
 	}
 	c.Setup = scratch.Setup
@@ -161,12 +181,31 @@ func (c *Corpus) validate() error {
 	if len(c.Calls) == 0 {
 		return fmt.Errorf("%s: a corpus needs at least one call", c.Slug)
 	}
+	return nestedGrant(c)
+}
+
+// nestedGrant refuses a `can run` that parents another: removing the child
+// would leave the parent deciding, so the row is not leave-one-out eligible.
+func nestedGrant(c *Corpus) error {
+	var grants []string
+	for _, call := range c.Calls {
+		if kind, arg, _ := parseRule(call.Rule); kind == "can run" && !contains(grants, arg) {
+			grants = append(grants, arg)
+		}
+	}
+	for _, a := range grants {
+		for _, b := range grants {
+			if a != b && strings.HasPrefix(b, a+" ") {
+				return fmt.Errorf("%s: `can run %s` nests `can run %s`; grant the leaf or the parent, not both", c.Slug, a, b)
+			}
+		}
+	}
 	return nil
 }
 
 // demo presents the corpus to the demo workspace, which owns install and setup.
 func (c *Corpus) demo() *Demo {
-	return &Demo{Slug: "corpus-" + c.Slug, Dir: c.Dir, Tool: c.Tool, Formats: []string{"kdl"}, Setup: c.Setup}
+	return &Demo{Slug: "corpus-" + c.Slug, Dir: c.Dir, Tool: c.Tool, Formats: []string{"kdl"}, Setup: c.Setup, Env: c.Env}
 }
 
 // generate runs every call against a fresh install and returns the rows. It refuses
@@ -183,6 +222,10 @@ func generate(demosRoot string, c *Corpus) ([]byte, error) {
 	}
 	if err := exec.Command("git", "-C", repo, "merge-base", "--is-ancestor", c.Requires, "HEAD").Run(); err != nil {
 		return nil, fmt.Errorf("%s: HEAD does not contain required commit %s", c.Slug, c.Requires)
+	}
+	version, err := c.checkVersion()
+	if err != nil {
+		return nil, err
 	}
 	d := c.demo()
 	gfPath := d.Guardfile("kdl")
@@ -224,7 +267,7 @@ func generate(demosRoot string, c *Corpus) ([]byte, error) {
 		row := Row{
 			Corpus: c.Slug, N: i + 1, Call: call.Cmd, Argv: strings.Fields(call.Cmd),
 			Class: call.Class, Expect: call.Expect, Rule: call.Rule, Note: call.Note,
-			Build: build, Generator: gen, Requires: c.Requires,
+			Build: build, Generator: gen, Requires: c.Requires, ToolVersion: version,
 			Guardfile: filepath.Base(gfPath), GuardfileSHA: hex.EncodeToString(sum[:]),
 			Exit: code,
 		}
@@ -313,6 +356,23 @@ func ruleDecided(r Row) error {
 		return fmt.Errorf("rule %q, but the refusal does not say %q", r.Rule, want)
 	}
 	return nil
+}
+
+// checkVersion runs the pinned version command against the real tool, before
+// any shim is on PATH, and refuses a host whose tool differs from the pin.
+func (c *Corpus) checkVersion() (string, error) {
+	if len(c.VersionCmd) == 0 {
+		return "", nil
+	}
+	out, err := exec.Command(c.VersionCmd[0], c.VersionCmd[1:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s: run %s: %w", c.Slug, strings.Join(c.VersionCmd, " "), err)
+	}
+	got := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	if got != c.Version {
+		return "", fmt.Errorf("%s: this host has %q, the corpus pins %q", c.Slug, got, c.Version)
+	}
+	return got, nil
 }
 
 // treeID hashes the committed trees of paths at HEAD, refusing uncommitted

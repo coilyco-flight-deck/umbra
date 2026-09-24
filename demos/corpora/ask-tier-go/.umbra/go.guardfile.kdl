@@ -1,0 +1,39 @@
+description "The go half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus go {
+    exec go
+    replace
+
+    can run "version"
+    can run "env"
+    can run "list"
+    can run "build"
+    can run "vet"
+    can run "test"
+    can run "fmt"
+    can run "doc"
+    can run "mod graph"
+    can run "mod verify"
+    can run "mod tidy"
+    can run "mod why"
+    can run "mod edit"
+    can run "mod download"
+    can run "run"
+    can run "tool"
+    can run "clean"
+    can run "help"
+    can run "fix"
+    can run "generate"
+    can run "telemetry"
+
+    never run "get"
+    never run "install"
+    never run "bug"
+    never run "mod init"
+    never run "mod vendor"
+    never run "work init"
+    never run "work use"
+    never run "work sync"
+    never run "work edit"
+    never run "work vendor"
+}

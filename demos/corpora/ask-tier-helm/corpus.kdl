@@ -1,0 +1,46 @@
+corpus ask-tier-helm {
+    tool helm
+    // umbra#8121: every refusal, stated or uncovered, writes its reject row.
+    requires "0a9d50d6319491624129f506597db7c5ef31cc82"
+    tool-version "helm" "version" "--short" "v4.3.0+gbec5b06"
+    env "HELM_NO_PLUGINS" "0"
+    setup {
+        file "Chart.yaml" "apiVersion: v2\nname: corpus\nversion: 0.1.0\n"
+        file "values.yaml" "greeting: corpus\n"
+        file "templates/cm.yaml" "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: corpus\ndata:\n  greeting: {{ .Values.greeting }}\n"
+    }
+
+    call "helm template ." class=granted expect=accept rule="can run template"
+    call "helm lint ." class=granted expect=accept rule="can run lint"
+    call "helm show chart ." class=granted expect=accept rule="can run show chart"
+    call "helm show values ." class=granted expect=accept rule="can run show values"
+    call "helm show readme ." class=granted expect=accept rule="can run show readme"
+    call "helm show all ." class=granted expect=accept rule="can run show all"
+    call "helm package ." class=granted expect=accept rule="can run package"
+    call "helm create newchart" class=granted expect=accept rule="can run create"
+    call "helm dependency list ." class=granted expect=accept rule="can run dependency list"
+    call "helm version" class=granted expect=accept rule="can run version"
+    call "helm env" class=granted expect=accept rule="can run env"
+    call "helm plugin list" class=granted expect=accept rule="can run plugin list"
+    call "helm repo list" class=granted expect=accept rule="can run repo list"
+    call "helm completion bash" class=granted expect=accept rule="can run completion"
+
+    call "helm install corpus ." class=never expect=reject rule="never run install"
+    call "helm upgrade corpus ." class=never expect=reject rule="never run upgrade"
+    call "helm uninstall corpus" class=never expect=reject rule="never run uninstall"
+    call "helm rollback corpus 1" class=never expect=reject rule="never run rollback"
+    call "helm push corpus-0.1.0.tgz oci://example.invalid" class=never expect=reject rule="never run push"
+    call "helm pull corpus" class=never expect=reject rule="never run pull"
+    call "helm registry login example.invalid" class=never expect=reject rule="never run registry login"
+    call "helm registry logout example.invalid" class=never expect=reject rule="never run registry logout"
+    call "helm repo add corpus https://example.invalid" class=never expect=reject rule="never run repo add"
+    call "helm repo update" class=never expect=reject rule="never run repo update"
+    call "helm repo remove corpus" class=never expect=reject rule="never run repo remove"
+    call "helm plugin install corpus" class=never expect=reject rule="never run plugin install"
+    call "helm plugin uninstall corpus" class=never expect=reject rule="never run plugin uninstall"
+    call "helm dependency update ." class=never expect=reject rule="never run dependency update"
+    call "helm dependency build ." class=never expect=reject rule="never run dependency build"
+    call "helm status corpus" class=never expect=reject rule="never run status"
+    call "helm history corpus" class=never expect=reject rule="never run history"
+    call "helm get values corpus" class=never expect=reject rule="never run get values"
+}

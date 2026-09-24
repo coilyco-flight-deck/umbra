@@ -30,6 +30,7 @@ type Demo struct {
 	Formats []string // the first is the one filmed
 	Setup   []SetupAction
 	Steps   []Step
+	Env     []string // extra `export` lines, e.g. GOPROXY=off for an offline corpus
 }
 
 // Guardfile is the demo's policy in one format.

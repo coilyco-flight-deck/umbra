@@ -1,0 +1,40 @@
+description "The helm half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus helm {
+    exec helm
+    replace
+
+    can run "template"
+    can run "lint"
+    can run "show chart"
+    can run "show values"
+    can run "show readme"
+    can run "show all"
+    can run "package"
+    can run "create"
+    can run "dependency list"
+    can run "version"
+    can run "env"
+    can run "plugin list"
+    can run "repo list"
+    can run "completion"
+
+    never run "install"
+    never run "upgrade"
+    never run "uninstall"
+    never run "rollback"
+    never run "push"
+    never run "pull"
+    never run "registry login"
+    never run "registry logout"
+    never run "repo add"
+    never run "repo update"
+    never run "repo remove"
+    never run "plugin install"
+    never run "plugin uninstall"
+    never run "dependency update"
+    never run "dependency build"
+    never run "status"
+    never run "history"
+    never run "get values"
+}

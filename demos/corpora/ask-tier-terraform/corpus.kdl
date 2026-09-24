@@ -1,0 +1,47 @@
+corpus ask-tier-terraform {
+    tool terraform
+    // umbra#8121: every refusal, stated or uncovered, writes its reject row.
+    requires "0a9d50d6319491624129f506597db7c5ef31cc82"
+    tool-version "terraform" "version" "Terraform v1.15.1"
+    env "TF_IN_AUTOMATION" "1"
+    env "CHECKPOINT_DISABLE" "1"
+    env "TF_INPUT" "0"
+    setup {
+        file "main.tf" "locals {\n  greeting = \"corpus\"\n}\n\noutput \"greeting\" {\n  value = local.greeting\n}\n"
+    }
+
+    call "terraform init" class=granted expect=accept rule="can run init"
+    call "terraform fmt" class=granted expect=accept rule="can run fmt"
+    call "terraform validate" class=granted expect=accept rule="can run validate"
+    call "terraform version" class=granted expect=accept rule="can run version"
+    call "terraform providers" class=granted expect=accept rule="can run providers"
+    call "terraform graph" class=granted expect=accept rule="can run graph"
+    call "terraform plan" class=granted expect=accept rule="can run plan"
+    call "terraform apply -auto-approve" class=granted expect=accept rule="can run apply"
+    call "terraform output" class=granted expect=accept rule="can run output"
+    call "terraform show" class=granted expect=accept rule="can run show"
+    call "terraform state list" class=granted expect=accept rule="can run state list"
+    call "terraform workspace list" class=granted expect=accept rule="can run workspace list"
+    call "terraform workspace show" class=granted expect=accept rule="can run workspace show"
+    call "terraform console -help" class=granted expect=accept rule="can run console"
+    call "terraform get" class=granted expect=accept rule="can run get"
+    call "terraform refresh" class=granted expect=accept rule="can run refresh"
+    call "terraform test" class=granted expect=accept rule="can run test"
+    call "terraform metadata functions -json" class=granted expect=accept rule="can run metadata functions"
+
+    call "terraform destroy -auto-approve" class=never expect=reject rule="never run destroy"
+    call "terraform import aws_instance.x i-0" class=never expect=reject rule="never run import"
+    call "terraform taint aws_instance.x" class=never expect=reject rule="never run taint"
+    call "terraform untaint aws_instance.x" class=never expect=reject rule="never run untaint"
+    call "terraform force-unlock 0" class=never expect=reject rule="never run force-unlock"
+    call "terraform login" class=never expect=reject rule="never run login"
+    call "terraform logout" class=never expect=reject rule="never run logout"
+    call "terraform state rm local.greeting" class=never expect=reject rule="never run state rm"
+    call "terraform state mv a b" class=never expect=reject rule="never run state mv"
+    call "terraform state push other.tfstate" class=never expect=reject rule="never run state push"
+    call "terraform state pull" class=never expect=reject rule="never run state pull"
+    call "terraform state replace-provider a b" class=never expect=reject rule="never run state replace-provider"
+    call "terraform workspace new other" class=never expect=reject rule="never run workspace new"
+    call "terraform workspace delete other" class=never expect=reject rule="never run workspace delete"
+    call "terraform workspace select other" class=never expect=reject rule="never run workspace select"
+}

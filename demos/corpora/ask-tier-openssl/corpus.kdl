@@ -1,0 +1,42 @@
+corpus ask-tier-openssl {
+    tool openssl
+    // umbra#8121: every refusal, stated or uncovered, writes its reject row.
+    requires "0a9d50d6319491624129f506597db7c5ef31cc82"
+    tool-version "openssl" "version" "LibreSSL 3.3.6"
+    setup {
+        file "data.txt" "corpus\n"
+    }
+
+    call "openssl genrsa -out key.pem 2048" class=granted expect=accept rule="can run genrsa"
+    call "openssl version" class=granted expect=accept rule="can run version"
+    call "openssl dgst -sha256 data.txt" class=granted expect=accept rule="can run dgst"
+    call "openssl rand -hex 8" class=granted expect=accept rule="can run rand"
+    call "openssl enc -base64 -in data.txt" class=granted expect=accept rule="can run enc"
+    call "openssl rsa -in key.pem -noout" class=granted expect=accept rule="can run rsa"
+    call "openssl pkey -in key.pem -noout" class=granted expect=accept rule="can run pkey"
+    call "openssl req -new -key key.pem -subj /CN=corpus" class=granted expect=accept rule="can run req"
+    call "openssl ciphers" class=granted expect=accept rule="can run ciphers"
+    call "openssl prime 13" class=granted expect=accept rule="can run prime"
+    call "openssl base64 -in data.txt" class=granted expect=accept rule="can run base64"
+    call "openssl errstr 0" class=granted expect=accept rule="can run errstr"
+    call "openssl passwd -1 corpus" class=granted expect=accept rule="can run passwd"
+    call "openssl sha256 data.txt" class=granted expect=accept rule="can run sha256"
+    call "openssl md5 data.txt" class=granted expect=accept rule="can run md5"
+
+    call "openssl s_client -connect example.invalid:443" class=never expect=reject rule="never run s_client"
+    call "openssl s_server -accept 4433" class=never expect=reject rule="never run s_server"
+    call "openssl s_time -connect example.invalid:443" class=never expect=reject rule="never run s_time"
+    call "openssl ca -in req.pem" class=never expect=reject rule="never run ca"
+    call "openssl ocsp -url http://example.invalid" class=never expect=reject rule="never run ocsp"
+    call "openssl x509 -in cert.pem" class=never expect=reject rule="never run x509"
+    call "openssl genpkey -algorithm RSA" class=never expect=reject rule="never run genpkey"
+    call "openssl ec -in key.pem" class=never expect=reject rule="never run ec"
+    call "openssl dhparam 2048" class=never expect=reject rule="never run dhparam"
+    call "openssl pkcs12 -export -in cert.pem" class=never expect=reject rule="never run pkcs12"
+    call "openssl smime -sign -in data.txt" class=never expect=reject rule="never run smime"
+    call "openssl verify cert.pem" class=never expect=reject rule="never run verify"
+    call "openssl crl -in crl.pem" class=never expect=reject rule="never run crl"
+    call "openssl ts -query -data data.txt" class=never expect=reject rule="never run ts"
+    call "openssl spkac -key key.pem" class=never expect=reject rule="never run spkac"
+    call "openssl speed rsa2048" class=never expect=reject rule="never run speed"
+}

@@ -30,6 +30,7 @@ func TestLoadCorpusRejectsBadCalls(t *testing.T) {
 		"duplicate":      {"call \"git log\" class=granted expect=accept rule=\"can run log\"\n    call \"git log\" class=granted expect=accept rule=\"can run log\"", "twice"},
 		"no rule":        {`call "git log" class=granted expect=accept`, "names no rule"},
 		"unknown rule":   {`call "git log" class=granted expect=accept rule="allow log"`, "is not `uncovered`"},
+		"nested grant":   {"call \"git mod\" class=granted expect=accept rule=\"can run mod\"\n    call \"git mod tidy\" class=granted expect=accept rule=\"can run mod tidy\"", "nests"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := writeCorpus(t, "corpus sample {\n    tool git\n    requires \"abc\"\n    "+tc.call+"\n}\n")
@@ -78,5 +79,17 @@ func TestRuleDecidedChecksTheObservedOutcome(t *testing.T) {
 		if err := ruleDecided(tc.row); (err == nil) != tc.ok {
 			t.Errorf("%s: ruleDecided = %v, want ok=%v", name, err, tc.ok)
 		}
+	}
+}
+
+// A pinned tool whose host version differs refuses to generate at all.
+func TestCheckVersionRefusesADifferentHost(t *testing.T) {
+	c := &Corpus{Slug: "s", VersionCmd: []string{"echo", "tool 1.2.3"}, Version: "tool 1.2.3"}
+	if got, err := c.checkVersion(); err != nil || got != "tool 1.2.3" {
+		t.Fatalf("matching pin = %q, %v", got, err)
+	}
+	c.Version = "tool 9.9.9"
+	if _, err := c.checkVersion(); err == nil || !strings.Contains(err.Error(), "pins") {
+		t.Fatalf("mismatched pin err = %v, want a refusal naming the pin", err)
 	}
 }

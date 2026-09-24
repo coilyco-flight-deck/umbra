@@ -1,0 +1,39 @@
+description "The openssl half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus openssl {
+    exec openssl
+    replace
+
+    can run "genrsa"
+    can run "version"
+    can run "dgst"
+    can run "rand"
+    can run "enc"
+    can run "rsa"
+    can run "pkey"
+    can run "req"
+    can run "ciphers"
+    can run "prime"
+    can run "base64"
+    can run "errstr"
+    can run "passwd"
+    can run "sha256"
+    can run "md5"
+
+    never run "s_client"
+    never run "s_server"
+    never run "s_time"
+    never run "ca"
+    never run "ocsp"
+    never run "x509"
+    never run "genpkey"
+    never run "ec"
+    never run "dhparam"
+    never run "pkcs12"
+    never run "smime"
+    never run "verify"
+    never run "crl"
+    never run "ts"
+    never run "spkac"
+    never run "speed"
+}

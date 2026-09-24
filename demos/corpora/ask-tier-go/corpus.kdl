@@ -1,0 +1,48 @@
+corpus ask-tier-go {
+    tool go
+    // umbra#8121: every refusal, stated or uncovered, writes its reject row.
+    requires "0a9d50d6319491624129f506597db7c5ef31cc82"
+    tool-version "go" "version" "go version go1.27.1 darwin/arm64"
+    env "GOPROXY" "off"
+    env "GOFLAGS" "-mod=mod"
+    env "GOTOOLCHAIN" "local"
+    env "GOTELEMETRY" "off"
+    setup {
+        file "go.mod" "module example.invalid/corpus\n\ngo 1.27\n"
+        file "main.go" "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"corpus\") }\n"
+        file "main_test.go" "package main\n\nimport \"testing\"\n\nfunc TestCorpus(t *testing.T) {}\n"
+    }
+
+    call "go version" class=granted expect=accept rule="can run version"
+    call "go env GOOS" class=granted expect=accept rule="can run env"
+    call "go list" class=granted expect=accept rule="can run list"
+    call "go build" class=granted expect=accept rule="can run build"
+    call "go vet" class=granted expect=accept rule="can run vet"
+    call "go test" class=granted expect=accept rule="can run test"
+    call "go fmt" class=granted expect=accept rule="can run fmt"
+    call "go doc fmt" class=granted expect=accept rule="can run doc"
+    call "go mod graph" class=granted expect=accept rule="can run mod graph"
+    call "go mod verify" class=granted expect=accept rule="can run mod verify"
+    call "go mod tidy" class=granted expect=accept rule="can run mod tidy"
+    call "go mod why" class=granted expect=accept rule="can run mod why"
+    call "go mod edit -json" class=granted expect=accept rule="can run mod edit"
+    call "go mod download" class=granted expect=accept rule="can run mod download"
+    call "go run ." class=granted expect=accept rule="can run run"
+    call "go tool" class=granted expect=accept rule="can run tool"
+    call "go clean" class=granted expect=accept rule="can run clean"
+    call "go help" class=granted expect=accept rule="can run help"
+    call "go fix" class=granted expect=accept rule="can run fix"
+    call "go generate" class=granted expect=accept rule="can run generate"
+    call "go telemetry" class=granted expect=accept rule="can run telemetry"
+
+    call "go get example.invalid/x" class=never expect=reject rule="never run get"
+    call "go install ./..." class=never expect=reject rule="never run install"
+    call "go bug" class=never expect=reject rule="never run bug"
+    call "go mod init example.invalid/y" class=never expect=reject rule="never run mod init"
+    call "go mod vendor" class=never expect=reject rule="never run mod vendor"
+    call "go work init" class=never expect=reject rule="never run work init"
+    call "go work use ." class=never expect=reject rule="never run work use"
+    call "go work sync" class=never expect=reject rule="never run work sync"
+    call "go work edit -json" class=never expect=reject rule="never run work edit"
+    call "go work vendor" class=never expect=reject rule="never run work vendor"
+}

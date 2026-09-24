@@ -1,0 +1,43 @@
+description "The uv half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus uv {
+    exec uv
+    replace
+
+    can run "version"
+    can run "lock"
+    can run "sync"
+    can run "tree"
+    can run "pip list"
+    can run "pip freeze"
+    can run "pip check"
+    can run "python list"
+    can run "python find"
+    can run "run"
+    can run "cache dir"
+    can run "tool list"
+    can run "tool dir"
+    can run "export"
+    can run "build"
+    can run "self version"
+    can run "help"
+    can run "add"
+
+    never run "publish"
+    never run "pip install"
+    never run "pip uninstall"
+    never run "pip sync"
+    never run "tool install"
+    never run "tool uninstall"
+    never run "tool upgrade"
+    never run "tool run"
+    never run "python install"
+    never run "python uninstall"
+    never run "python pin"
+    never run "self update"
+    never run "remove"
+    never run "init"
+    never run "venv"
+    never run "cache clean"
+    never run "cache prune"
+}

@@ -1,0 +1,41 @@
+description "The terraform half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus terraform {
+    exec terraform
+    replace
+
+    can run "init"
+    can run "fmt"
+    can run "validate"
+    can run "version"
+    can run "providers"
+    can run "graph"
+    can run "plan"
+    can run "apply"
+    can run "output"
+    can run "show"
+    can run "state list"
+    can run "workspace list"
+    can run "workspace show"
+    can run "console"
+    can run "get"
+    can run "refresh"
+    can run "test"
+    can run "metadata functions"
+
+    never run "destroy"
+    never run "import"
+    never run "taint"
+    never run "untaint"
+    never run "force-unlock"
+    never run "login"
+    never run "logout"
+    never run "state rm"
+    never run "state mv"
+    never run "state push"
+    never run "state pull"
+    never run "state replace-provider"
+    never run "workspace new"
+    never run "workspace delete"
+    never run "workspace select"
+}

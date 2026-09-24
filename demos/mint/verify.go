@@ -65,7 +65,7 @@ func newWorkspace(demosRoot, slug string) (workspace, error) {
 	return w, os.MkdirAll(w.root, 0o755)
 }
 
-func (w workspace) writeEnv(format string) error {
+func (w workspace) writeEnv(format string, extra []string) error {
 	env := fmt.Sprintf(`export PATH=%q:"$PATH"
 export HOME=%q
 export PS1='$ '
@@ -76,6 +76,9 @@ export GIT_COMMITTER_NAME=demo GIT_COMMITTER_EMAIL=demo@example.invalid
 export GIT_CONFIG_NOSYSTEM=1
 cd %q
 `, w.dir("shims", format), w.dir("home", format), w.dir("fixture", format))
+	for _, kv := range extra {
+		env += "export " + kv + "\n"
+	}
 	return os.WriteFile(w.envFile(format), []byte(env), 0o644)
 }
 
@@ -174,7 +177,7 @@ func (w workspace) prepare(demosRoot, bin string, d *Demo, format string) error 
 	if err := w.setup(d, format); err != nil {
 		return err
 	}
-	return w.writeEnv(format)
+	return w.writeEnv(format, d.Env)
 }
 
 // check holds the filmed format's transcript to the manifest and the frame.

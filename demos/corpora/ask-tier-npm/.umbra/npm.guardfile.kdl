@@ -1,0 +1,43 @@
+description "The npm half of the ask-tier corpus: one grant per accepted call, one never per refused verb, nothing nested."
+
+wrap corpus npm {
+    exec npm
+    replace
+
+    can run "ls"
+    can run "pack"
+    can run "config list"
+    can run "run"
+    can run "test"
+    can run "start"
+    can run "help"
+    can run "prefix"
+    can run "root"
+    can run "query"
+    can run "pkg get"
+    can run "version"
+    can run "fund"
+    can run "exec"
+    can run "cache verify"
+
+    never run "install"
+    never run "ci"
+    never run "publish"
+    never run "unpublish"
+    never run "deprecate"
+    never run "login"
+    never run "logout"
+    never run "adduser"
+    never run "dist-tag add"
+    never run "owner add"
+    never run "audit"
+    never run "update"
+    never run "uninstall"
+    never run "link"
+    never run "cache clean"
+    never run "config set"
+    never run "pkg set"
+    never run "token create"
+    never run "outdated"
+    never run "search"
+}
